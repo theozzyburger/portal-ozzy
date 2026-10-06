@@ -37,7 +37,7 @@ export function Cartao({ children, className = '', onClick }: { children: ReactN
   return (
     <Tag
       onClick={onClick}
-      className={`block w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-200 ${onClick ? 'transition hover:ring-ozzy-400 active:scale-[0.99]' : ''} ${className}`}
+      className={`block w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 ring-stone-200 ${onClick ? 'transition hover:ring-carvao active:scale-[0.99]' : ''} ${className}`}
     >
       {children}
     </Tag>
@@ -47,7 +47,7 @@ export function Cartao({ children, className = '', onClick }: { children: ReactN
 export function Selo({ children, cor = 'cinza' }: { children: ReactNode; cor?: 'cinza' | 'ambar' | 'verde' | 'vermelho' | 'azul' }) {
   const c = {
     cinza: 'bg-stone-100 text-stone-700',
-    ambar: 'bg-ozzy-100 text-ozzy-700',
+    ambar: 'bg-ozzy-400 text-carvao',
     verde: 'bg-emerald-50 text-emerald-700',
     vermelho: 'bg-red-50 text-red-700',
     azul: 'bg-sky-50 text-sky-700',
@@ -100,7 +100,7 @@ export function Avatar({ nome, tamanho = 40 }: { nome: string; tamanho?: number 
   const iniciais = nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-ozzy-100 font-bold text-ozzy-700"
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-carvao font-semibold text-ozzy-400"
       style={{ width: tamanho, height: tamanho, fontSize: tamanho * 0.38 }}
     >
       {iniciais}

@@ -90,7 +90,7 @@ function Organograma({ pessoas }: { pessoas: Funcionario[] }) {
 
   const No = ({ p, nivel }: { p: Funcionario; nivel: number }) => (
     <div className={nivel > 0 ? 'ml-4 border-l-2 border-stone-200 pl-4 sm:ml-6 sm:pl-6' : ''}>
-      <button onClick={() => ir('rh/equipe/' + p.id)} className="my-1.5 flex w-full max-w-sm items-center gap-3 rounded-xl bg-white p-2.5 text-left ring-1 ring-stone-200 hover:ring-ozzy-400">
+      <button onClick={() => ir('rh/equipe/' + p.id)} className="my-1.5 flex w-full max-w-sm items-center gap-3 rounded-xl bg-white p-2.5 text-left ring-1 ring-stone-200 hover:ring-carvao">
         <Avatar nome={p.nome} tamanho={32} />
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{p.nome}</div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao, Campo, estiloEntrada } from '../components/ui'
+import logo from '../assets/logo.png'
 import { SENHA_DEMO, criarDemoStore } from '../lib/demoStore'
 import type { Store } from '../lib/store'
 import { nomeNivel, type Funcionario } from '../lib/types'
@@ -29,8 +30,8 @@ export default function Login({ store, aoEntrar }: { store: Store; aoEntrar: (f:
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-carvao px-4 py-10">
       <div className="mb-8 text-center">
-        <div className="text-3xl font-black tracking-[0.2em] text-ozzy-400">THE OZZY</div>
-        <div className="mt-1 text-sm text-stone-400">Portal do Funcionário</div>
+        <img src={logo} alt="The Ozzy Burger" className="mx-auto h-36 w-36" />
+        <div className="rotulo-marca mt-4 text-xs text-ozzy-400">Portal do Funcionário</div>
       </div>
 
       <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6">

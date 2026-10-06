@@ -35,7 +35,7 @@ export default function Comunicados() {
           const alvo = publico(c)
           const leram = alvo.filter((f) => c.lidoPor.includes(f.id)).length
           return (
-            <Cartao key={c.id} className={lido ? '' : 'ring-2! ring-ozzy-400!'}>
+            <Cartao key={c.id} className={lido ? '' : 'ring-2! ring-carvao!'}>
               <div className="flex flex-wrap items-center gap-2">
                 <Selo cor={c.unidadeId ? 'azul' : 'cinza'}>{nomeUnidade(c.unidadeId)}</Selo>
                 {!lido && <Selo cor="ambar">Novo</Selo>}

@@ -63,7 +63,7 @@ export default function Inicio() {
       {gestao && <PainelGestao totalAtivos={equipe.filter((f) => f.status === 'ativo').length} />}
 
       <section>
-        <Titulo acao={<button onClick={() => ir('rh/avisos')} className="text-sm font-semibold text-ozzy-700">Ver todos</button>}>
+        <Titulo acao={<button onClick={() => ir('rh/avisos')} className="text-sm font-semibold text-carvao underline decoration-ozzy-500 decoration-2 underline-offset-4">Ver todos</button>}>
           Últimos avisos
         </Titulo>
         <div className="space-y-2">
@@ -91,7 +91,7 @@ export default function Inicio() {
               <button
                 key={m.id}
                 onClick={() => ir(m.id === 'rh' ? 'rh/avisos' : m.id)}
-                className="flex flex-col items-start gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-ozzy-400"
+                className="flex flex-col items-start gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-carvao"
               >
                 <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${m.pronto ? 'bg-carvao text-ozzy-400' : 'bg-stone-100 text-stone-500'}`}>
                   <Icone nome={m.id} />

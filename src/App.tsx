@@ -14,6 +14,7 @@ import Equipe from './pages/Equipe'
 import Perfil from './pages/Perfil'
 import EmBreve from './pages/EmBreve'
 import Icone from './components/Icone'
+import logo from './assets/logo.png'
 import { modulosVisiveis } from './lib/modulos'
 
 const URL_SB = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -92,9 +93,12 @@ function Casca({ aoSair }: { aoSair: () => void }) {
 
   const menu = (
     <nav className="flex h-full flex-col bg-carvao text-stone-300">
-      <button onClick={() => ir('inicio')} className="px-5 pt-5 pb-1 text-left">
-        <div className="text-lg font-black tracking-[0.2em] text-ozzy-400">THE OZZY</div>
-        <div className="text-xs text-stone-500">Portal interno</div>
+      <button onClick={() => ir('inicio')} className="flex items-center gap-3 px-5 pt-5 pb-1 text-left">
+        <img src={logo} alt="The Ozzy" className="h-14 w-14" />
+        <div>
+          <div className="text-[15px] font-light tracking-[0.25em] text-white">THE OZZY</div>
+          <div className="rotulo-marca text-[10px] text-ozzy-400">Portal interno</div>
+        </div>
       </button>
       <div className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
         {modulos.map((m) => {
@@ -154,7 +158,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
           <button onClick={() => setMenuAberto(true)} className="-ml-1 rounded-lg p-1.5 text-stone-700 hover:bg-stone-100" aria-label="Abrir menu">
             <Icone nome="menu" tamanho={22} />
           </button>
-          <span className="rounded-lg bg-carvao px-2 py-1 text-xs font-black tracking-widest text-ozzy-400">THE OZZY</span>
+          <img src={logo} alt="The Ozzy" className="h-8 w-8" />
           <span className="flex-1 truncate text-sm font-semibold text-stone-600">{modulo.id === 'inicio' ? '' : modulo.nome}</span>
         </div>
       </header>

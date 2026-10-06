@@ -89,7 +89,7 @@ export default function Escala() {
                           onClick={() => alternar(p.id, d)}
                           className={`h-9 w-full min-w-11 rounded-lg text-xs font-bold transition ${
                             folga ? 'bg-ozzy-500 text-carvao' : 'bg-stone-50 text-stone-300'
-                          } ${gestao ? 'hover:ring-2 hover:ring-ozzy-400' : 'cursor-default'}`}
+                          } ${gestao ? 'hover:ring-2 hover:ring-carvao' : 'cursor-default'}`}
                         >
                           {folga ? 'FOLGA' : '·'}
                         </button>

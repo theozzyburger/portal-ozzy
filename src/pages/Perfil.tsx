@@ -266,7 +266,7 @@ function EnviarDocumento({ aberto, funcionarioId, aoFechar, aoEnviar }: { aberto
         </Campo>
         <Campo rotulo="Foto ou arquivo" dica="Pode tirar foto na hora. Confira se está legível.">
           <input
-            className={`${estiloEntrada} file:mr-3 file:rounded-lg file:border-0 file:bg-ozzy-100 file:px-3 file:py-1.5 file:font-semibold file:text-ozzy-700`}
+            className={`${estiloEntrada} file:mr-3 file:rounded-lg file:border-0 file:bg-ozzy-400 file:px-3 file:py-1.5 file:font-semibold file:text-carvao`}
             type="file"
             accept="image/*,application/pdf"
             onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
