@@ -60,7 +60,7 @@ export default function Equipe() {
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">
           {filtrados.map((f) => (
-            <Cartao key={f.id} onClick={() => ir('equipe/' + f.id)}>
+            <Cartao key={f.id} className="min-w-0" onClick={() => ir('rh/equipe/' + f.id)}>
               <div className="flex items-center gap-3">
                 <Avatar nome={f.nome} />
                 <div className="min-w-0 flex-1">
@@ -90,7 +90,7 @@ function Organograma({ pessoas }: { pessoas: Funcionario[] }) {
 
   const No = ({ p, nivel }: { p: Funcionario; nivel: number }) => (
     <div className={nivel > 0 ? 'ml-4 border-l-2 border-stone-200 pl-4 sm:ml-6 sm:pl-6' : ''}>
-      <button onClick={() => ir('equipe/' + p.id)} className="my-1.5 flex w-full max-w-sm items-center gap-3 rounded-xl bg-white p-2.5 text-left ring-1 ring-stone-200 hover:ring-ozzy-400">
+      <button onClick={() => ir('rh/equipe/' + p.id)} className="my-1.5 flex w-full max-w-sm items-center gap-3 rounded-xl bg-white p-2.5 text-left ring-1 ring-stone-200 hover:ring-ozzy-400">
         <Avatar nome={p.nome} tamanho={32} />
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{p.nome}</div>

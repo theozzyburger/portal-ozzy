@@ -40,7 +40,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
       await recarregarEquipe()
       avisar(existente ? 'Cadastro atualizado' : 'Funcionário cadastrado')
       aoFechar()
-      if (!existente) ir('equipe/' + salvo.id)
+      if (!existente) ir('rh/equipe/' + salvo.id)
     } catch (err) {
       setErro((err as Error).message)
     } finally {

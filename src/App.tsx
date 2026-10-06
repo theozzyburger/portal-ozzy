@@ -12,6 +12,9 @@ import Comunicados from './pages/Comunicados'
 import Escala from './pages/Escala'
 import Equipe from './pages/Equipe'
 import Perfil from './pages/Perfil'
+import EmBreve from './pages/EmBreve'
+import Icone from './components/Icone'
+import { modulosVisiveis } from './lib/modulos'
 
 const URL_SB = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const CHAVE_SB = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
@@ -61,78 +64,130 @@ function useRota() {
 
 function Casca({ aoSair }: { aoSair: () => void }) {
   const { eu, nomeUnidade, store } = useApp()
-  const [pagina = 'inicio', param] = useRota()
+  const [area = 'inicio', sub, param] = useRota()
+  const [menuAberto, setMenuAberto] = useState(false)
+  const modulos = modulosVisiveis(eu.nivel)
+  const modulo = modulos.find((m) => m.id === area) ?? modulos[0]
 
-  const abas = [
-    { id: 'inicio', nome: 'Início', icone: '⌂' },
-    { id: 'comunicados', nome: 'Avisos', icone: '✉' },
-    { id: 'escala', nome: 'Folgas', icone: '▦' },
-    ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe', icone: '☰' }] : []),
-    { id: 'eu', nome: 'Meu perfil', icone: '◉' },
+  useEffect(() => setMenuAberto(false), [area, sub])
+
+  const abasRh = [
+    { id: 'avisos', nome: 'Avisos' },
+    { id: 'folgas', nome: 'Folgas' },
+    ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe' }] : []),
+    { id: 'ponto', nome: 'Ponto', emBreve: true },
+    { id: 'perfil', nome: 'Meu perfil' },
   ]
+  const abaRh = abasRh.find((a) => a.id === sub)?.id ?? 'avisos'
 
   let conteudo
-  if (pagina === 'comunicados') conteudo = <Comunicados />
-  else if (pagina === 'escala') conteudo = <Escala />
-  else if (pagina === 'equipe' && param) conteudo = <Perfil funcionarioId={param} />
-  else if (pagina === 'equipe' && podeVerEquipe(eu.nivel)) conteudo = <Equipe />
-  else if (pagina === 'eu') conteudo = <Perfil funcionarioId={eu.id} />
-  else conteudo = <Inicio />
+  if (modulo.id === 'inicio') conteudo = <Inicio />
+  else if (modulo.id !== 'rh') conteudo = <EmBreve modulo={modulo} />
+  else if (abaRh === 'folgas') conteudo = <Escala />
+  else if (abaRh === 'equipe' && param) conteudo = <Perfil funcionarioId={param} />
+  else if (abaRh === 'equipe') conteudo = <Equipe />
+  else if (abaRh === 'ponto') conteudo = <EmBreve modulo={PONTO} />
+  else if (abaRh === 'perfil') conteudo = <Perfil funcionarioId={eu.id} />
+  else conteudo = <Comunicados />
+
+  const menu = (
+    <nav className="flex h-full flex-col bg-carvao text-stone-300">
+      <button onClick={() => ir('inicio')} className="px-5 pt-5 pb-1 text-left">
+        <div className="text-lg font-black tracking-[0.2em] text-ozzy-400">THE OZZY</div>
+        <div className="text-xs text-stone-500">Portal interno</div>
+      </button>
+      <div className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+        {modulos.map((m) => {
+          const ativo = m.id === modulo.id
+          return (
+            <button
+              key={m.id}
+              onClick={() => ir(m.id === 'rh' ? 'rh/avisos' : m.id)}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                ativo ? 'bg-ozzy-500 text-carvao' : 'hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Icone nome={m.id} />
+              <span className="flex-1">{m.nome}</span>
+              {!m.pronto && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${ativo ? 'bg-carvao/15' : 'bg-white/10 text-stone-400'}`}>
+                  em breve
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div className="border-t border-white/10 px-5 py-4">
+        <div className="text-sm font-semibold text-white">{eu.nome}</div>
+        <div className="text-xs text-stone-400">
+          {nomeNivel(eu.nivel)} · {nomeUnidade(eu.unidadeId)}
+        </div>
+        <button onClick={aoSair} className="mt-2 text-xs font-semibold text-stone-400 hover:text-white">
+          Sair
+        </button>
+      </div>
+    </nav>
+  )
 
   return (
-    <div className="min-h-full pb-24 sm:pb-8">
+    <div className="min-h-full lg:pl-64">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 lg:block">{menu}</aside>
+
+      {menuAberto && (
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setMenuAberto(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw] pt-[env(safe-area-inset-top)]" onClick={(e) => e.stopPropagation()}>
+            {menu}
+          </aside>
+        </div>
+      )}
+
       {store.modo === 'demo' && (
         <div className="bg-ozzy-500 px-4 py-1.5 text-center text-xs font-semibold text-carvao">
           Modo demonstração: dados de exemplo, nada é salvo de verdade
         </div>
       )}
-      <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <button onClick={() => ir('inicio')} className="flex items-center gap-2">
-            <span className="rounded-lg bg-carvao px-2 py-1 text-xs font-black tracking-widest text-ozzy-400">THE OZZY</span>
-            <span className="hidden text-sm font-semibold text-stone-500 sm:inline">Portal do Funcionário</span>
+
+      <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur lg:hidden">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <button onClick={() => setMenuAberto(true)} className="-ml-1 rounded-lg p-1.5 text-stone-700 hover:bg-stone-100" aria-label="Abrir menu">
+            <Icone nome="menu" tamanho={22} />
           </button>
-          <nav className="hidden gap-1 sm:flex">
-            {abas.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => ir(a.id)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${pagina === a.id ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
-              >
-                {a.nome}
-              </button>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2 text-right">
-            <div className="leading-tight">
-              <div className="text-sm font-semibold">{eu.nome.split(' ')[0]}</div>
-              <div className="text-[11px] text-stone-500">
-                {nomeNivel(eu.nivel)} · {nomeUnidade(eu.unidadeId).replace('The Ozzy ', '')}
-              </div>
-            </div>
-            <button onClick={aoSair} className="rounded-lg px-2 py-1 text-xs font-semibold text-stone-500 hover:bg-stone-100">
-              Sair
-            </button>
-          </div>
+          <span className="rounded-lg bg-carvao px-2 py-1 text-xs font-black tracking-widest text-ozzy-400">THE OZZY</span>
+          <span className="flex-1 truncate text-sm font-semibold text-stone-600">{modulo.id === 'inicio' ? '' : modulo.nome}</span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-5">{conteudo}</main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white pb-[env(safe-area-inset-bottom)] sm:hidden">
-        <div className="flex">
-          {abas.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => ir(a.id)}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${pagina === a.id ? 'text-ozzy-600' : 'text-stone-500'}`}
-            >
-              <span className="text-lg leading-none">{a.icone}</span>
-              {a.nome}
-            </button>
-          ))}
+      {modulo.id === 'rh' && (
+        <div className="sticky top-[57px] z-20 border-b border-stone-200 bg-[#f6f5f3]/95 backdrop-blur lg:top-0">
+          <div className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-4 py-2">
+            <span className="mr-2 hidden text-sm font-bold lg:inline">RH</span>
+            {abasRh.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => ir('rh/' + a.id)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                  abaRh === a.id ? 'bg-carvao text-white' : 'text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                {a.nome}
+                {'emBreve' in a && <span className="h-1.5 w-1.5 rounded-full bg-ozzy-500" title="Em breve" />}
+              </button>
+            ))}
+          </div>
         </div>
-      </nav>
+      )}
+
+      <main className="mx-auto max-w-5xl px-4 py-5 pb-12">{conteudo}</main>
     </div>
   )
+}
+
+const PONTO = {
+  id: 'rh' as const,
+  nome: 'Ponto',
+  resumo: 'Batidas do relógio Control iD dentro do portal.',
+  itens: ['Espelho de ponto de cada funcionário', 'Atrasos e faltas cruzados com atestados', 'Cada pessoa vê o próprio ponto pelo celular'],
+  origem: 'Primeiro por importação do relatório do Control iD; depois, se o seu modelo permitir, direto pela API.',
 }

@@ -50,7 +50,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   return (
     <div className="space-y-5">
       {!souEu && podeVerEquipe(eu.nivel) && (
-        <button onClick={() => ir('equipe')} className="text-sm font-semibold text-stone-500">
+        <button onClick={() => ir('rh/equipe')} className="text-sm font-semibold text-stone-500">
           ‹ Equipe
         </button>
       )}

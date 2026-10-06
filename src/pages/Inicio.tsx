@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Cartao, Selo, Titulo } from '../components/ui'
+import Icone from '../components/Icone'
+import { modulosVisiveis } from '../lib/modulos'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana, tempoDesde } from '../lib/datas'
 import { podeGerenciar } from '../lib/permissoes'
@@ -31,11 +33,11 @@ export default function Inicio() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Cartao onClick={() => ir('comunicados')}>
+        <Cartao onClick={() => ir('rh/avisos')}>
           <div className="text-sm text-stone-500">Avisos não lidos</div>
           <div className="mt-1 text-3xl font-bold">{naoLidos.length}</div>
         </Cartao>
-        <Cartao onClick={() => ir('escala')}>
+        <Cartao onClick={() => ir('rh/folgas')}>
           <div className="text-sm text-stone-500">Minhas próximas folgas</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {minhasFolgas.filter((f) => f.data >= hoje()).length === 0 ? (
@@ -52,7 +54,7 @@ export default function Inicio() {
             )}
           </div>
         </Cartao>
-        <Cartao onClick={() => ir('eu')} className="bg-carvao! text-white ring-0!">
+        <Cartao onClick={() => ir('rh/perfil')} className="bg-carvao! text-white ring-0!">
           <div className="text-sm text-stone-300">Mandou atestado?</div>
           <div className="mt-1 font-semibold text-ozzy-400">Enviar documento ›</div>
         </Cartao>
@@ -61,12 +63,12 @@ export default function Inicio() {
       {gestao && <PainelGestao totalAtivos={equipe.filter((f) => f.status === 'ativo').length} />}
 
       <section>
-        <Titulo acao={<button onClick={() => ir('comunicados')} className="text-sm font-semibold text-ozzy-700">Ver todos</button>}>
+        <Titulo acao={<button onClick={() => ir('rh/avisos')} className="text-sm font-semibold text-ozzy-700">Ver todos</button>}>
           Últimos avisos
         </Titulo>
         <div className="space-y-2">
           {comunicados.slice(0, 3).map((c) => (
-            <Cartao key={c.id} onClick={() => ir('comunicados')}>
+            <Cartao key={c.id} onClick={() => ir('rh/avisos')}>
               <div className="flex items-start justify-between gap-2">
                 <div className="font-semibold">{c.titulo}</div>
                 {!c.lidoPor.includes(eu.id) && <Selo cor="ambar">Novo</Selo>}
@@ -77,6 +79,27 @@ export default function Inicio() {
               </div>
             </Cartao>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <Titulo>Áreas do portal</Titulo>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {modulosVisiveis(eu.nivel)
+            .filter((m) => m.id !== 'inicio')
+            .map((m) => (
+              <button
+                key={m.id}
+                onClick={() => ir(m.id === 'rh' ? 'rh/avisos' : m.id)}
+                className="flex flex-col items-start gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-stone-200 transition hover:ring-ozzy-400"
+              >
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${m.pronto ? 'bg-carvao text-ozzy-400' : 'bg-stone-100 text-stone-500'}`}>
+                  <Icone nome={m.id} />
+                </span>
+                <span className="text-sm font-semibold">{m.nome}</span>
+                {m.pronto ? <Selo cor="verde">Disponível</Selo> : <Selo>Em breve</Selo>}
+              </button>
+            ))}
         </div>
       </section>
     </div>
@@ -102,7 +125,7 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
     <section>
       <Titulo>Visão da gestão</Titulo>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Cartao onClick={() => ir('equipe')}>
+        <Cartao onClick={() => ir('rh/equipe')}>
           <div className="text-sm text-stone-500">Funcionários ativos</div>
           <div className="mt-1 text-3xl font-bold">{totalAtivos}</div>
         </Cartao>
@@ -111,7 +134,7 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
           <div className="mt-1 text-3xl font-bold">{atestados.length}</div>
           <div className="mt-1 space-y-0.5">
             {atestados.slice(0, 3).map((d) => (
-              <button key={d.id} onClick={() => ir('equipe/' + d.funcionarioId)} className="block text-left text-xs text-stone-600 hover:underline">
+              <button key={d.id} onClick={() => ir('rh/equipe/' + d.funcionarioId)} className="block text-left text-xs text-stone-600 hover:underline">
                 {nomeDe(d.funcionarioId)} · {d.inicio ? dataCurta(d.inicio) : dataCurta(d.criadoEm)}
               </button>
             ))}
@@ -122,7 +145,7 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
           <div className="mt-1 text-3xl font-bold">{ocorrencias.length}</div>
           <div className="mt-1 space-y-0.5">
             {ocorrencias.slice(0, 3).map((o) => (
-              <button key={o.id} onClick={() => ir('equipe/' + o.funcionarioId)} className="block text-left text-xs text-stone-600 hover:underline">
+              <button key={o.id} onClick={() => ir('rh/equipe/' + o.funcionarioId)} className="block text-left text-xs text-stone-600 hover:underline">
                 {nomeTipoOcorrencia(o.tipo)} · {nomeDe(o.funcionarioId)} · {dataCurta(o.data)}
               </button>
             ))}
