@@ -20,7 +20,11 @@ export interface Funcionario {
   respondePara?: string | null
 }
 
-export type TipoDocumento = 'atestado' | 'contrato' | 'documento_pessoal' | 'exame' | 'outro'
+export type TipoDocumento =
+  | 'atestado' | 'contrato' | 'documento_pessoal' | 'exame' | 'outro'
+  // Saúde ocupacional (NR-7 e Portaria CVS 3/2026 para manipuladores de alimentos).
+  | 'aso_admissional' | 'aso_periodico' | 'aso_retorno' | 'aso_mudanca_funcao' | 'aso_demissional'
+  | 'coprocultura' | 'coproparasitologico' | 'curso_manipulador'
 
 export interface Documento {
   id: string
@@ -31,6 +35,9 @@ export interface Documento {
   // Atestado: período de afastamento.
   inicio?: string | null
   fim?: string | null
+  // Exames e cursos: quando foi feito e quando vence.
+  realizadoEm?: string | null
+  vence?: string | null
   enviadoPor: string
   criadoEm: string
 }
@@ -72,13 +79,62 @@ export const NIVEIS: { valor: Nivel; nome: string }[] = [
   { valor: 'proprietario', nome: 'Proprietário' },
 ]
 
-export const TIPOS_DOCUMENTO: { valor: TipoDocumento; nome: string }[] = [
-  { valor: 'atestado', nome: 'Atestado' },
-  { valor: 'documento_pessoal', nome: 'Documento pessoal' },
-  { valor: 'contrato', nome: 'Contrato' },
-  { valor: 'exame', nome: 'Exame' },
-  { valor: 'outro', nome: 'Outro' },
+// validadeMeses: sugestão de vencimento a partir da data do exame (dá para mudar no envio).
+// A periodicidade final é a que o médico do PCMSO definir.
+export const TIPOS_DOCUMENTO: { valor: TipoDocumento; nome: string; grupo: 'geral' | 'saude'; validadeMeses?: number }[] = [
+  { valor: 'atestado', nome: 'Atestado', grupo: 'geral' },
+  { valor: 'documento_pessoal', nome: 'Documento pessoal', grupo: 'geral' },
+  { valor: 'contrato', nome: 'Contrato', grupo: 'geral' },
+  { valor: 'outro', nome: 'Outro', grupo: 'geral' },
+  { valor: 'aso_admissional', nome: 'ASO admissional', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'aso_periodico', nome: 'ASO periódico', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'aso_retorno', nome: 'ASO retorno ao trabalho', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'aso_mudanca_funcao', nome: 'ASO mudança de função', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'aso_demissional', nome: 'ASO demissional', grupo: 'saude' },
+  { valor: 'coprocultura', nome: 'Coprocultura', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'coproparasitologico', nome: 'Coproparasitológico (fezes)', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'curso_manipulador', nome: 'Curso de boas práticas (manipulador)', grupo: 'saude', validadeMeses: 12 },
+  { valor: 'exame', nome: 'Outro exame', grupo: 'saude' },
 ]
+
+export const ehSaude = (t: TipoDocumento) => TIPOS_DOCUMENTO.find((x) => x.valor === t)?.grupo === 'saude'
+
+// O que todo funcionário ativo precisa ter em dia. Todos aqui manipulam alimentos.
+export const EXIGENCIAS: { id: string; nome: string; tipos: TipoDocumento[]; base: string }[] = [
+  { id: 'aso', nome: 'ASO (exame clínico)', tipos: ['aso_admissional', 'aso_periodico', 'aso_retorno', 'aso_mudanca_funcao'], base: 'NR-7 (PCMSO)' },
+  { id: 'coprocultura', nome: 'Coprocultura', tipos: ['coprocultura'], base: 'Portaria CVS 3/2026' },
+  { id: 'coproparasitologico', nome: 'Coproparasitológico', tipos: ['coproparasitologico'], base: 'Portaria CVS 3/2026' },
+]
+
+// Entrega de uniforme com termo assinado na tela.
+export interface ItemUniforme {
+  item: string
+  tamanho?: string
+  quantidade: number
+}
+
+export interface EntregaUniforme {
+  id: string
+  funcionarioId: string
+  data: string
+  itens: ItemUniforme[]
+  observacao?: string | null
+  entreguePor: string
+  // Imagem da assinatura (PNG em base64). Nulo enquanto a pessoa não assina.
+  assinatura: string | null
+  assinadoEm: string | null
+  // 'presencial': assinou no aparelho de quem entregou; 'portal': assinou no próprio login.
+  assinadoVia: 'presencial' | 'portal' | null
+  criadoEm: string
+}
+
+export const ITENS_UNIFORME = ['Camiseta', 'Dólmã', 'Avental', 'Boné', 'Touca', 'Calça', 'Jaqueta', 'Bota de segurança (EPI)', 'Luva térmica (EPI)']
+export const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'Único']
+
+export const termoUniforme = (nome: string, data: string, itens: ItemUniforme[]) =>
+  `Eu, ${nome}, declaro que recebi da empresa, gratuitamente, em ${data.split('-').reverse().join('/')}, os itens de uniforme e equipamentos listados abaixo, ` +
+  `em bom estado: ${itens.map((i) => `${i.quantidade}x ${i.item}${i.tamanho ? ` (${i.tamanho})` : ''}`).join('; ')}. ` +
+  `Comprometo-me a usá-los somente durante o trabalho, a conservá-los e a devolvê-los quando for desligado(a) ou quando forem substituídos.`
 
 export const TIPOS_OCORRENCIA: { valor: TipoOcorrencia; nome: string }[] = [
   { valor: 'falta', nome: 'Falta' },

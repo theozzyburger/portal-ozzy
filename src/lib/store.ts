@@ -1,4 +1,4 @@
-import type { Avaliacao, Comunicado, Documento, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Avaliacao, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -9,6 +9,17 @@ export interface NovoDocumento {
   observacao?: string
   inicio?: string
   fim?: string
+  realizadoEm?: string
+  vence?: string
+}
+
+export interface NovaEntregaUniforme {
+  funcionarioId: string
+  data: string
+  itens: ItemUniforme[]
+  observacao?: string
+  // Quando a pessoa assina na hora, no aparelho de quem está entregando.
+  assinatura?: string
 }
 
 export interface NovaOcorrencia {
@@ -41,6 +52,13 @@ export interface Store {
   documentos(funcionarioId: string): Promise<Documento[]>
   enviarDocumento(d: NovoDocumento): Promise<Documento>
   abrirDocumento(d: Documento): Promise<string | null>
+  // Todos os documentos que eu posso ver (para o controle de vencimentos).
+  documentosTodos(): Promise<Documento[]>
+
+  uniformes(funcionarioId: string): Promise<EntregaUniforme[]>
+  registrarUniforme(e: NovaEntregaUniforme): Promise<EntregaUniforme>
+  // Só a própria pessoa assina pelo portal.
+  assinarUniforme(entregaId: string, assinatura: string): Promise<void>
 
   ocorrencias(funcionarioId: string): Promise<Ocorrencia[]>
   // Para o painel da gestão: tudo que eu posso ver num período.

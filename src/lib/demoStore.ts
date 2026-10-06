@@ -1,8 +1,9 @@
 import { podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Comunicado, Documento, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, diaNoMes, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
+import { addMesesData } from './vencimentos'
 
 export const SENHA_DEMO = '1234'
 
@@ -44,6 +45,7 @@ const funcionarios: Funcionario[] = [
 ]
 
 const agora = () => new Date().toISOString()
+const porIdSeed = (id: string) => funcionarios.find((x) => x.id === id)
 let seq = 100
 const novoId = (p: string) => `${p}${++seq}`
 
@@ -53,6 +55,50 @@ const documentos: Documento[] = [
   { id: 'd4', funcionarioId: 'f12', tipo: 'atestado', nomeArquivo: 'atestado-gustavo.jpg', observacao: 'Consulta', inicio: diaNoMes(1, 21), fim: diaNoMes(1, 21), enviadoPor: 'f12', criadoEm: diaNoMes(1, 21) + 'T18:00:00Z' },
   { id: 'd5', funcionarioId: 'f11', tipo: 'atestado', nomeArquivo: 'atestado-aline.pdf', inicio: diaNoMes(1, 12), fim: diaNoMes(1, 13), enviadoPor: 'f11', criadoEm: diaNoMes(1, 12) + 'T11:00:00Z' },
   { id: 'd3', funcionarioId: 'f10', tipo: 'exame', nomeArquivo: 'aso-admissional.pdf', observacao: 'Exame admissional', enviadoPor: 'f2', criadoEm: '2023-08-01T09:00:00Z' },
+]
+
+// Exames de saúde de exemplo, com situações variadas (em dia, vencendo, vencido, faltando).
+// [funcionário, dias desde o exame, faltando coprocultura?]
+const situacoesExame: [string, number, boolean?][] = [
+  ['f1', 120], ['f2', 200], ['f3', 300], ['f4', 90], ['f5', 352], ['f6', 400], ['f7', 345], ['f8', 60],
+  ['f9', 180], ['f10', 380], ['f11', 30], ['f12', 250, true], ['f16', 20], ['f19', 50], ['f21', 160], ['f22', 340],
+]
+documentos.push(
+  ...situacoesExame.flatMap(([fid, dias, semCopro], i): Documento[] => {
+    const feito = addDias(hoje(), -dias)
+    const vence = addMesesData(feito, 12)
+    const p = porIdSeed(fid)
+    const asoTipo = p && p.dataAdmissao >= addDias(feito, -30) ? 'aso_admissional' : 'aso_periodico'
+    const base = { funcionarioId: fid, enviadoPor: 'f2', realizadoEm: feito, vence, criadoEm: feito + 'T15:00:00Z' }
+    return [
+      { ...base, id: `ds${i}a`, tipo: asoTipo, nomeArquivo: `aso-${fid}.pdf`, observacao: 'Clínica de segurança do trabalho' },
+      ...(semCopro ? [] : [{ ...base, id: `ds${i}b`, tipo: 'coprocultura' as const, nomeArquivo: `coprocultura-${fid}.pdf` }]),
+      { ...base, id: `ds${i}c`, tipo: 'coproparasitologico', nomeArquivo: `parasitologico-${fid}.pdf` },
+    ]
+  }),
+)
+
+// Assinatura de exemplo (um rabisco em SVG).
+const ASSINATURA_DEMO =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"><path d="M10 70 C30 20 50 20 55 60 S80 90 95 50 S120 20 130 55 S160 80 175 45 S210 30 230 60 S270 70 290 40" fill="none" stroke="#0b0b0c" stroke-width="3" stroke-linecap="round"/></svg>')
+
+const uniformes: EntregaUniforme[] = [
+  {
+    id: 'u1', funcionarioId: 'f8', data: '2024-07-22', entreguePor: 'f5', observacao: null, criadoEm: '2024-07-22T10:00:00Z',
+    itens: [{ item: 'Camiseta', tamanho: 'M', quantidade: 2 }, { item: 'Avental', quantidade: 1 }, { item: 'Boné', quantidade: 1 }],
+    assinatura: ASSINATURA_DEMO, assinadoEm: '2024-07-22T10:02:00Z', assinadoVia: 'presencial',
+  },
+  {
+    id: 'u2', funcionarioId: 'f7', data: '2024-02-05', entreguePor: 'f5', observacao: null, criadoEm: '2024-02-05T10:00:00Z',
+    itens: [{ item: 'Dólmã', tamanho: 'G', quantidade: 2 }, { item: 'Touca', quantidade: 2 }, { item: 'Luva térmica (EPI)', quantidade: 1 }],
+    assinatura: ASSINATURA_DEMO, assinadoEm: '2024-02-05T10:05:00Z', assinadoVia: 'presencial',
+  },
+  {
+    id: 'u3', funcionarioId: 'f7', data: addDias(hoje(), -1), entreguePor: 'f3', observacao: 'Troca do dólmã gasto', criadoEm: addDias(hoje(), -1) + 'T16:00:00Z',
+    itens: [{ item: 'Dólmã', tamanho: 'G', quantidade: 1 }, { item: 'Avental', quantidade: 1 }],
+    assinatura: null, assinadoEm: null, assinadoVia: null,
+  },
 ]
 const arquivosDemo = new Map<string, string>()
 
@@ -148,7 +194,8 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (u.id !== d.funcionarioId && !podeGerenciar(u.nivel)) throw new Error('Você só pode enviar os seus documentos.')
       const doc: Documento = {
         id: novoId('d'), funcionarioId: d.funcionarioId, tipo: d.tipo, nomeArquivo: d.arquivo.name,
-        observacao: d.observacao || null, inicio: d.inicio || null, fim: d.fim || null, enviadoPor: u.id, criadoEm: agora(),
+        observacao: d.observacao || null, inicio: d.inicio || null, fim: d.fim || null,
+        realizadoEm: d.realizadoEm || null, vence: d.vence || null, enviadoPor: u.id, criadoEm: agora(),
       }
       arquivosDemo.set(doc.id, URL.createObjectURL(d.arquivo))
       documentos.push(doc)
@@ -156,6 +203,32 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async abrirDocumento(d) {
       return arquivosDemo.get(d.id) ?? null
+    },
+    async documentosTodos() {
+      const u = exigeEu()
+      return espera(documentos.filter((d) => podeVerDocumentosDe(u, porId(d.funcionarioId))))
+    },
+    async uniformes(fid) {
+      const u = exigeEu()
+      if (!podeVerFuncionario(u, porId(fid))) return espera([])
+      return espera(uniformes.filter((x) => x.funcionarioId === fid).sort((a, b) => b.data.localeCompare(a.data)))
+    },
+    async registrarUniforme(e) {
+      const u = exigeGestao()
+      const nova: EntregaUniforme = {
+        id: novoId('u'), funcionarioId: e.funcionarioId, data: e.data, itens: e.itens, observacao: e.observacao || null,
+        entreguePor: u.id, criadoEm: agora(),
+        assinatura: e.assinatura ?? null, assinadoEm: e.assinatura ? agora() : null, assinadoVia: e.assinatura ? 'presencial' : null,
+      }
+      uniformes.push(nova)
+      return espera(nova)
+    },
+    async assinarUniforme(id, assinatura) {
+      const u = exigeEu()
+      const x = uniformes.find((y) => y.id === id)
+      if (!x || x.funcionarioId !== u.id) throw new Error('Só a própria pessoa pode assinar este termo.')
+      if (x.assinatura) throw new Error('Este termo já foi assinado.')
+      Object.assign(x, { assinatura, assinadoEm: agora(), assinadoVia: 'portal' })
     },
     async ocorrencias(fid) {
       const u = exigeEu()

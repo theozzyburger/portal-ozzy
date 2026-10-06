@@ -7,7 +7,8 @@ import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana, tempoDesde } from 
 import { podeGerenciar, podeVerPainel } from '../lib/permissoes'
 import Painel from './Painel'
 import { ir } from '../lib/rota'
-import type { Comunicado, Documento, Folga, Ocorrencia } from '../lib/types'
+import type { Comunicado, Documento, EntregaUniforme, Folga, Ocorrencia } from '../lib/types'
+import { exigenciasDe, pendencias, textoSituacao, type Pendencia } from '../lib/vencimentos'
 import { nomeTipoOcorrencia } from '../lib/types'
 
 export default function Inicio() {
@@ -16,6 +17,16 @@ export default function Inicio() {
   const [minhasFolgas, setMinhasFolgas] = useState<Folga[]>([])
   const gestao = podeGerenciar(eu.nivel)
   const painel = podeVerPainel(eu.nivel)
+
+  const [meusDocs, setMeusDocs] = useState<Documento[]>([])
+  const [meusUniformes, setMeusUniformes] = useState<EntregaUniforme[]>([])
+  const [docsEquipe, setDocsEquipe] = useState<Documento[]>([])
+
+  useEffect(() => {
+    store.documentos(eu.id).then(setMeusDocs)
+    store.uniformes(eu.id).then(setMeusUniformes)
+    if (podeGerenciar(eu.nivel)) store.documentosTodos().then(setDocsEquipe)
+  }, [store, eu.id, eu.nivel])
 
   useEffect(() => {
     store.comunicados().then(setComunicados)
@@ -33,6 +44,10 @@ export default function Inicio() {
         <p className="text-sm text-stone-500">{saudacao},</p>
         <h1 className="text-2xl font-bold tracking-tight">{eu.nome.split(' ')[0]}</h1>
       </div>
+
+      <MeusAvisos docs={meusDocs} uniformes={meusUniformes} />
+
+      {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
 
       {painel && <Painel />}
 
@@ -157,5 +172,64 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
         </Cartao>
       </div>
     </section>
+  )
+}
+
+// Avisos pessoais: exame vencendo ou faltando, e termo de uniforme para assinar.
+function MeusAvisos({ docs, uniformes }: { docs: Documento[]; uniformes: EntregaUniforme[] }) {
+  const exames = exigenciasDe(docs).filter((i) => i.situacao !== 'em_dia')
+  const termos = uniformes.filter((u) => !u.assinatura)
+  if (!exames.length && !termos.length) return null
+  return (
+    <section className="space-y-2">
+      {termos.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => ir('rh/perfil')}
+          className="flex w-full items-center gap-3 rounded-2xl bg-ozzy-400 p-4 text-left text-carvao"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-carvao text-lg font-bold text-ozzy-400">!</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Assine o termo do uniforme</span>
+            <span className="block text-sm">Você recebeu {t.itens.map((i) => i.item.toLowerCase()).join(', ')}. Toque para assinar.</span>
+          </span>
+          <span className="text-xl">›</span>
+        </button>
+      ))}
+      {exames.length > 0 && (
+        <button onClick={() => ir('rh/perfil')} className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left ring-2 ring-red-200">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-600 text-lg font-bold text-white">!</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Seus exames precisam de atenção</span>
+            {exames.map((i) => (
+              <span key={i.id} className="block text-sm text-stone-600">
+                {i.nome}: {textoSituacao(i).toLowerCase()}
+              </span>
+            ))}
+          </span>
+          <span className="text-xl text-stone-400">›</span>
+        </button>
+      )}
+    </section>
+  )
+}
+
+function AlertaEquipe({ pend }: { pend: Pendencia[] }) {
+  if (!pend.length) return null
+  const n = (s: string) => pend.filter((p) => p.item.situacao === s).length
+  const partes = [
+    n('vencido') && `${n('vencido')} vencido${n('vencido') > 1 ? 's' : ''}`,
+    n('faltando') && `${n('faltando')} não enviado${n('faltando') > 1 ? 's' : ''}`,
+    n('vence_logo') && `${n('vence_logo')} vencendo em 30 dias`,
+  ].filter(Boolean)
+  return (
+    <button onClick={() => ir('rh/exames')} className="flex w-full items-center gap-3 rounded-2xl bg-carvao p-4 text-left text-white">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-600 text-lg font-bold">!</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Exames da equipe</span>
+        <span className="block text-sm text-stone-300">{partes.join(' · ')}</span>
+      </span>
+      <span className="text-sm font-semibold text-ozzy-400">Ver ›</span>
+    </button>
   )
 }

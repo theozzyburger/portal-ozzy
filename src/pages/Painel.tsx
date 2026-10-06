@@ -7,6 +7,8 @@ import { ir } from '../lib/rota'
 import { apelidoUnidade, type Avaliacao, type Documento, type Funcionario, type Ocorrencia } from '../lib/types'
 import PainelAvaliacoes from './PainelAvaliacoes'
 import PainelPedidos from './PainelPedidos'
+import { ResumoNumeros } from './Vencimentos'
+import { pendencias } from '../lib/vencimentos'
 
 type Aba = 'pedidos' | 'avaliacoes' | 'rh' | 'financeiro'
 
@@ -55,8 +57,10 @@ export default function Painel() {
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([])
   const anterior = addMeses(mes, -1)
 
+  const [docsSaude, setDocsSaude] = useState<Documento[]>([])
   useEffect(() => {
     store.avaliacoes().then(setAvaliacoes)
+    store.documentosTodos().then(setDocsSaude)
   }, [store])
 
   useEffect(() => {
@@ -222,6 +226,18 @@ export default function Painel() {
             </table>
           </div>
         )}
+
+        <div className="mt-5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-stone-600">Exames de saúde (hoje)</h4>
+            <button onClick={() => ir('rh/exames')} className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4">Ver exames</button>
+          </div>
+          {(() => {
+            const pend = pendencias(sel.pessoas, docsSaude)
+            const n = (s: string) => pend.filter((p) => p.item.situacao === s).length
+            return <ResumoNumeros vencidos={n('vencido')} faltando={n('faltando')} vencendo={n('vence_logo')} aoClicar={() => ir('rh/exames')} />
+          })()}
+        </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <Lista titulo="Quem mais faltou">

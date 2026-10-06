@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Avaliacao, Comunicado, Documento, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Avaliacao, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -13,7 +13,12 @@ const paraFuncionario = (r: any): Funcionario => ({
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
   id: r.id, funcionarioId: r.funcionario_id, tipo: r.tipo, nomeArquivo: r.nome_arquivo, observacao: r.observacao,
-  inicio: r.inicio, fim: r.fim, enviadoPor: r.enviado_por, criadoEm: r.criado_em, caminho: r.caminho,
+  inicio: r.inicio, fim: r.fim, realizadoEm: r.realizado_em, vence: r.vence, enviadoPor: r.enviado_por, criadoEm: r.criado_em, caminho: r.caminho,
+})
+
+const paraUniforme = (r: any): EntregaUniforme => ({
+  id: r.id, funcionarioId: r.funcionario_id, data: r.data, itens: r.itens, observacao: r.observacao, entreguePor: r.entregue_por,
+  assinatura: r.assinatura, assinadoEm: r.assinado_em, assinadoVia: r.assinado_via, criadoEm: r.criado_em,
 })
 
 const paraOcorrencia = (r: any): Ocorrencia => ({
@@ -94,7 +99,8 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       const r = ok(
         await sb.from('documentos').insert({
           funcionario_id: d.funcionarioId, tipo: d.tipo, nome_arquivo: d.arquivo.name, caminho,
-          observacao: d.observacao || null, inicio: d.inicio || null, fim: d.fim || null, enviado_por: u.id,
+          observacao: d.observacao || null, inicio: d.inicio || null, fim: d.fim || null,
+          realizado_em: d.realizadoEm || null, vence: d.vence || null, enviado_por: u.id,
         }).select().single(),
       )
       return paraDocumento(r)
@@ -104,6 +110,25 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       if (!caminho) return null
       const { data } = await sb.storage.from('documentos').createSignedUrl(caminho, 60)
       return data?.signedUrl ?? null
+    },
+    async documentosTodos() {
+      return (ok(await sb.from('documentos').select('*')) ?? []).map(paraDocumento)
+    },
+    async uniformes(fid) {
+      return (ok(await sb.from('uniforme_entregas').select('*').eq('funcionario_id', fid).order('data', { ascending: false })) ?? []).map(paraUniforme)
+    },
+    async registrarUniforme(e) {
+      const u = exigeEu()
+      const r = ok(
+        await sb.from('uniforme_entregas').insert({
+          funcionario_id: e.funcionarioId, data: e.data, itens: e.itens, observacao: e.observacao || null, entregue_por: u.id,
+          assinatura: e.assinatura ?? null, assinado_em: e.assinatura ? new Date().toISOString() : null, assinado_via: e.assinatura ? 'presencial' : null,
+        }).select().single(),
+      )
+      return paraUniforme(r)
+    },
+    async assinarUniforme(id, assinatura) {
+      ok(await sb.rpc('assinar_uniforme', { entrega: id, imagem: assinatura }))
     },
     async ocorrencias(fid) {
       return (ok(await sb.from('ocorrencias').select('*').eq('funcionario_id', fid).order('data', { ascending: false })) ?? []).map(paraOcorrencia)

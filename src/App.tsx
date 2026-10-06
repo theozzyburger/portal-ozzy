@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ProvedorApp, useApp } from './lib/contexto'
 import { criarDemoStore } from './lib/demoStore'
 import { criarSupabaseStore } from './lib/supabaseStore'
-import { podeVerEquipe } from './lib/permissoes'
+import { podeGerenciar, podeVerEquipe } from './lib/permissoes'
 import { ir } from './lib/rota'
 import type { Funcionario } from './lib/types'
 import { nomeNivel } from './lib/types'
@@ -13,6 +13,7 @@ import Escala from './pages/Escala'
 import Equipe from './pages/Equipe'
 import Perfil from './pages/Perfil'
 import EmBreve from './pages/EmBreve'
+import Vencimentos from './pages/Vencimentos'
 import Icone from './components/Icone'
 import logo from './assets/logo.png'
 import { modulosVisiveis } from './lib/modulos'
@@ -76,6 +77,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
     { id: 'avisos', nome: 'Avisos' },
     { id: 'folgas', nome: 'Folgas' },
     ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe' }] : []),
+    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }] : []),
     { id: 'ponto', nome: 'Ponto', emBreve: true },
     { id: 'perfil', nome: 'Meu perfil' },
   ]
@@ -87,6 +89,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (abaRh === 'folgas') conteudo = <Escala />
   else if (abaRh === 'equipe' && param) conteudo = <Perfil funcionarioId={param} />
   else if (abaRh === 'equipe') conteudo = <Equipe />
+  else if (abaRh === 'exames') conteudo = <Vencimentos />
   else if (abaRh === 'ponto') conteudo = <EmBreve modulo={PONTO} />
   else if (abaRh === 'perfil') conteudo = <Perfil funcionarioId={eu.id} />
   else conteudo = <Comunicados />

@@ -6,9 +6,13 @@ import { dataLonga, hoje } from '../lib/datas'
 import { podeGerenciar, podeVerDocumentosDe, podeVerEquipe } from '../lib/permissoes'
 import { ir } from '../lib/rota'
 import {
-  TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
+  TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
   type Documento, type Ocorrencia, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
+import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
+import Uniformes from './Uniformes'
+
+type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias'
 
 const corOcorrencia: Record<TipoOcorrencia, 'vermelho' | 'ambar' | 'verde' | 'cinza'> = {
   falta: 'vermelho', advertencia: 'vermelho', atraso: 'ambar', orientacao: 'cinza', elogio: 'verde', outro: 'cinza',
@@ -17,7 +21,8 @@ const corOcorrencia: Record<TipoOcorrencia, 'vermelho' | 'ambar' | 'verde' | 'ci
 export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const { eu, store, equipe, nomeDe, nomeUnidade, recarregarEquipe, avisar } = useApp()
   const pessoa = equipe.find((f) => f.id === funcionarioId) ?? (funcionarioId === eu.id ? eu : null)
-  const [aba, setAba] = useState<'documentos' | 'ocorrencias'>('documentos')
+  const [aba, setAba] = useState<AbaPerfil>('documentos')
+  const [tipoInicial, setTipoInicial] = useState<TipoDocumento>('atestado')
   const [docs, setDocs] = useState<Documento[]>([])
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
@@ -34,6 +39,10 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
 
   if (!pessoa) return <Vazio>Funcionário não encontrado ou fora do seu acesso.</Vazio>
   const verDocs = podeVerDocumentosDe(eu, pessoa)
+  const docsSaude = docs.filter((d) => ehSaude(d.tipo))
+  const docsGerais = docs.filter((d) => !ehSaude(d.tipo))
+  const exigencias = exigenciasDe(docs)
+  const pendentes = pessoa.status === 'ativo' ? exigencias.filter((i) => i.situacao !== 'em_dia').length : 0
 
   const abrir = async (d: Documento) => {
     const url = await store.abrirDocumento(d)
@@ -109,27 +118,94 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         )}
       </Cartao>
 
-      <div className="flex gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
-        {(['documentos', 'ocorrencias'] as const).map((a) => (
-          <button key={a} onClick={() => setAba(a)} className={`flex-1 rounded-lg py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
-            {a === 'documentos' ? `Documentos (${docs.length})` : `Ocorrências (${ocorrencias.length})`}
+      <div className="grid grid-cols-4 gap-1 rounded-xl bg-stone-200 p-1 text-xs font-semibold sm:text-sm">
+        {(
+          [
+            ['documentos', 'Documentos'],
+            ['saude', 'Exames'],
+            ['uniformes', 'Uniformes'],
+            ['ocorrencias', 'Ocorrências'],
+          ] as const
+        ).map(([a, nome]) => (
+          <button key={a} onClick={() => setAba(a)} className={`min-w-0 truncate rounded-lg px-1 py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+            {nome}
+            {a === 'saude' && verDocs && pendentes > 0 && <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] text-white">{pendentes}</span>}
           </button>
         ))}
       </div>
 
-      {aba === 'documentos' ? (
+      {aba === 'saude' ? (
+        <section className="space-y-3">
+          {!verDocs ? (
+            <Vazio>Exames são visíveis só para a própria pessoa e para a gestão.</Vazio>
+          ) : (
+            <>
+              <Cartao>
+                <div className="mb-2 text-sm font-semibold text-stone-600">Obrigatórios para manipulador de alimentos</div>
+                <ul className="divide-y divide-stone-100">
+                  {exigencias.map((i) => (
+                    <li key={i.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 py-2.5">
+                      <div className="min-w-0">
+                        <div className="font-semibold">{i.nome}</div>
+                        <div className="text-xs text-stone-500">{i.base}</div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Selo cor={corSituacao[i.situacao]}>
+                          {iconeSituacao[i.situacao]} {textoSituacao(i)}
+                        </Selo>
+                        {(souEu || gestao) && i.situacao !== 'em_dia' && (
+                          <button
+                            onClick={() => {
+                              setTipoInicial(i.id === 'aso' ? (i.doc ? 'aso_periodico' : 'aso_admissional') : (i.id as TipoDocumento))
+                              setModal('documento')
+                            }}
+                            className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4"
+                          >
+                            Enviar
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Cartao>
+              {(souEu || gestao) && (
+                <Botao
+                  className="w-full"
+                  variante="secundario"
+                  onClick={() => {
+                    setTipoInicial('aso_periodico')
+                    setModal('documento')
+                  }}
+                >
+                  + Enviar exame ou laudo da clínica
+                </Botao>
+              )}
+              {docsSaude.length === 0 ? <Vazio>Nenhum exame enviado.</Vazio> : docsSaude.map((d) => <LinhaDocumento key={d.id} d={d} aoAbrir={abrir} />)}
+            </>
+          )}
+        </section>
+      ) : aba === 'uniformes' ? (
+        <Uniformes pessoa={pessoa} />
+      ) : aba === 'documentos' ? (
         <section className="space-y-2">
           {(souEu || gestao) && (
-            <Botao className="w-full" onClick={() => setModal('documento')}>
+            <Botao
+              className="w-full"
+              onClick={() => {
+                setTipoInicial('atestado')
+                setModal('documento')
+              }}
+            >
               {souEu ? '+ Enviar atestado ou documento' : '+ Anexar documento'}
             </Botao>
           )}
           {!verDocs ? (
             <Vazio>Documentos e atestados são visíveis só para a própria pessoa e para a gestão.</Vazio>
-          ) : docs.length === 0 ? (
+          ) : docsGerais.length === 0 ? (
             <Vazio>Nenhum documento enviado.</Vazio>
           ) : (
-            docs.map((d) => (
+            docsGerais.map((d) => (
               <Cartao key={d.id} onClick={() => abrir(d)}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
@@ -170,7 +246,9 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
 
       {modal === 'editar' && <FormFuncionario aberto existente={pessoa} aoFechar={() => setModal(null)} />}
       <EnviarDocumento
+        key={tipoInicial + String(modal === 'documento')}
         aberto={modal === 'documento'}
+        tipoInicial={tipoInicial}
         funcionarioId={pessoa.id}
         aoFechar={() => setModal(null)}
         aoEnviar={async () => {
@@ -222,9 +300,47 @@ function Desligar({ nome, aoConfirmar }: { nome: string; aoConfirmar: (data: str
   )
 }
 
-function EnviarDocumento({ aberto, funcionarioId, aoFechar, aoEnviar }: { aberto: boolean; funcionarioId: string; aoFechar: () => void; aoEnviar: () => void }) {
+function LinhaDocumento({ d, aoAbrir }: { d: Documento; aoAbrir: (d: Documento) => void }) {
+  const { eu, nomeDe } = useApp()
+  const sit = situacaoDoc(d.vence)
+  return (
+    <Cartao onClick={() => aoAbrir(d)}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Selo>{nomeTipoDocumento(d.tipo)}</Selo>
+            {d.vence && (
+              <Selo cor={corSituacao[sit]}>
+                {iconeSituacao[sit]} {sit === 'vencido' ? 'Venceu' : 'Vence'} {dataLonga(d.vence)}
+              </Selo>
+            )}
+          </div>
+          <div className="mt-1 truncate text-sm font-medium">{d.nomeArquivo}</div>
+          <div className="mt-0.5 text-xs text-stone-500">
+            {d.realizadoEm && `Feito em ${dataLonga(d.realizadoEm)} · `}
+            Enviado por {d.enviadoPor === eu.id ? 'você' : nomeDe(d.enviadoPor)}
+            {d.observacao && ` · ${d.observacao}`}
+          </div>
+        </div>
+        <span className="text-stone-400">›</span>
+      </div>
+    </Cartao>
+  )
+}
+
+function EnviarDocumento({
+  aberto, funcionarioId, aoFechar, aoEnviar, tipoInicial = 'atestado',
+}: { aberto: boolean; funcionarioId: string; aoFechar: () => void; aoEnviar: () => void; tipoInicial?: TipoDocumento }) {
   const { store } = useApp()
-  const [tipo, setTipo] = useState<TipoDocumento>('atestado')
+  const [tipo, setTipoBruto] = useState<TipoDocumento>(tipoInicial)
+  const meses = (t: TipoDocumento) => TIPOS_DOCUMENTO.find((x) => x.valor === t)?.validadeMeses
+  const [realizadoEm, setRealizadoEm] = useState(hoje())
+  const [vence, setVence] = useState(meses(tipoInicial) ? addMesesData(hoje(), meses(tipoInicial)!) : '')
+  const recalcular = (t: TipoDocumento, feito: string) => setVence(meses(t) && feito ? addMesesData(feito, meses(t)!) : '')
+  const setTipo = (t: TipoDocumento) => {
+    setTipoBruto(t)
+    recalcular(t, realizadoEm)
+  }
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [inicio, setInicio] = useState(hoje())
   const [fim, setFim] = useState(hoje())
@@ -241,6 +357,8 @@ function EnviarDocumento({ aberto, funcionarioId, aoFechar, aoEnviar }: { aberto
         funcionarioId, tipo, arquivo, observacao,
         inicio: tipo === 'atestado' ? inicio : undefined,
         fim: tipo === 'atestado' ? fim : undefined,
+        realizadoEm: ehSaude(tipo) ? realizadoEm : undefined,
+        vence: ehSaude(tipo) && vence ? vence : undefined,
       })
       setArquivo(null)
       setObservacao('')
@@ -257,14 +375,18 @@ function EnviarDocumento({ aberto, funcionarioId, aoFechar, aoEnviar }: { aberto
       <form onSubmit={enviar} className="space-y-4">
         <Campo rotulo="Tipo">
           <select className={estiloEntrada} value={tipo} onChange={(e) => setTipo(e.target.value as TipoDocumento)}>
-            {TIPOS_DOCUMENTO.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.nome}
-              </option>
+            {(['geral', 'saude'] as const).map((g) => (
+              <optgroup key={g} label={g === 'geral' ? 'Documentos' : 'Exames e saúde'}>
+                {TIPOS_DOCUMENTO.filter((t) => t.grupo === g).map((t) => (
+                  <option key={t.valor} value={t.valor}>
+                    {t.nome}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </Campo>
-        <Campo rotulo="Foto ou arquivo" dica="Pode tirar foto na hora. Confira se está legível.">
+        <Campo rotulo={ehSaude(tipo) ? 'Laudo ou relatório da clínica' : 'Foto ou arquivo'} dica="Pode tirar foto na hora. Confira se está legível.">
           <input
             className={`${estiloEntrada} file:mr-3 file:rounded-lg file:border-0 file:bg-ozzy-400 file:px-3 file:py-1.5 file:font-semibold file:text-carvao`}
             type="file"
@@ -282,8 +404,27 @@ function EnviarDocumento({ aberto, funcionarioId, aoFechar, aoEnviar }: { aberto
             </Campo>
           </div>
         )}
+        {ehSaude(tipo) && (
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Data do exame">
+              <input
+                className={estiloEntrada}
+                type="date"
+                value={realizadoEm}
+                max={hoje()}
+                onChange={(e) => {
+                  setRealizadoEm(e.target.value)
+                  recalcular(tipo, e.target.value)
+                }}
+              />
+            </Campo>
+            <Campo rotulo="Vence em" dica={meses(tipo) ? `Sugestão: ${meses(tipo)} meses. Ajuste se o médico pediu outro prazo.` : 'Deixe vazio se não vence.'}>
+              <input className={estiloEntrada} type="date" value={vence} min={realizadoEm} onChange={(e) => setVence(e.target.value)} />
+            </Campo>
+          </div>
+        )}
         <Campo rotulo="Observação (opcional)">
-          <input className={estiloEntrada} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
+          <input className={estiloEntrada} value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder={ehSaude(tipo) ? 'Ex.: nome da clínica' : ''} />
         </Campo>
         {erro && <p className="text-sm text-red-600">{erro}</p>}
         <Botao className="w-full" disabled={enviando}>
