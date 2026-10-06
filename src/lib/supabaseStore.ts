@@ -108,6 +108,12 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async ocorrencias(fid) {
       return (ok(await sb.from('ocorrencias').select('*').eq('funcionario_id', fid).order('data', { ascending: false })) ?? []).map(paraOcorrencia)
     },
+    async ocorrenciasEntre(inicio, fim) {
+      return (ok(await sb.from('ocorrencias').select('*').gte('data', inicio).lte('data', fim)) ?? []).map(paraOcorrencia)
+    },
+    async atestadosEntre(inicio, fim) {
+      return (ok(await sb.from('documentos').select('*').eq('tipo', 'atestado').gte('inicio', inicio).lte('inicio', fim)) ?? []).map(paraDocumento)
+    },
     async registrarOcorrencia(o) {
       const u = exigeEu()
       const r = ok(

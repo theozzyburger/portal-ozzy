@@ -4,7 +4,8 @@ import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana, tempoDesde } from '../lib/datas'
-import { podeGerenciar } from '../lib/permissoes'
+import { podeGerenciar, podeVerPainel } from '../lib/permissoes'
+import Painel from './Painel'
 import { ir } from '../lib/rota'
 import type { Comunicado, Documento, Folga, Ocorrencia } from '../lib/types'
 import { nomeTipoOcorrencia } from '../lib/types'
@@ -14,6 +15,7 @@ export default function Inicio() {
   const [comunicados, setComunicados] = useState<Comunicado[]>([])
   const [minhasFolgas, setMinhasFolgas] = useState<Folga[]>([])
   const gestao = podeGerenciar(eu.nivel)
+  const painel = podeVerPainel(eu.nivel)
 
   useEffect(() => {
     store.comunicados().then(setComunicados)
@@ -31,6 +33,8 @@ export default function Inicio() {
         <p className="text-sm text-stone-500">{saudacao},</p>
         <h1 className="text-2xl font-bold tracking-tight">{eu.nome.split(' ')[0]}</h1>
       </div>
+
+      {painel && <Painel />}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Cartao onClick={() => ir('rh/avisos')}>
@@ -60,7 +64,7 @@ export default function Inicio() {
         </Cartao>
       </div>
 
-      {gestao && <PainelGestao totalAtivos={equipe.filter((f) => f.status === 'ativo').length} />}
+      {gestao && !painel && <PainelGestao totalAtivos={equipe.filter((f) => f.status === 'ativo').length} />}
 
       <section>
         <Titulo acao={<button onClick={() => ir('rh/avisos')} className="text-sm font-semibold text-carvao underline decoration-ozzy-500 decoration-2 underline-offset-4">Ver todos</button>}>

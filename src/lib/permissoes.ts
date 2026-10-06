@@ -4,6 +4,9 @@ import type { Funcionario, Nivel } from './types'
 // Gerente, Administrativo e Proprietário cadastram, desligam e publicam.
 const GESTAO: Nivel[] = ['gerente', 'administrativo', 'proprietario']
 
+// Painel inicial com indicadores por área (pedido de 06/10: Proprietário e Gerente).
+export const podeVerPainel = (n: Nivel) => n === 'proprietario' || n === 'gerente'
+
 export const podeGerenciar = (n: Nivel) => GESTAO.includes(n)
 
 // Supervisor enxerga a equipe da própria unidade, sem editar.

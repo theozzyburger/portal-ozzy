@@ -1,7 +1,7 @@
 import { podeGerenciar, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
 import type { Comunicado, Documento, Folga, Funcionario, Ocorrencia, Unidade } from './types'
-import { addDias, hoje, inicioDaSemana } from './datas'
+import { addDias, diaNoMes, hoje, inicioDaSemana } from './datas'
 
 export const SENHA_DEMO = '1234'
 
@@ -29,7 +29,14 @@ const funcionarios: Funcionario[] = [
   f('f10', 'Thiago Martins', '11999990010', 'Pizzaiolo', 'pizza', 'funcionario', '2023-08-01', 'f6'),
   f('f11', 'Aline Ribeiro', '11999990011', 'Atendente', 'pizza', 'funcionario', '2024-11-04', 'f6'),
   f('f12', 'Gustavo Pereira', '11999990012', 'Entregador', 'pizza', 'funcionario', '2025-03-10', 'f6'),
-  f('f13', 'Fernanda Dias', '11999990013', 'Caixa', 'burger', 'funcionario', '2023-05-02', 'f5', 'inativo', '2025-08-29'),
+  f('f13', 'Fernanda Dias', '11999990013', 'Caixa', 'burger', 'funcionario', '2023-05-02', 'f5', 'inativo', diaNoMes(1, 29)),
+  f('f14', 'Vitor Santos', '11999990014', 'Atendente', 'pizza', 'funcionario', diaNoMes(0, 1), 'f6'),
+  f('f15', 'Camila Rocha', '11999990015', 'Auxiliar de cozinha', 'burger', 'funcionario', diaNoMes(0, 2), 'f5'),
+  f('f16', 'Rodrigo Nunes', '11999990016', 'Entregador', 'burger', 'funcionario', diaNoMes(1, 15), 'f5'),
+  f('f17', 'Bianca Lopes', '11999990017', 'Atendente', 'pizza', 'funcionario', '2024-06-03', 'f6', 'inativo', diaNoMes(0, 3)),
+  f('f18', 'Felipe Araújo', '11999990018', 'Chapeiro', 'burger', 'funcionario', '2024-09-16', 'f5', 'inativo', diaNoMes(1, 20)),
+  f('f19', 'Sabrina Melo', '11999990019', 'Atendente', 'burger', 'funcionario', diaNoMes(2, 8), 'f5'),
+  f('f20', 'Eduardo Pinto', '11999990020', 'Pizzaiolo', 'pizza', 'funcionario', '2023-02-13', 'f6', 'inativo', diaNoMes(2, 25)),
 ]
 
 const agora = () => new Date().toISOString()
@@ -39,6 +46,8 @@ const novoId = (p: string) => `${p}${++seq}`
 const documentos: Documento[] = [
   { id: 'd1', funcionarioId: 'f7', tipo: 'atestado', nomeArquivo: 'atestado-diego.pdf', observacao: 'Gripe', inicio: addDias(hoje(), -9), fim: addDias(hoje(), -8), enviadoPor: 'f7', criadoEm: addDias(hoje(), -9) + 'T10:12:00Z' },
   { id: 'd2', funcionarioId: 'f7', tipo: 'documento_pessoal', nomeArquivo: 'rg-diego.jpg', enviadoPor: 'f2', criadoEm: '2024-02-05T14:00:00Z' },
+  { id: 'd4', funcionarioId: 'f12', tipo: 'atestado', nomeArquivo: 'atestado-gustavo.jpg', observacao: 'Consulta', inicio: diaNoMes(1, 21), fim: diaNoMes(1, 21), enviadoPor: 'f12', criadoEm: diaNoMes(1, 21) + 'T18:00:00Z' },
+  { id: 'd5', funcionarioId: 'f11', tipo: 'atestado', nomeArquivo: 'atestado-aline.pdf', inicio: diaNoMes(1, 12), fim: diaNoMes(1, 13), enviadoPor: 'f11', criadoEm: diaNoMes(1, 12) + 'T11:00:00Z' },
   { id: 'd3', funcionarioId: 'f10', tipo: 'exame', nomeArquivo: 'aso-admissional.pdf', observacao: 'Exame admissional', enviadoPor: 'f2', criadoEm: '2023-08-01T09:00:00Z' },
 ]
 const arquivosDemo = new Map<string, string>()
@@ -47,6 +56,17 @@ const ocorrencias: Ocorrencia[] = [
   { id: 'o1', funcionarioId: 'f7', tipo: 'falta', data: addDias(hoje(), -9), descricao: 'Faltou com atestado (gripe).', registradoPor: 'f3', criadoEm: agora() },
   { id: 'o2', funcionarioId: 'f8', tipo: 'atraso', data: addDias(hoje(), -3), descricao: 'Chegou 25 min atrasada, avisou pelo WhatsApp.', registradoPor: 'f5', criadoEm: agora() },
   { id: 'o3', funcionarioId: 'f10', tipo: 'elogio', data: addDias(hoje(), -5), descricao: 'Cliente elogiou a pizza no iFood citando o atendimento.', registradoPor: 'f4', criadoEm: agora() },
+  // Histórico de exemplo dos últimos meses, para o painel ter comparação.
+  ...([
+    ['f8', 0, 2, 'falta'], ['f12', 0, 4, 'falta'], ['f11', 0, 5, 'atraso'],
+    ['f9', 1, 3, 'falta'], ['f12', 1, 9, 'falta'], ['f12', 1, 21, 'falta'], ['f11', 1, 12, 'falta'], ['f18', 1, 6, 'falta'],
+    ['f18', 1, 13, 'falta'], ['f8', 1, 17, 'atraso'], ['f10', 1, 24, 'atraso'], ['f9', 1, 27, 'advertencia'],
+    ['f7', 2, 5, 'falta'], ['f11', 2, 18, 'falta'], ['f20', 2, 11, 'falta'], ['f8', 2, 22, 'atraso'],
+  ] as const).map(([fid, m, d, tipo], i): Ocorrencia => ({
+    id: `oh${i}`, funcionarioId: fid, tipo, data: diaNoMes(m, d),
+    descricao: tipo === 'falta' ? 'Faltou sem aviso prévio.' : tipo === 'atraso' ? 'Chegou atrasado ao turno.' : 'Advertência por faltas repetidas.',
+    registradoPor: 'f3', criadoEm: agora(),
+  })),
 ]
 
 const comunicados: Comunicado[] = [
@@ -132,6 +152,19 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const u = exigeEu()
       if (!podeVerFuncionario(u, porId(fid))) return espera([])
       return espera(ocorrencias.filter((o) => o.funcionarioId === fid).sort((a, b) => b.data.localeCompare(a.data)))
+    },
+    async ocorrenciasEntre(inicio, fim) {
+      const u = exigeEu()
+      return espera(ocorrencias.filter((o) => o.data >= inicio && o.data <= fim && podeVerFuncionario(u, porId(o.funcionarioId))))
+    },
+    async atestadosEntre(inicio, fim) {
+      const u = exigeEu()
+      return espera(
+        documentos.filter((d) => {
+          const dia = d.inicio ?? d.criadoEm.slice(0, 10)
+          return d.tipo === 'atestado' && dia >= inicio && dia <= fim && podeVerDocumentosDe(u, porId(d.funcionarioId))
+        }),
+      )
     },
     async registrarOcorrencia(o) {
       const u = exigeGestao()

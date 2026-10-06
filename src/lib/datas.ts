@@ -42,3 +42,24 @@ export const tempoDesde = (isoDataHora: string) => {
   const d = Math.round(h / 24)
   return d === 1 ? 'ontem' : `há ${d} dias`
 }
+
+// Mês como 'AAAA-MM'.
+export const mesDe = (s: string) => s.slice(0, 7)
+export const addMeses = (mes: string, n: number) => {
+  const [a, m] = mes.split('-').map(Number)
+  const d = new Date(a, m - 1 + n, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+export const primeiroDia = (mes: string) => `${mes}-01`
+export const ultimoDia = (mes: string) => addDias(primeiroDia(addMeses(mes, 1)), -1)
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+export const nomeMes = (mes: string) => MESES[Number(mes.slice(5, 7)) - 1]
+export const nomeMesAno = (mes: string) => `${nomeMes(mes)} de ${mes.slice(0, 4)}`
+
+// Um dia de N meses atrás (sem passar de hoje), para dados de exemplo.
+export const diaNoMes = (mesesAtras: number, dia: number) => {
+  const mes = addMeses(mesDe(hoje()), -mesesAtras)
+  const d = `${mes}-${String(Math.min(dia, Number(ultimoDia(mes).slice(8)))).padStart(2, '0')}`
+  return d > hoje() ? hoje() : d
+}

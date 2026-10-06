@@ -43,6 +43,9 @@ export interface Store {
   abrirDocumento(d: Documento): Promise<string | null>
 
   ocorrencias(funcionarioId: string): Promise<Ocorrencia[]>
+  // Para o painel da gestão: tudo que eu posso ver num período.
+  ocorrenciasEntre(inicio: string, fim: string): Promise<Ocorrencia[]>
+  atestadosEntre(inicio: string, fim: string): Promise<Documento[]>
   registrarOcorrencia(o: NovaOcorrencia): Promise<Ocorrencia>
 
   comunicados(): Promise<Comunicado[]>
