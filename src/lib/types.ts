@@ -18,7 +18,17 @@ export interface Funcionario {
   dataAdmissao: string
   dataDesligamento?: string | null
   respondePara?: string | null
+  // Setor, usado na caixinha (grupos de bônus). 'geral' = gerente que atende as duas lojas.
+  setor?: Setor | null
 }
+
+export type Setor = 'cozinha' | 'atendimento' | 'unidade' | 'geral'
+export const SETORES: { valor: Setor; nome: string }[] = [
+  { valor: 'cozinha', nome: 'Cozinha' },
+  { valor: 'atendimento', nome: 'Atendimento' },
+  { valor: 'unidade', nome: 'Unidade toda' },
+  { valor: 'geral', nome: 'Geral (todas as lojas)' },
+]
 
 export type TipoDocumento =
   | 'atestado' | 'contrato' | 'documento_pessoal' | 'exame' | 'outro'

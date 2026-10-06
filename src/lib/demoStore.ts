@@ -1,7 +1,7 @@
 import { podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
 import type { Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
-import { addDias, diaNoMes, hoje, inicioDaSemana } from './datas'
+import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { addMesesData } from './vencimentos'
 
@@ -16,62 +16,60 @@ const unidades: Unidade[] = [
 const f = (
   id: string, nome: string, celular: string, cargo: string, unidadeId: string,
   nivel: Funcionario['nivel'], dataAdmissao: string, respondePara: string | null = null,
-  status: Funcionario['status'] = 'ativo', dataDesligamento: string | null = null,
-): Funcionario => ({ id, nome, celular, cargo, unidadeId, nivel, status, dataAdmissao, respondePara, dataDesligamento })
+  status: Funcionario['status'] = 'ativo', dataDesligamento: string | null = null, setor: Funcionario['setor'] = null,
+): Funcionario => ({ id, nome, celular, cargo, unidadeId, nivel, status, dataAdmissao, respondePara, dataDesligamento, setor })
+
+// Equipe real, da planilha de caixinha (06/10/2026). Celulares são fictícios.
+// A planilha não tem data de admissão; as de desligamento são a última ocorrência de cada um.
+const ADMISSAO_A_CONFIRMAR = '2026-01-05'
 
 const funcionarios: Funcionario[] = [
   f('f1', 'Heitor', '11999990001', 'Proprietário', 'burger-psd', 'proprietario', '2019-03-01'),
-  f('f2', 'Marina Costa', '11999990002', 'Assistente administrativo/financeiro', 'burger-psd', 'administrativo', '2022-02-14', 'f1'),
-  f('f3', 'Rafael Lima', '11999990003', 'Gerente de unidade', 'burger-psd', 'gerente', '2021-06-01', 'f1'),
-  f('f4', 'Juliana Souza', '11999990004', 'Gerente de unidade', 'pizza', 'gerente', '2022-09-12', 'f1'),
-  f('f5', 'Bruno Alves', '11999990005', 'Supervisor de cozinha', 'burger-psd', 'supervisor', '2023-01-09', 'f3'),
-  f('f6', 'Carla Mendes', '11999990006', 'Supervisora de salão', 'pizza', 'supervisor', '2023-04-17', 'f4'),
-  f('f7', 'Diego Rocha', '11999990007', 'Chapeiro', 'burger-psd', 'funcionario', '2024-02-05', 'f5'),
-  f('f8', 'Patrícia Gomes', '11999990008', 'Atendente', 'burger-psd', 'funcionario', '2024-07-22', 'f5'),
-  f('f9', 'Lucas Ferreira', '11999990009', 'Auxiliar de cozinha', 'burger-va', 'funcionario', '2025-01-13', 'f22'),
-  f('f10', 'Thiago Martins', '11999990010', 'Pizzaiolo', 'pizza', 'funcionario', '2023-08-01', 'f6'),
-  f('f11', 'Aline Ribeiro', '11999990011', 'Atendente', 'pizza', 'funcionario', '2024-11-04', 'f6'),
-  f('f12', 'Gustavo Pereira', '11999990012', 'Entregador', 'pizza', 'funcionario', '2025-03-10', 'f6'),
-  f('f13', 'Fernanda Dias', '11999990013', 'Caixa', 'burger-psd', 'funcionario', '2023-05-02', 'f5', 'inativo', diaNoMes(1, 29)),
-  f('f14', 'Vitor Santos', '11999990014', 'Atendente', 'pizza', 'funcionario', diaNoMes(0, 1), 'f6'),
-  f('f15', 'Camila Rocha', '11999990015', 'Auxiliar de cozinha', 'burger-va', 'funcionario', diaNoMes(0, 2), 'f22'),
-  f('f16', 'Rodrigo Nunes', '11999990016', 'Entregador', 'burger-psd', 'funcionario', diaNoMes(1, 15), 'f5'),
-  f('f17', 'Bianca Lopes', '11999990017', 'Atendente', 'pizza', 'funcionario', '2024-06-03', 'f6', 'inativo', diaNoMes(0, 3)),
-  f('f18', 'Felipe Araújo', '11999990018', 'Chapeiro', 'burger-va', 'funcionario', '2024-09-16', 'f22', 'inativo', diaNoMes(1, 20)),
-  f('f19', 'Sabrina Melo', '11999990019', 'Atendente', 'burger-va', 'funcionario', diaNoMes(2, 8), 'f22'),
-  f('f21', 'Renata Prado', '11999990021', 'Gerente de unidade', 'burger-va', 'gerente', '2023-10-02', 'f1'),
-  f('f22', 'Marcos Silva', '11999990022', 'Supervisor de cozinha', 'burger-va', 'supervisor', '2024-03-11', 'f21'),
-  f('f20', 'Eduardo Pinto', '11999990020', 'Pizzaiolo', 'pizza', 'funcionario', '2023-02-13', 'f6', 'inativo', diaNoMes(2, 25)),
+  f('p-maria-costa', 'Maria Josélia de Jesus da Costa', '11999990021', 'Gerente', 'burger-psd', 'gerente', ADMISSAO_A_CONFIRMAR, 'f1', 'ativo', null, 'geral'),
+  f('p-queli-souza', 'Queli da Silva Souza', '11999990022', 'Supervisor', 'burger-psd', 'supervisor', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'cozinha'),
+  f('p-arlene-santos', 'Arlene Aquino dos Santos', '11999990011', 'Supervisor', 'burger-va', 'supervisor', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'unidade'),
+  f('p-cibeli-costa', 'Cibeli Alves da Costa', '11999990012', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
+  f('p-dora-ramos', 'Dora Alice Miranda Ramos', '11999990013', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'ativo', null, 'atendimento'),
+  f('p-gustavo-lima', 'Gustavo Almeida Lima', '11999990014', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
+  f('p-julia-silva', 'Júlia Vitória Muniz da Silva', '11999990015', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'atendimento'),
+  f('p-kaua-silva', 'Kauã de Oliveira da Silva', '11999990016', 'Auxiliar', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'ativo', null, 'cozinha'),
+  f('p-kaue-oliveira', 'Kaue Oliveira', '11999990017', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'atendimento'),
+  f('p-larissa-porto', 'Larissa Nunes de Oliveira Porto', '11999990018', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'atendimento'),
+  f('p-laura-costa', 'Laura Sofia Alves da Costa', '11999990019', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'atendimento'),
+  f('p-lucas-torres', 'Lucas Vidal Moreira Torres', '11999990020', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
+  f('p-victor-correa', 'Victor Hugo da Silva Correa', '11999990023', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
+  f('p-caciano-souza', 'Caciano Ribeiro Silva Souza', '11999990024', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'inativo', '2026-07-28', 'atendimento'),
+  f('p-gilson-silva', 'Gilson Bento Silva', '11999990025', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-23', 'cozinha'),
+  f('p-joao-costa', 'João Victor Alves da Costa', '11999990026', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-09', 'atendimento'),
+  f('p-lucas-oliveira', 'Lucas Jean de Oliveira', '11999990027', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-06-30', 'cozinha'),
+  f('p-lucilene-mathias', 'Lucilene Aparecida Mathias', '11999990028', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-03', 'atendimento'),
+  f('p-natalia-silva', 'Natália dos Santos Silva', '11999990029', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-08-02', 'atendimento'),
+  f('p-richard-alexandre', 'Richard Aparecido Fernandes Alexandre', '11999990030', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-12', 'cozinha'),
 ]
 
 const agora = () => new Date().toISOString()
-const porIdSeed = (id: string) => funcionarios.find((x) => x.id === id)
 let seq = 100
 const novoId = (p: string) => `${p}${++seq}`
 
+// Documentos e exames são EXEMPLO (não vieram da planilha).
 const documentos: Documento[] = [
-  { id: 'd1', funcionarioId: 'f7', tipo: 'atestado', nomeArquivo: 'atestado-diego.pdf', observacao: 'Gripe', inicio: addDias(hoje(), -9), fim: addDias(hoje(), -8), enviadoPor: 'f7', criadoEm: addDias(hoje(), -9) + 'T10:12:00Z' },
-  { id: 'd2', funcionarioId: 'f7', tipo: 'documento_pessoal', nomeArquivo: 'rg-diego.jpg', enviadoPor: 'f2', criadoEm: '2024-02-05T14:00:00Z' },
-  { id: 'd4', funcionarioId: 'f12', tipo: 'atestado', nomeArquivo: 'atestado-gustavo.jpg', observacao: 'Consulta', inicio: diaNoMes(1, 21), fim: diaNoMes(1, 21), enviadoPor: 'f12', criadoEm: diaNoMes(1, 21) + 'T18:00:00Z' },
-  { id: 'd5', funcionarioId: 'f11', tipo: 'atestado', nomeArquivo: 'atestado-aline.pdf', inicio: diaNoMes(1, 12), fim: diaNoMes(1, 13), enviadoPor: 'f11', criadoEm: diaNoMes(1, 12) + 'T11:00:00Z' },
-  { id: 'd3', funcionarioId: 'f10', tipo: 'exame', nomeArquivo: 'aso-admissional.pdf', observacao: 'Exame admissional', enviadoPor: 'f2', criadoEm: '2023-08-01T09:00:00Z' },
+  { id: 'd1', funcionarioId: 'p-cibeli-costa', tipo: 'atestado', nomeArquivo: 'atestado.pdf', observacao: 'Exemplo', inicio: addDias(hoje(), -9), fim: addDias(hoje(), -8), enviadoPor: 'p-cibeli-costa', criadoEm: addDias(hoje(), -9) + 'T10:12:00Z' },
+  { id: 'd2', funcionarioId: 'p-cibeli-costa', tipo: 'documento_pessoal', nomeArquivo: 'rg.jpg', enviadoPor: 'p-maria-costa', criadoEm: '2026-01-05T14:00:00Z' },
 ]
 
-// Exames de saúde de exemplo, com situações variadas (em dia, vencendo, vencido, faltando).
 // [funcionário, dias desde o exame, faltando coprocultura?]
 const situacoesExame: [string, number, boolean?][] = [
-  ['f1', 120], ['f2', 200], ['f3', 300], ['f4', 90], ['f5', 352], ['f6', 400], ['f7', 345], ['f8', 60],
-  ['f9', 180], ['f10', 380], ['f11', 30], ['f12', 250, true], ['f16', 20], ['f19', 50], ['f21', 160], ['f22', 340],
+  ['f1', 120], ['p-maria-costa', 200], ['p-queli-souza', 352], ['p-arlene-santos', 90], ['p-cibeli-costa', 345],
+  ['p-dora-ramos', 380], ['p-gustavo-lima', 60], ['p-julia-silva', 250, true], ['p-kaue-oliveira', 30],
+  ['p-larissa-porto', 300], ['p-laura-costa', 180], ['p-lucas-torres', 400], ['p-victor-correa', 20],
 ]
 documentos.push(
   ...situacoesExame.flatMap(([fid, dias, semCopro], i): Documento[] => {
     const feito = addDias(hoje(), -dias)
     const vence = addMesesData(feito, 12)
-    const p = porIdSeed(fid)
-    const asoTipo = p && p.dataAdmissao >= addDias(feito, -30) ? 'aso_admissional' : 'aso_periodico'
-    const base = { funcionarioId: fid, enviadoPor: 'f2', realizadoEm: feito, vence, criadoEm: feito + 'T15:00:00Z' }
+    const base = { funcionarioId: fid, enviadoPor: 'p-maria-costa', realizadoEm: feito, vence, criadoEm: feito + 'T15:00:00Z' }
     return [
-      { ...base, id: `ds${i}a`, tipo: asoTipo, nomeArquivo: `aso-${fid}.pdf`, observacao: 'Clínica de segurança do trabalho' },
+      { ...base, id: `ds${i}a`, tipo: 'aso_periodico', nomeArquivo: `aso-${fid}.pdf`, observacao: 'Exemplo · clínica de segurança do trabalho' },
       ...(semCopro ? [] : [{ ...base, id: `ds${i}b`, tipo: 'coprocultura' as const, nomeArquivo: `coprocultura-${fid}.pdf` }]),
       { ...base, id: `ds${i}c`, tipo: 'coproparasitologico', nomeArquivo: `parasitologico-${fid}.pdf` },
     ]
@@ -85,49 +83,108 @@ const ASSINATURA_DEMO =
 
 const uniformes: EntregaUniforme[] = [
   {
-    id: 'u1', funcionarioId: 'f8', data: '2024-07-22', entreguePor: 'f5', observacao: null, criadoEm: '2024-07-22T10:00:00Z',
+    id: 'u1', funcionarioId: 'p-dora-ramos', data: '2026-01-05', entreguePor: 'p-arlene-santos', observacao: 'Exemplo', criadoEm: '2026-01-05T10:00:00Z',
     itens: [{ item: 'Camiseta', tamanho: 'M', quantidade: 2 }, { item: 'Avental', quantidade: 1 }, { item: 'Boné', quantidade: 1 }],
-    assinatura: ASSINATURA_DEMO, assinadoEm: '2024-07-22T10:02:00Z', assinadoVia: 'presencial',
+    assinatura: ASSINATURA_DEMO, assinadoEm: '2026-01-05T10:02:00Z', assinadoVia: 'presencial',
   },
   {
-    id: 'u2', funcionarioId: 'f7', data: '2024-02-05', entreguePor: 'f5', observacao: null, criadoEm: '2024-02-05T10:00:00Z',
-    itens: [{ item: 'Dólmã', tamanho: 'G', quantidade: 2 }, { item: 'Touca', quantidade: 2 }, { item: 'Luva térmica (EPI)', quantidade: 1 }],
-    assinatura: ASSINATURA_DEMO, assinadoEm: '2024-02-05T10:05:00Z', assinadoVia: 'presencial',
+    id: 'u2', funcionarioId: 'p-cibeli-costa', data: '2026-01-05', entreguePor: 'p-queli-souza', observacao: 'Exemplo', criadoEm: '2026-01-05T10:00:00Z',
+    itens: [{ item: 'Dólmã', tamanho: 'M', quantidade: 2 }, { item: 'Touca', quantidade: 2 }, { item: 'Luva térmica (EPI)', quantidade: 1 }],
+    assinatura: ASSINATURA_DEMO, assinadoEm: '2026-01-05T10:05:00Z', assinadoVia: 'presencial',
   },
   {
-    id: 'u3', funcionarioId: 'f7', data: addDias(hoje(), -1), entreguePor: 'f3', observacao: 'Troca do dólmã gasto', criadoEm: addDias(hoje(), -1) + 'T16:00:00Z',
-    itens: [{ item: 'Dólmã', tamanho: 'G', quantidade: 1 }, { item: 'Avental', quantidade: 1 }],
+    id: 'u3', funcionarioId: 'p-cibeli-costa', data: addDias(hoje(), -1), entreguePor: 'p-maria-costa', observacao: 'Exemplo · troca do dólmã gasto', criadoEm: addDias(hoje(), -1) + 'T16:00:00Z',
+    itens: [{ item: 'Dólmã', tamanho: 'M', quantidade: 1 }, { item: 'Avental', quantidade: 1 }],
     assinatura: null, assinadoEm: null, assinadoVia: null,
   },
 ]
 const arquivosDemo = new Map<string, string>()
 
-const ocorrencias: Ocorrencia[] = [
-  { id: 'o1', funcionarioId: 'f7', tipo: 'falta', data: addDias(hoje(), -9), descricao: 'Faltou com atestado (gripe).', registradoPor: 'f3', criadoEm: agora() },
-  { id: 'o2', funcionarioId: 'f8', tipo: 'atraso', data: addDias(hoje(), -3), descricao: 'Chegou 25 min atrasada, avisou pelo WhatsApp.', registradoPor: 'f5', criadoEm: agora() },
-  { id: 'o3', funcionarioId: 'f10', tipo: 'elogio', data: addDias(hoje(), -5), descricao: 'Cliente elogiou a pizza no iFood citando o atendimento.', registradoPor: 'f4', criadoEm: agora() },
-  // Histórico de exemplo dos últimos meses, para o painel ter comparação.
-  ...([
-    ['f8', 0, 2, 'falta'], ['f12', 0, 4, 'falta'], ['f11', 0, 5, 'atraso'],
-    ['f9', 1, 3, 'falta'], ['f12', 1, 9, 'falta'], ['f12', 1, 21, 'falta'], ['f11', 1, 12, 'falta'], ['f18', 1, 6, 'falta'],
-    ['f18', 1, 13, 'falta'], ['f8', 1, 17, 'atraso'], ['f10', 1, 24, 'atraso'], ['f9', 1, 27, 'advertencia'],
-    ['f7', 2, 5, 'falta'], ['f11', 2, 18, 'falta'], ['f20', 2, 11, 'falta'], ['f8', 2, 22, 'atraso'],
-  ] as const).map(([fid, m, d, tipo], i): Ocorrencia => ({
-    id: `oh${i}`, funcionarioId: fid, tipo, data: diaNoMes(m, d),
-    descricao: tipo === 'falta' ? 'Faltou sem aviso prévio.' : tipo === 'atraso' ? 'Chegou atrasado ao turno.' : 'Advertência por faltas repetidas.',
-    registradoPor: 'f3', criadoEm: agora(),
-  })),
-]
+// Valores reais de setembro/2026, da planilha.
+const caixinhas: Record<string, Record<string, number>> = {
+  '2026-09': { 'burger-psd': 3616.18, 'burger-va': 1118.34 },
+}
+
+// Faltas e advertências reais, da aba Ocorrências da planilha (jun a set/2026).
+// Uma linha de 25/08 ("Julia Motta Bernardo") ficou de fora: o nome não está na equipe.
+const ocorrencias: Ocorrencia[] = ([
+  ['2026-06-25', 'p-cibeli-costa', 'advertencia'],
+  ['2026-06-25', 'p-dora-ramos', 'advertencia'],
+  ['2026-06-25', 'p-gilson-silva', 'advertencia'],
+  ['2026-06-25', 'p-gilson-silva', 'falta'],
+  ['2026-06-25', 'p-joao-costa', 'advertencia'],
+  ['2026-06-25', 'p-kaua-silva', 'advertencia'],
+  ['2026-06-25', 'p-kaua-silva', 'falta'],
+  ['2026-06-25', 'p-laura-costa', 'advertencia'],
+  ['2026-06-25', 'p-lucilene-mathias', 'advertencia'],
+  ['2026-06-25', 'p-lucilene-mathias', 'falta'],
+  ['2026-06-25', 'p-lucilene-mathias', 'falta'],
+  ['2026-06-25', 'p-lucilene-mathias', 'falta'],
+  ['2026-06-25', 'p-lucilene-mathias', 'falta'],
+  ['2026-06-25', 'p-lucilene-mathias', 'falta'],
+  ['2026-06-25', 'p-natalia-silva', 'advertencia'],
+  ['2026-06-25', 'p-natalia-silva', 'falta'],
+  ['2026-06-25', 'p-richard-alexandre', 'advertencia'],
+  ['2026-07-03', 'p-cibeli-costa', 'advertencia'],
+  ['2026-07-03', 'p-dora-ramos', 'advertencia'],
+  ['2026-07-03', 'p-gilson-silva', 'advertencia'],
+  ['2026-07-03', 'p-gilson-silva', 'falta'],
+  ['2026-07-03', 'p-joao-costa', 'advertencia'],
+  ['2026-07-03', 'p-kaua-silva', 'advertencia'],
+  ['2026-07-03', 'p-kaua-silva', 'falta'],
+  ['2026-07-03', 'p-laura-costa', 'advertencia'],
+  ['2026-07-03', 'p-lucilene-mathias', 'advertencia'],
+  ['2026-07-03', 'p-lucilene-mathias', 'falta'],
+  ['2026-07-03', 'p-lucilene-mathias', 'falta'],
+  ['2026-07-03', 'p-lucilene-mathias', 'falta'],
+  ['2026-07-03', 'p-lucilene-mathias', 'falta'],
+  ['2026-07-03', 'p-lucilene-mathias', 'falta'],
+  ['2026-07-03', 'p-natalia-silva', 'advertencia'],
+  ['2026-07-03', 'p-natalia-silva', 'falta'],
+  ['2026-07-03', 'p-richard-alexandre', 'advertencia'],
+  ['2026-07-08', 'p-kaua-silva', 'falta'],
+  ['2026-07-09', 'p-joao-costa', 'falta'],
+  ['2026-07-09', 'p-kaua-silva', 'advertencia'],
+  ['2026-07-12', 'p-richard-alexandre', 'falta'],
+  ['2026-07-23', 'p-gilson-silva', 'falta'],
+  ['2026-07-23', 'p-gilson-silva', 'falta'],
+  ['2026-07-25', 'p-julia-silva', 'falta'],
+  ['2026-07-26', 'p-julia-silva', 'falta'],
+  ['2026-07-27', 'p-julia-silva', 'falta'],
+  ['2026-07-28', 'p-caciano-souza', 'advertencia'],
+  ['2026-08-02', 'p-natalia-silva', 'advertencia'],
+  ['2026-08-11', 'p-cibeli-costa', 'falta'],
+  ['2026-08-13', 'p-larissa-porto', 'falta'],
+  ['2026-08-13', 'p-lucas-torres', 'advertencia'],
+  ['2026-09-09', 'p-kaua-silva', 'advertencia'],
+  ['2026-09-12', 'p-larissa-porto', 'falta'],
+  ['2026-09-13', 'p-gustavo-lima', 'falta'],
+  ['2026-09-13', 'p-larissa-porto', 'falta'],
+  ['2026-09-18', 'p-larissa-porto', 'advertencia'],
+  ['2026-09-18', 'p-laura-costa', 'advertencia'],
+  ['2026-09-19', 'p-victor-correa', 'falta'],
+  ['2026-09-20', 'p-lucas-torres', 'falta'],
+  ['2026-09-20', 'p-victor-correa', 'falta'],
+  ['2026-09-21', 'p-lucas-torres', 'falta'],
+  ['2026-09-21', 'p-victor-correa', 'falta'],
+  ['2026-09-22', 'p-victor-correa', 'advertencia'],
+  ['2026-09-22', 'p-victor-correa', 'advertencia'],
+] as const).map(([data, fid, tipo], i): Ocorrencia => ({
+  id: `oc${i}`, funcionarioId: fid, tipo, data,
+  descricao: tipo === 'falta' ? 'Falta (importada da planilha de caixinha).' : 'Advertência (importada da planilha de caixinha).',
+  registradoPor: 'p-maria-costa', criadoEm: data + 'T12:00:00Z',
+}))
 
 const comunicados: Comunicado[] = [
-  { id: 'c1', titulo: 'Bem-vindos ao Portal The Ozzy', corpo: 'A partir de agora, comunicados, folgas e documentos ficam aqui. Atestados devem ser enviados pelo portal no mesmo dia, com foto legível.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -2) + 'T12:00:00Z', lidoPor: ['f2', 'f3'] },
-  { id: 'c2', titulo: 'Reunião de alinhamento de regras', corpo: 'Gerentes, supervisores e escritório: reunião na quinta às 15h para revisar regras e processos. Tragam as dúvidas da equipe.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -1) + 'T09:30:00Z', lidoPor: [] },
-  { id: 'c3', titulo: 'Novo forno: cuidado na limpeza', corpo: 'O forno novo não pode ser lavado com água corrente. Usar somente o produto indicado no POP de limpeza.', unidadeId: 'pizza', autorId: 'f4', criadoEm: addDias(hoje(), -4) + 'T16:00:00Z', lidoPor: ['f10'] },
+  { id: 'c1', titulo: 'Bem-vindos ao Portal The Ozzy', corpo: 'A partir de agora, comunicados, folgas e documentos ficam aqui. Atestados devem ser enviados pelo portal no mesmo dia, com foto legível.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -2) + 'T12:00:00Z', lidoPor: ['p-maria-costa'] },
+  { id: 'c2', titulo: 'Reunião de alinhamento de regras', corpo: 'Gerente e supervisoras: reunião na quinta às 15h para revisar regras e processos. Tragam as dúvidas da equipe.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -1) + 'T09:30:00Z', lidoPor: [] },
+  { id: 'c3', titulo: 'Limpeza da chapa no fechamento', corpo: 'A partir de hoje a chapa é limpa no fechamento com o produto indicado no POP. A supervisora confere antes de sair.', unidadeId: 'burger-va', autorId: 'p-arlene-santos', criadoEm: addDias(hoje(), -4) + 'T16:00:00Z', lidoPor: ['p-dora-ramos'] },
 ]
 
 const semana = inicioDaSemana(hoje())
 const folgas: Folga[] = [
-  ['f7', 1], ['f8', 2], ['f9', 3], ['f5', 0], ['f10', 1], ['f11', 2], ['f12', 0], ['f6', 3], ['f3', 0], ['f4', 1],
+  ['p-cibeli-costa', 1], ['p-gustavo-lima', 2], ['p-julia-silva', 3], ['p-kaue-oliveira', 0], ['p-larissa-porto', 1],
+  ['p-laura-costa', 2], ['p-lucas-torres', 3], ['p-victor-correa', 0], ['p-dora-ramos', 1], ['p-kaua-silva', 2], ['p-queli-souza', 0],
 ].map(([fid, d], i) => ({ id: `g${i}`, funcionarioId: fid as string, data: addDias(semana, d as number) }))
 
 const espera = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 80))
@@ -285,6 +342,14 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async vendasEntre(inicio, fim) {
       exigePainel()
       return espera(vendasDemo(inicio, fim))
+    },
+    async caixinhaTotais(mes) {
+      exigeGestao()
+      return espera({ ...(caixinhas[mes] ?? {}) })
+    },
+    async salvarCaixinhaTotal(mes, unidadeId, valor) {
+      exigeGestao()
+      caixinhas[mes] = { ...(caixinhas[mes] ?? {}), [unidadeId]: valor }
     },
     async avaliacoes() {
       exigePainel()

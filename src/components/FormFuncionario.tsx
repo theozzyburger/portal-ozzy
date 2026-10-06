@@ -3,7 +3,7 @@ import { Botao, Campo, Modal, estiloEntrada } from './ui'
 import { useApp } from '../lib/contexto'
 import { hoje } from '../lib/datas'
 import { ir } from '../lib/rota'
-import { NIVEIS, type Funcionario, type Nivel } from '../lib/types'
+import { NIVEIS, SETORES, type Funcionario, type Nivel } from '../lib/types'
 
 export default function FormFuncionario({ aberto, aoFechar, existente }: { aberto: boolean; aoFechar: () => void; existente?: Funcionario }) {
   const { store, unidades, equipe, recarregarEquipe, avisar } = useApp()
@@ -15,6 +15,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     nivel: existente?.nivel ?? ('funcionario' as Nivel),
     dataAdmissao: existente?.dataAdmissao ?? hoje(),
     respondePara: existente?.respondePara ?? '',
+    setor: existente?.setor ?? '',
   }))
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
@@ -32,6 +33,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
           ...f,
           id: existente?.id,
           respondePara: f.respondePara || null,
+          setor: (f.setor || null) as Funcionario['setor'],
           status: existente?.status ?? 'ativo',
           dataDesligamento: existente?.dataDesligamento ?? null,
         },
@@ -60,13 +62,28 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
           <input className={estiloEntrada} inputMode="tel" value={f.celular} onChange={mudar('celular')} required />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="Cargo">
-            <input className={estiloEntrada} placeholder="Ex.: Chapeiro" value={f.cargo} onChange={mudar('cargo')} required />
+          <Campo rotulo="Cargo" dica="Na caixinha: Auxiliar, Atendente, Supervisor ou Gerente.">
+            <input className={estiloEntrada} placeholder="Ex.: Atendente" value={f.cargo} onChange={mudar('cargo')} required list="cargos-caixinha" />
+            <datalist id="cargos-caixinha">
+              {['Auxiliar', 'Atendente', 'Supervisor', 'Gerente'].map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </Campo>
           <Campo rotulo="Admissão">
             <input className={estiloEntrada} type="date" value={f.dataAdmissao} onChange={mudar('dataAdmissao')} required />
           </Campo>
         </div>
+        <Campo rotulo="Setor" dica="Define o grupo do bônus da caixinha.">
+          <select className={estiloEntrada} value={f.setor} onChange={mudar('setor')}>
+            <option value="">—</option>
+            {SETORES.map((x) => (
+              <option key={x.valor} value={x.valor}>
+                {x.nome}
+              </option>
+            ))}
+          </select>
+        </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo="Unidade">
             <select className={estiloEntrada} value={f.unidadeId} onChange={mudar('unidadeId')}>

@@ -14,6 +14,7 @@ import Equipe from './pages/Equipe'
 import Perfil from './pages/Perfil'
 import EmBreve from './pages/EmBreve'
 import Vencimentos from './pages/Vencimentos'
+import Caixinha from './pages/Caixinha'
 import Icone from './components/Icone'
 import logo from './assets/logo.png'
 import { modulosVisiveis } from './lib/modulos'
@@ -77,7 +78,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
     { id: 'avisos', nome: 'Avisos' },
     { id: 'folgas', nome: 'Folgas' },
     ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe' }] : []),
-    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }] : []),
+    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }, { id: 'caixinha', nome: 'Caixinha' }] : []),
     { id: 'ponto', nome: 'Ponto', emBreve: true },
     { id: 'perfil', nome: 'Meu perfil' },
   ]
@@ -90,6 +91,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (abaRh === 'equipe' && param) conteudo = <Perfil funcionarioId={param} />
   else if (abaRh === 'equipe') conteudo = <Equipe />
   else if (abaRh === 'exames') conteudo = <Vencimentos />
+  else if (abaRh === 'caixinha') conteudo = <Caixinha />
   else if (abaRh === 'ponto') conteudo = <EmBreve modulo={PONTO} />
   else if (abaRh === 'perfil') conteudo = <Perfil funcionarioId={eu.id} />
   else conteudo = <Comunicados />

@@ -8,7 +8,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
-  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para,
+  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor,
 })
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
@@ -29,7 +29,7 @@ const paraOcorrencia = (r: any): Ocorrencia => ({
 const deFuncionario = (f: Partial<Funcionario>) => ({
   nome: f.nome, celular: f.celular ? soDigitos(f.celular) : undefined, cargo: f.cargo, unidade_id: f.unidadeId,
   nivel: f.nivel, status: f.status, data_admissao: f.dataAdmissao, data_desligamento: f.dataDesligamento || null,
-  responde_para: f.respondePara || null,
+  responde_para: f.respondePara || null, setor: f.setor || null,
 })
 
 const ok = <T,>({ data, error }: { data: T; error: { message: string } | null }) => {
@@ -179,6 +179,13 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return linhas.map((r: any): VendaDia => ({
         unidadeId: r.unidade_id, data: r.data, canal: r.canal, pedidos: r.pedidos, faturamento: Number(r.faturamento),
       }))
+    },
+    async caixinhaTotais(mes) {
+      const linhas = ok(await sb.from('caixinha_mensal').select('*').eq('mes', mes)) ?? []
+      return Object.fromEntries(linhas.map((r: any) => [r.unidade_id, Number(r.total)]))
+    },
+    async salvarCaixinhaTotal(mes, unidadeId, valor) {
+      ok(await sb.from('caixinha_mensal').upsert({ mes, unidade_id: unidadeId, total: valor }))
     },
     async avaliacoes() {
       const linhas = ok(await sb.from('avaliacoes').select('*')) ?? []

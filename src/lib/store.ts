@@ -75,6 +75,10 @@ export interface Store {
 
   // Painel (Proprietário e Gerente): pedidos e faturamento por dia/loja/canal, e notas nas plataformas.
   vendasEntre(inicio: string, fim: string): Promise<VendaDia[]>
+
+  // Caixinha: valor total arrecadado no mês ('AAAA-MM') por loja. Só a gestão.
+  caixinhaTotais(mes: string): Promise<Record<string, number>>
+  salvarCaixinhaTotal(mes: string, unidadeId: string, valor: number): Promise<void>
   avaliacoes(): Promise<Avaliacao[]>
 }
 
