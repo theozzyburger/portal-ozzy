@@ -13,7 +13,8 @@ create table unidades (
 );
 
 insert into unidades (id, nome) values
-  ('burger', 'The Ozzy Burger'),
+  ('burger-psd', 'The Ozzy Burger Parque São Domingos'),
+  ('burger-va', 'The Ozzy Burger Vila Anastácio'),
   ('pizza', 'The Ozzy Pizza');
 
 create table funcionarios (

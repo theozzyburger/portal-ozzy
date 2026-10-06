@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Comunicado, Documento, Folga, Funcionario, Ocorrencia } from './types'
+import type { Avaliacao, Comunicado, Documento, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -148,6 +148,19 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       const existente = ok(await sb.from('folgas').select('id').eq('funcionario_id', fid).eq('data', data).maybeSingle())
       if (existente) ok(await sb.from('folgas').delete().eq('id', (existente as any).id))
       else ok(await sb.from('folgas').insert({ funcionario_id: fid, data }))
+    },
+    async vendasEntre(inicio, fim) {
+      const linhas = ok(await sb.from('vendas_diarias').select('*').gte('data', inicio).lte('data', fim)) ?? []
+      return linhas.map((r: any): VendaDia => ({
+        unidadeId: r.unidade_id, data: r.data, canal: r.canal, pedidos: r.pedidos, faturamento: Number(r.faturamento),
+      }))
+    },
+    async avaliacoes() {
+      const linhas = ok(await sb.from('avaliacoes').select('*')) ?? []
+      return linhas.map((r: any): Avaliacao => ({
+        unidadeId: r.unidade_id, plataforma: r.plataforma, nota: Number(r.nota), totalAvaliacoes: r.total_avaliacoes,
+        notaHa30Dias: r.nota_ha_30_dias === null ? null : Number(r.nota_ha_30_dias), atualizadoEm: r.atualizado_em,
+      }))
     },
   }
 }

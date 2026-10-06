@@ -1,4 +1,4 @@
-import type { Comunicado, Documento, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade } from './types'
+import type { Avaliacao, Comunicado, Documento, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -54,6 +54,10 @@ export interface Store {
 
   folgas(inicio: string, fim: string): Promise<Folga[]>
   alternarFolga(funcionarioId: string, data: string): Promise<void>
+
+  // Painel (Proprietário e Gerente): pedidos e faturamento por dia/loja/canal, e notas nas plataformas.
+  vendasEntre(inicio: string, fim: string): Promise<VendaDia[]>
+  avaliacoes(): Promise<Avaliacao[]>
 }
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')

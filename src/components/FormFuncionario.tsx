@@ -11,7 +11,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     nome: existente?.nome ?? '',
     celular: existente?.celular ?? '',
     cargo: existente?.cargo ?? '',
-    unidadeId: existente?.unidadeId ?? unidades[0]?.id ?? 'burger',
+    unidadeId: existente?.unidadeId ?? unidades[0]?.id ?? '',
     nivel: existente?.nivel ?? ('funcionario' as Nivel),
     dataAdmissao: existente?.dataAdmissao ?? hoje(),
     respondePara: existente?.respondePara ?? '',

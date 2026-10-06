@@ -4,7 +4,11 @@ import { Avatar, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addMeses, dataCurta, hoje, mesDe, nomeMes, nomeMesAno, primeiroDia, ultimoDia } from '../lib/datas'
 import { ir } from '../lib/rota'
-import type { Documento, Funcionario, Ocorrencia } from '../lib/types'
+import { apelidoUnidade, type Avaliacao, type Documento, type Funcionario, type Ocorrencia } from '../lib/types'
+import PainelAvaliacoes from './PainelAvaliacoes'
+import PainelPedidos from './PainelPedidos'
+
+type Aba = 'pedidos' | 'avaliacoes' | 'rh' | 'financeiro'
 
 interface Numeros {
   ativos: number
@@ -47,7 +51,13 @@ export default function Painel() {
   const [unidade, setUnidade] = useState('')
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [atestados, setAtestados] = useState<Documento[]>([])
+  const [aba, setAba] = useState<Aba>('pedidos')
+  const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([])
   const anterior = addMeses(mes, -1)
+
+  useEffect(() => {
+    store.avaliacoes().then(setAvaliacoes)
+  }, [store])
 
   useEffect(() => {
     const ini = primeiroDia(anterior)
@@ -83,43 +93,84 @@ export default function Painel() {
   ).sort((a, b) => b[1] - a[1])
   const pessoa = (id: string) => equipe.find((p) => p.id === id)
 
+  const abas: { id: Aba; nome: string; icone: 'pedidos' | 'avaliacoes' | 'rh' | 'financeiro' }[] = [
+    { id: 'pedidos', nome: 'Pedidos', icone: 'pedidos' },
+    { id: 'avaliacoes', nome: 'Avaliações', icone: 'avaliacoes' },
+    { id: 'rh', nome: 'RH', icone: 'rh' },
+    { id: 'financeiro', nome: 'Financeiro', icone: 'financeiro' },
+  ]
+
   return (
-    <section className="space-y-5">
+    <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="rotulo-marca text-[11px] text-stone-500">Painel da gestão</div>
-          <h2 className="text-2xl font-bold tracking-tight first-letter:uppercase">{nomeMesAno(mes)}</h2>
-          {mesAtual && <p className="text-sm text-stone-500">Mês em andamento, até hoje ({dataCurta(hoje())})</p>}
+          <h2 className="text-2xl font-bold tracking-tight">{unidade ? nomeUnidade(unidade) : 'Todas as lojas'}</h2>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center rounded-xl bg-white ring-1 ring-stone-300">
-            <button onClick={() => setMes(addMeses(mes, -1))} className="px-3 py-2 font-semibold text-stone-600 hover:text-carvao" aria-label="Mês anterior">
-              ‹
-            </button>
-            <span className="min-w-24 text-center text-sm font-semibold capitalize">{nomeMes(mes)}</span>
-            <button
-              onClick={() => setMes(addMeses(mes, 1))}
-              disabled={mesAtual}
-              className="px-3 py-2 font-semibold text-stone-600 hover:text-carvao disabled:opacity-30"
-              aria-label="Próximo mês"
-            >
-              ›
-            </button>
-          </div>
-          <select className={`${estiloEntrada} w-auto! py-2!`} value={unidade} onChange={(e) => setUnidade(e.target.value)}>
-            <option value="">Todas as unidades</option>
-            {unidades.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nome}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select className={`${estiloEntrada} w-full! py-2! sm:w-auto!`} value={unidade} onChange={(e) => setUnidade(e.target.value)} aria-label="Loja">
+          <option value="">Todas as lojas</option>
+          {unidades.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.nome}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* RH */}
+      <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist">
+        {abas.map((a) => (
+          <button
+            key={a.id}
+            role="tab"
+            aria-selected={aba === a.id}
+            onClick={() => setAba(a.id)}
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition ${
+              aba === a.id ? 'bg-carvao text-ozzy-400' : 'bg-white text-stone-600 ring-1 ring-stone-200 hover:text-carvao hover:ring-carvao'
+            }`}
+          >
+            <Icone nome={a.icone} tamanho={16} />
+            {a.nome}
+          </button>
+        ))}
+      </div>
+
+      {aba === 'pedidos' && (
+        <div className="rounded-3xl bg-white p-3 ring-1 ring-stone-200 sm:p-5">
+          <PainelPedidos unidade={unidade} avaliacoes={avaliacoes} />
+        </div>
+      )}
+
+      {aba === 'avaliacoes' && (
+        <div className="rounded-3xl bg-white p-3 ring-1 ring-stone-200 sm:p-5">
+          <PainelAvaliacoes unidade={unidade} avaliacoes={avaliacoes} />
+        </div>
+      )}
+
+      {aba === 'rh' && (
       <div className="rounded-3xl bg-white p-4 ring-1 ring-stone-200 sm:p-5">
-        <CabecalhoArea icone="rh" nome="RH" acao={<button onClick={() => ir('rh/equipe')} className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4">Ver equipe</button>} />
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold first-letter:uppercase">{nomeMesAno(mes)}</h3>
+            {mesAtual && <p className="text-sm text-stone-500">Mês em andamento, até hoje ({dataCurta(hoje())})</p>}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center rounded-xl bg-white ring-1 ring-stone-300">
+              <button onClick={() => setMes(addMeses(mes, -1))} className="px-3 py-2 font-semibold text-stone-600 hover:text-carvao" aria-label="Mês anterior">
+                ‹
+              </button>
+              <span className="min-w-24 text-center text-sm font-semibold capitalize">{nomeMes(mes)}</span>
+              <button
+                onClick={() => setMes(addMeses(mes, 1))}
+                disabled={mesAtual}
+                className="px-3 py-2 font-semibold text-stone-600 hover:text-carvao disabled:opacity-30"
+                aria-label="Próximo mês"
+              >
+                ›
+              </button>
+            </div>
+            <button onClick={() => ir('rh/equipe')} className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4">Ver equipe</button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           <Indicador nome="Faltas" valor={atual.faltas} comparacao={comparacao} antes={antes.faltas} subirEhRuim destaque />
           <Indicador nome="Contratações" valor={atual.contratacoes} comparacao={comparacao} antes={antes.contratacoes} />
@@ -142,7 +193,7 @@ export default function Painel() {
             <table className="w-full min-w-[520px] text-sm tabular-nums">
               <thead>
                 <tr className="border-b border-stone-200 text-left text-stone-500">
-                  <th className="py-2 pr-3 font-semibold">Unidade</th>
+                  <th className="py-2 pr-3 font-semibold">Loja</th>
                   <th className="px-2 py-2 text-right font-semibold">Ativos</th>
                   <th className="px-2 py-2 text-right font-semibold">Faltas</th>
                   <th className="px-2 py-2 text-right font-semibold">Atrasos</th>
@@ -157,7 +208,7 @@ export default function Painel() {
                   const n = calcular(d.pessoas, d.ocorrencias, d.atestados, mes)
                   return (
                     <tr key={u.id} className="border-b border-stone-100 last:border-0">
-                      <td className="py-2 pr-3 font-semibold">{u.nome}</td>
+                      <td className="py-2 pr-3 font-semibold">{apelidoUnidade(u.nome)}</td>
                       <td className="px-2 py-2 text-right">{n.ativos}</td>
                       <td className="px-2 py-2 text-right">{n.faltas}</td>
                       <td className="px-2 py-2 text-right">{n.atrasos}</td>
@@ -189,12 +240,15 @@ export default function Painel() {
             {sairam.length === 0 ? <Vazio>Ninguém desligado no mês.</Vazio> : sairam.map((p) => <LinhaPessoa key={p.id} p={p} extra={dataCurta(p.dataDesligamento!)} />)}
           </Lista>
         </div>
-        {unidade && <p className="mt-3 text-xs text-stone-500">Mostrando só {nomeUnidade(unidade)}.</p>}
       </div>
+      )}
 
-      {/* Financeiro */}
+      {aba === 'financeiro' && (
       <div className="rounded-3xl bg-white p-4 ring-1 ring-stone-200 sm:p-5">
-        <CabecalhoArea icone="financeiro" nome="Financeiro" acao={<Selo>Em breve</Selo>} />
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-bold">Financeiro</h3>
+          <Selo>Em breve</Selo>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {['Faturamento', 'CMV', 'Ticket médio', 'Despesas'].map((n) => (
             <div key={n} className="rounded-2xl border border-dashed border-stone-300 p-3">
@@ -203,23 +257,10 @@ export default function Painel() {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-sm text-stone-500">Estes números vão vir do Lucro Fácil, por unidade e por mês.</p>
+        <p className="mt-3 text-sm text-stone-500">Estes números vão vir do Lucro Fácil, por loja e por mês.</p>
       </div>
+      )}
     </section>
-  )
-}
-
-function CabecalhoArea({ icone, nome, acao }: { icone: 'rh' | 'financeiro'; nome: string; acao?: React.ReactNode }) {
-  return (
-    <div className="mb-4 flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-carvao text-ozzy-400">
-          <Icone nome={icone} tamanho={18} />
-        </span>
-        <h3 className="text-lg font-bold">{nome}</h3>
-      </div>
-      {acao}
-    </div>
   )
 }
 

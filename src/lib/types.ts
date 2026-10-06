@@ -92,3 +92,36 @@ export const TIPOS_OCORRENCIA: { valor: TipoOcorrencia; nome: string }[] = [
 export const nomeNivel = (n: Nivel) => NIVEIS.find((x) => x.valor === n)?.nome ?? n
 export const nomeTipoDocumento = (t: TipoDocumento) => TIPOS_DOCUMENTO.find((x) => x.valor === t)?.nome ?? t
 export const nomeTipoOcorrencia = (t: TipoOcorrencia) => TIPOS_OCORRENCIA.find((x) => x.valor === t)?.nome ?? t
+
+// Nome curto da loja, para selos e gráficos: "Parque São Domingos", "Vila Anastácio", "Pizza".
+export const apelidoUnidade = (nome: string) => nome.replace(/^The Ozzy Burger /, '').replace(/^The Ozzy /, '')
+
+// Vendas por dia, loja e canal. Vão vir do PDV / iFood / 99Food; por enquanto, exemplo.
+export type Canal = 'salao' | 'ifood' | 'proprio' | '99food'
+
+// A ordem é fixa: é ela que define a cor de cada canal nos gráficos.
+export const CANAIS: { valor: Canal; nome: string; cor: string }[] = [
+  { valor: 'salao', nome: 'Salão', cor: '#2a78d6' },
+  { valor: 'ifood', nome: 'iFood', cor: '#eb6834' },
+  { valor: 'proprio', nome: 'Delivery próprio', cor: '#1baf7a' },
+  { valor: '99food', nome: '99Food', cor: '#eda100' },
+]
+
+export interface VendaDia {
+  unidadeId: string
+  data: string
+  canal: Canal
+  pedidos: number
+  faturamento: number
+}
+
+export type Plataforma = 'ifood' | '99food'
+
+export interface Avaliacao {
+  unidadeId: string
+  plataforma: Plataforma
+  nota: number
+  totalAvaliacoes: number
+  notaHa30Dias: number | null
+  atualizadoEm: string
+}

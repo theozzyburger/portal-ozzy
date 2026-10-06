@@ -4,7 +4,7 @@ import FormFuncionario from '../components/FormFuncionario'
 import { useApp } from '../lib/contexto'
 import { podeGerenciar } from '../lib/permissoes'
 import { ir } from '../lib/rota'
-import { nomeNivel, type Funcionario } from '../lib/types'
+import { apelidoUnidade, nomeNivel, type Funcionario } from '../lib/types'
 
 export default function Equipe() {
   const { eu, equipe, unidades, nomeUnidade } = useApp()
@@ -68,7 +68,7 @@ export default function Equipe() {
                   <div className="truncate text-sm text-stone-500">{f.cargo}</div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <Selo cor="azul">{nomeUnidade(f.unidadeId).replace('The Ozzy ', '')}</Selo>
+                  <Selo cor="azul">{apelidoUnidade(nomeUnidade(f.unidadeId))}</Selo>
                   {f.nivel !== 'funcionario' && <Selo>{nomeNivel(f.nivel)}</Selo>}
                 </div>
               </div>

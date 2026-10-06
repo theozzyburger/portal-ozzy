@@ -1,12 +1,14 @@
-import { podeGerenciar, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
+import { podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
 import type { Comunicado, Documento, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, diaNoMes, hoje, inicioDaSemana } from './datas'
+import { avaliacoesDemo, vendasDemo } from './demoVendas'
 
 export const SENHA_DEMO = '1234'
 
 const unidades: Unidade[] = [
-  { id: 'burger', nome: 'The Ozzy Burger' },
+  { id: 'burger-psd', nome: 'The Ozzy Burger Parque São Domingos' },
+  { id: 'burger-va', nome: 'The Ozzy Burger Vila Anastácio' },
   { id: 'pizza', nome: 'The Ozzy Pizza' },
 ]
 
@@ -17,25 +19,27 @@ const f = (
 ): Funcionario => ({ id, nome, celular, cargo, unidadeId, nivel, status, dataAdmissao, respondePara, dataDesligamento })
 
 const funcionarios: Funcionario[] = [
-  f('f1', 'Heitor', '11999990001', 'Proprietário', 'burger', 'proprietario', '2019-03-01'),
-  f('f2', 'Marina Costa', '11999990002', 'Assistente administrativo/financeiro', 'burger', 'administrativo', '2022-02-14', 'f1'),
-  f('f3', 'Rafael Lima', '11999990003', 'Gerente de unidade', 'burger', 'gerente', '2021-06-01', 'f1'),
+  f('f1', 'Heitor', '11999990001', 'Proprietário', 'burger-psd', 'proprietario', '2019-03-01'),
+  f('f2', 'Marina Costa', '11999990002', 'Assistente administrativo/financeiro', 'burger-psd', 'administrativo', '2022-02-14', 'f1'),
+  f('f3', 'Rafael Lima', '11999990003', 'Gerente de unidade', 'burger-psd', 'gerente', '2021-06-01', 'f1'),
   f('f4', 'Juliana Souza', '11999990004', 'Gerente de unidade', 'pizza', 'gerente', '2022-09-12', 'f1'),
-  f('f5', 'Bruno Alves', '11999990005', 'Supervisor de cozinha', 'burger', 'supervisor', '2023-01-09', 'f3'),
+  f('f5', 'Bruno Alves', '11999990005', 'Supervisor de cozinha', 'burger-psd', 'supervisor', '2023-01-09', 'f3'),
   f('f6', 'Carla Mendes', '11999990006', 'Supervisora de salão', 'pizza', 'supervisor', '2023-04-17', 'f4'),
-  f('f7', 'Diego Rocha', '11999990007', 'Chapeiro', 'burger', 'funcionario', '2024-02-05', 'f5'),
-  f('f8', 'Patrícia Gomes', '11999990008', 'Atendente', 'burger', 'funcionario', '2024-07-22', 'f5'),
-  f('f9', 'Lucas Ferreira', '11999990009', 'Auxiliar de cozinha', 'burger', 'funcionario', '2025-01-13', 'f5'),
+  f('f7', 'Diego Rocha', '11999990007', 'Chapeiro', 'burger-psd', 'funcionario', '2024-02-05', 'f5'),
+  f('f8', 'Patrícia Gomes', '11999990008', 'Atendente', 'burger-psd', 'funcionario', '2024-07-22', 'f5'),
+  f('f9', 'Lucas Ferreira', '11999990009', 'Auxiliar de cozinha', 'burger-va', 'funcionario', '2025-01-13', 'f22'),
   f('f10', 'Thiago Martins', '11999990010', 'Pizzaiolo', 'pizza', 'funcionario', '2023-08-01', 'f6'),
   f('f11', 'Aline Ribeiro', '11999990011', 'Atendente', 'pizza', 'funcionario', '2024-11-04', 'f6'),
   f('f12', 'Gustavo Pereira', '11999990012', 'Entregador', 'pizza', 'funcionario', '2025-03-10', 'f6'),
-  f('f13', 'Fernanda Dias', '11999990013', 'Caixa', 'burger', 'funcionario', '2023-05-02', 'f5', 'inativo', diaNoMes(1, 29)),
+  f('f13', 'Fernanda Dias', '11999990013', 'Caixa', 'burger-psd', 'funcionario', '2023-05-02', 'f5', 'inativo', diaNoMes(1, 29)),
   f('f14', 'Vitor Santos', '11999990014', 'Atendente', 'pizza', 'funcionario', diaNoMes(0, 1), 'f6'),
-  f('f15', 'Camila Rocha', '11999990015', 'Auxiliar de cozinha', 'burger', 'funcionario', diaNoMes(0, 2), 'f5'),
-  f('f16', 'Rodrigo Nunes', '11999990016', 'Entregador', 'burger', 'funcionario', diaNoMes(1, 15), 'f5'),
+  f('f15', 'Camila Rocha', '11999990015', 'Auxiliar de cozinha', 'burger-va', 'funcionario', diaNoMes(0, 2), 'f22'),
+  f('f16', 'Rodrigo Nunes', '11999990016', 'Entregador', 'burger-psd', 'funcionario', diaNoMes(1, 15), 'f5'),
   f('f17', 'Bianca Lopes', '11999990017', 'Atendente', 'pizza', 'funcionario', '2024-06-03', 'f6', 'inativo', diaNoMes(0, 3)),
-  f('f18', 'Felipe Araújo', '11999990018', 'Chapeiro', 'burger', 'funcionario', '2024-09-16', 'f5', 'inativo', diaNoMes(1, 20)),
-  f('f19', 'Sabrina Melo', '11999990019', 'Atendente', 'burger', 'funcionario', diaNoMes(2, 8), 'f5'),
+  f('f18', 'Felipe Araújo', '11999990018', 'Chapeiro', 'burger-va', 'funcionario', '2024-09-16', 'f22', 'inativo', diaNoMes(1, 20)),
+  f('f19', 'Sabrina Melo', '11999990019', 'Atendente', 'burger-va', 'funcionario', diaNoMes(2, 8), 'f22'),
+  f('f21', 'Renata Prado', '11999990021', 'Gerente de unidade', 'burger-va', 'gerente', '2023-10-02', 'f1'),
+  f('f22', 'Marcos Silva', '11999990022', 'Supervisor de cozinha', 'burger-va', 'supervisor', '2024-03-11', 'f21'),
   f('f20', 'Eduardo Pinto', '11999990020', 'Pizzaiolo', 'pizza', 'funcionario', '2023-02-13', 'f6', 'inativo', diaNoMes(2, 25)),
 ]
 
@@ -91,6 +95,11 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
   const exigeGestao = () => {
     const u = exigeEu()
     if (!podeGerenciar(u.nivel)) throw new Error('Seu nível de acesso não permite esta ação.')
+    return u
+  }
+  const exigePainel = () => {
+    const u = exigeEu()
+    if (!podeVerPainel(u.nivel)) throw new Error('Seu nível de acesso não permite ver o painel.')
     return u
   }
   const porId = (id: string) => funcionarios.find((x) => x.id === id)!
@@ -199,6 +208,14 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const i = folgas.findIndex((g) => g.funcionarioId === fid && g.data === data)
       if (i >= 0) folgas.splice(i, 1)
       else folgas.push({ id: novoId('g'), funcionarioId: fid, data })
+    },
+    async vendasEntre(inicio, fim) {
+      exigePainel()
+      return espera(vendasDemo(inicio, fim))
+    },
+    async avaliacoes() {
+      exigePainel()
+      return espera(avaliacoesDemo())
     },
   }
 }
