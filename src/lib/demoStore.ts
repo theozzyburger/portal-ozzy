@@ -38,6 +38,8 @@ const funcionarios: Funcionario[] = [
   f('p-laura-costa', 'Laura Sofia Alves da Costa', '11999990019', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'atendimento'),
   f('p-lucas-torres', 'Lucas Vidal Moreira Torres', '11999990020', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
   f('p-victor-correa', 'Victor Hugo da Silva Correa', '11999990023', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
+  // Não está na planilha de caixinha; Heitor confirmou em 07/10 que é da Produção. Loja e cargo a confirmar.
+  f('p-julia-bernardo', 'Julia Motta Bernardo', '11999990031', 'Colaboradora de produção', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'producao'),
   f('p-caciano-souza', 'Caciano Ribeiro Silva Souza', '11999990024', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'inativo', '2026-07-28', 'atendimento'),
   f('p-gilson-silva', 'Gilson Bento Silva', '11999990025', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-23', 'cozinha'),
   f('p-joao-costa', 'João Victor Alves da Costa', '11999990026', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-09', 'atendimento'),
@@ -106,7 +108,6 @@ const caixinhas: Record<string, Record<string, number>> = {
 }
 
 // Faltas e advertências reais, da aba Ocorrências da planilha (jun a set/2026).
-// Uma linha de 25/08 ("Julia Motta Bernardo") ficou de fora: o nome não está na equipe.
 const ocorrencias: Ocorrencia[] = ([
   ['2026-06-25', 'p-cibeli-costa', 'advertencia'],
   ['2026-06-25', 'p-dora-ramos', 'advertencia'],
@@ -156,6 +157,7 @@ const ocorrencias: Ocorrencia[] = ([
   ['2026-08-11', 'p-cibeli-costa', 'falta'],
   ['2026-08-13', 'p-larissa-porto', 'falta'],
   ['2026-08-13', 'p-lucas-torres', 'advertencia'],
+  ['2026-08-25', 'p-julia-bernardo', 'advertencia'],
   ['2026-09-09', 'p-kaua-silva', 'advertencia'],
   ['2026-09-12', 'p-larissa-porto', 'falta'],
   ['2026-09-13', 'p-gustavo-lima', 'falta'],

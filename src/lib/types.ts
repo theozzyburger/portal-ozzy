@@ -22,10 +22,11 @@ export interface Funcionario {
   setor?: Setor | null
 }
 
-export type Setor = 'cozinha' | 'atendimento' | 'unidade' | 'geral'
+export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral'
 export const SETORES: { valor: Setor; nome: string }[] = [
   { valor: 'cozinha', nome: 'Cozinha' },
   { valor: 'atendimento', nome: 'Atendimento' },
+  { valor: 'producao', nome: 'Produção' },
   { valor: 'unidade', nome: 'Unidade toda' },
   { valor: 'geral', nome: 'Geral (todas as lojas)' },
 ]

@@ -51,8 +51,11 @@ export interface LinhaCaixinha {
   total: number
 }
 
+// Setores que não entram na caixinha da planilha (a Produção não participa).
+export const SETORES_FORA = ['producao']
+
 export function calcularCaixinha(pessoas: Funcionario[], ocorrenciasDoMes: Ocorrencia[], totais: Record<string, number>) {
-  const participantes = pessoas.filter((p) => p.status === 'ativo' && pontosDoCargo(p.cargo) > 0 && (p.setor === 'geral' || UNIDADES_CAIXINHA.includes(p.unidadeId)))
+  const participantes = pessoas.filter((p) => p.status === 'ativo' && pontosDoCargo(p.cargo) > 0 && !SETORES_FORA.includes(p.setor ?? '') && (p.setor === 'geral' || UNIDADES_CAIXINHA.includes(p.unidadeId)))
   const gerais = participantes.filter((p) => p.setor === 'geral')
   const conta = (id: string, tipo: string) => ocorrenciasDoMes.filter((o) => o.funcionarioId === id && o.tipo === tipo).length
   const nota = (id: string) => conta(id, 'falta') + PESO_ADVERTENCIA * conta(id, 'advertencia')
@@ -94,6 +97,6 @@ export function calcularCaixinha(pessoas: Funcionario[], ocorrenciasDoMes: Ocorr
   })
 
   // Quem está ativo mas ficou de fora (cargo sem pontos, loja sem caixinha).
-  const foraDaConta = pessoas.filter((p) => p.status === 'ativo' && !participantes.includes(p) && p.nivel !== 'proprietario' && UNIDADES_CAIXINHA.includes(p.unidadeId))
+  const foraDaConta = pessoas.filter((p) => p.status === 'ativo' && !participantes.includes(p) && p.nivel !== 'proprietario' && !SETORES_FORA.includes(p.setor ?? '') && UNIDADES_CAIXINHA.includes(p.unidadeId))
   return { unidades, linhas, foraDaConta }
 }

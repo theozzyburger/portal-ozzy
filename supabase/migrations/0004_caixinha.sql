@@ -1,7 +1,7 @@
 -- Caixinha: setor de cada funcionário (grupos de bônus) e total arrecadado por mês e loja.
 -- As regras de divisão ficam no app (src/lib/caixinha.ts), iguais às da planilha.
 
-create type setor_trabalho as enum ('cozinha', 'atendimento', 'unidade', 'geral');
+create type setor_trabalho as enum ('cozinha', 'atendimento', 'producao', 'unidade', 'geral');
 alter table funcionarios add column setor setor_trabalho;
 
 create table caixinha_mensal (
