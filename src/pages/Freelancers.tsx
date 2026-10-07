@@ -3,7 +3,7 @@ import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/u
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana } from '../lib/datas'
 import { soDigitos } from '../lib/store'
-import { apelidoUnidade, nomeCurto, type DiariaFreela, type Freelancer, type PagamentoFreela, type TurnoFreela } from '../lib/types'
+import { apelidoUnidade, nomeCurto, type DiariaFreela, type Funcionario, type Freelancer, type PagamentoFreela, type TurnoFreela } from '../lib/types'
 import { reais } from './Fichas'
 
 const FUNCOES = ['Chapeiro', 'Auxiliar de cozinha', 'Pizzaiolo', 'Atendente', 'Caixa', 'Entregador', 'Limpeza']
@@ -13,6 +13,12 @@ export { cpfValido, formatarCpf } from '../lib/cpf'
 import { cpfValido, formatarCpf } from '../lib/cpf'
 
 type Aba = 'lancamentos' | 'relatorio' | 'cadastro'
+
+// Freelancer ligado a um cadastro: funcionário ativo (diária na folga) ou ex-funcionário que voltou como freela.
+const vinculo = (f: Freelancer, equipe: Funcionario[]) => {
+  if (!f.funcionarioId) return null
+  return equipe.find((p) => p.id === f.funcionarioId)?.status === 'inativo' ? 'ex' : 'funcionario'
+}
 
 export default function Freelancers() {
   const { store, avisar } = useApp()
@@ -199,7 +205,7 @@ function Relatorio({
   semana: string; diarias: DiariaFreela[]; pagos: PagamentoFreela[]; porId: Map<string, Freelancer>
   alternarPago: (f: Freelancer, total: number, pago: boolean) => void
 }) {
-  const { unidades, avisar } = useApp()
+  const { unidades, avisar, equipe } = useApp()
   const nomeLoja = (id: string) => apelidoUnidade(unidades.find((u) => u.id === id)?.nome ?? id)
   const linhas = useMemo(() => {
     const m = new Map<string, DiariaFreela[]>()
@@ -266,7 +272,7 @@ function Relatorio({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-semibold">{f.nome}</div>
-                <div className="text-xs text-stone-500">{f.funcionarioId ? 'Funcionário, diária na folga' : `CPF ${formatarCpf(f.cpf)}`}</div>
+                <div className="text-xs text-stone-500">{vinculo(f, equipe) === 'funcionario' ? 'Funcionário, diária na folga' : `${vinculo(f, equipe) === 'ex' ? 'Ex-funcionário · ' : ''}${f.cpf ? `CPF ${formatarCpf(f.cpf)}` : ''}`}</div>
               </div>
               <div className="shrink-0 text-right">
                 <div className="text-lg font-bold tabular-nums">{reais(t)}</div>
@@ -305,6 +311,7 @@ function Relatorio({
 }
 
 function Cadastro({ freelas, editar }: { freelas: Freelancer[]; editar: (f: Freelancer) => void }) {
+  const { equipe } = useApp()
   const [busca, setBusca] = useState('')
   if (!freelas.length) return <Vazio>Nenhum freelancer cadastrado ainda.</Vazio>
   const termo = busca.trim().toLowerCase()
@@ -318,7 +325,8 @@ function Cadastro({ freelas, editar }: { freelas: Freelancer[]; editar: (f: Free
             <div className="font-semibold">{f.nome}</div>
             <div className="truncate text-xs text-stone-500">{f.cpf ? `CPF ${formatarCpf(f.cpf)} · ` : ''}Pix {f.pix}</div>
           </div>
-          {f.funcionarioId && <Selo cor="azul">Funcionário</Selo>}
+          {vinculo(f, equipe) === 'funcionario' && <Selo cor="azul">Funcionário</Selo>}
+          {vinculo(f, equipe) === 'ex' && <Selo cor="ambar">Ex-funcionário</Selo>}
           {!f.ativo && <Selo>Inativo</Selo>}
         </button>
       ))}
@@ -397,7 +405,11 @@ function FormDiaria({
 }) {
   const { store, unidades, eu, equipe } = useApp()
   // Funcionário também pode fazer diária na folga: aparece na lista e ganha um cadastro de freelancer ao lançar.
-  const doQuadro = equipe.filter((f) => f.status === 'ativo' && f.nivel !== 'proprietario' && !freelas.some((x) => x.funcionarioId === f.id)).sort((a, b) => a.nome.localeCompare(b.nome))
+  const semFreela = (status: Funcionario['status']) =>
+    equipe.filter((f) => f.status === status && f.nivel !== 'proprietario' && !freelas.some((x) => x.funcionarioId === f.id)).sort((a, b) => a.nome.localeCompare(b.nome))
+  const doQuadro = semFreela('ativo')
+  // Quem saiu da empresa e voltou só como freelancer: aproveita nome, CPF e Pix do cadastro antigo.
+  const exFuncionarios = semFreela('inativo')
   const [pixFunc, setPixFunc] = useState('')
   const [d, setD] = useState({
     freelancerId: '', data, turno: 'noite' as TurnoFreela, unidadeId: eu.unidadeId, funcao: '', valor: '', observacao: '',
@@ -424,7 +436,7 @@ function FormDiaria({
         const func = equipe.find((f) => 'func:' + f.id === freelancerId)!
         if (!pixFunc.trim()) throw new Error(`Informe o Pix de ${func.nome.split(' ')[0]} para o pagamento.`)
         const criado = await store.salvarFreelancer({
-          nome: func.nome, cpf: null, pix: pixFunc.trim(), celular: func.celular, ativo: true, funcionarioId: func.id,
+          nome: func.nome, cpf: func.status === 'inativo' ? func.cpf ?? null : null, pix: pixFunc.trim(), celular: func.celular, ativo: true, funcionarioId: func.id,
         })
         freelancerId = criado.id
       }
@@ -440,7 +452,7 @@ function FormDiaria({
 
   return (
     <Modal titulo="Lançar diária" aberto aoFechar={aoFechar}>
-      {freelas.length === 0 && doQuadro.length === 0 ? (
+      {freelas.length === 0 && doQuadro.length === 0 && exFuncionarios.length === 0 ? (
         <div className="space-y-3">
           <Vazio>Cadastre o freelancer antes de lançar a diária.</Vazio>
           <Botao className="w-full" onClick={novoFreela}>+ Novo freelancer</Botao>
@@ -452,12 +464,19 @@ function FormDiaria({
               <option value="">Escolha…</option>
               <optgroup label="Freelancers">
                 {freelas.map((f) => (
-                  <option key={f.id} value={f.id}>{f.nome}{f.funcionarioId ? ' (funcionário)' : ''}</option>
+                  <option key={f.id} value={f.id}>{f.nome}{vinculo(f, equipe) === 'funcionario' ? ' (funcionário)' : vinculo(f, equipe) === 'ex' ? ' (ex-funcionário)' : ''}</option>
                 ))}
               </optgroup>
               {doQuadro.length > 0 && (
                 <optgroup label="Funcionários (diária na folga)">
                   {doQuadro.map((f) => (
+                    <option key={f.id} value={'func:' + f.id}>{f.nome}</option>
+                  ))}
+                </optgroup>
+              )}
+              {exFuncionarios.length > 0 && (
+                <optgroup label="Ex-funcionários (voltaram como freela)">
+                  {exFuncionarios.map((f) => (
                     <option key={f.id} value={'func:' + f.id}>{f.nome}</option>
                   ))}
                 </optgroup>
