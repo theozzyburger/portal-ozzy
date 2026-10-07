@@ -102,7 +102,7 @@ export default function Painel() {
   const abas: { id: Aba; nome: string; icone: 'pedidos' | 'avaliacoes' | 'rh' | 'financeiro' }[] = [
     { id: 'pedidos', nome: 'Pedidos', icone: 'pedidos' },
     { id: 'avaliacoes', nome: 'Avaliações', icone: 'avaliacoes' },
-    { id: 'rh', nome: 'RH', icone: 'rh' },
+    { id: 'rh', nome: 'Pessoal', icone: 'rh' },
     { id: 'financeiro', nome: 'Financeiro', icone: 'financeiro' },
   ]
 

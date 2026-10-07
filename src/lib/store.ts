@@ -1,4 +1,4 @@
-import type { Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -118,6 +118,16 @@ export interface Store {
   fichas(): Promise<{ fichas: Ficha[]; atualizadoEm: string | null }>
   // Resultado do mês por loja: só Proprietário e Administrativo.
   resultados(): Promise<{ linhas: ResultadoMes[]; atualizadoEm: string | null }>
+
+  // Freelancers (só a gestão). semana = segunda-feira que abre a semana.
+  freelancers(): Promise<Freelancer[]>
+  salvarFreelancer(f: Omit<Freelancer, 'id'> & { id?: string }): Promise<Freelancer>
+  diariasFreela(inicio: string, fim: string): Promise<DiariaFreela[]>
+  lancarDiaria(d: Omit<DiariaFreela, 'id' | 'lancadoPor'>): Promise<DiariaFreela>
+  excluirDiaria(id: string): Promise<void>
+  pagamentosFreela(semana: string): Promise<PagamentoFreela[]>
+  marcarPagoFreela(freelancerId: string, semana: string, valor: number): Promise<void>
+  desfazerPagoFreela(freelancerId: string, semana: string): Promise<void>
 }
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')

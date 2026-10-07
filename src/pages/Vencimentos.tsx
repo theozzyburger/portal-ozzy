@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Avatar, Cartao, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
+import { isentoDeRotinas } from '../lib/permissoes'
 import { ir } from '../lib/rota'
 import { EXIGENCIAS, apelidoUnidade, type Documento } from '../lib/types'
 import { AVISO_DIAS, corSituacao, exigenciasDe, iconeSituacao, pendencias, textoSituacao, type Situacao } from '../lib/vencimentos'
@@ -17,7 +18,7 @@ export default function Vencimentos() {
   }, [store])
 
   if (!docs) return <p className="text-sm text-stone-500">Carregando…</p>
-  const pessoas = equipe.filter((p) => p.status === 'ativo' && (!unidade || p.unidadeId === unidade)).sort((a, b) => a.nome.localeCompare(b.nome))
+  const pessoas = equipe.filter((p) => p.status === 'ativo' && !isentoDeRotinas(p.nivel) && (!unidade || p.unidadeId === unidade)).sort((a, b) => a.nome.localeCompare(b.nome))
   const lista = pendencias(pessoas, docs)
   const conta = (s: Situacao) => lista.filter((x) => x.item.situacao === s).length
 

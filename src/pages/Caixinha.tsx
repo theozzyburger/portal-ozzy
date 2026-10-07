@@ -134,7 +134,7 @@ export default function Caixinha() {
           <li>
             O bônus vai para quem tiver a menor nota do grupo no mês (falta = 1, advertência = {PESO_ADVERTENCIA}). Empate divide. Gerente não entra no bônus.
           </li>
-          <li>Faltas e advertências vêm das ocorrências lançadas no RH.</li>
+          <li>Faltas e advertências vêm das ocorrências lançadas no Departamento Pessoal.</li>
         </ol>
       </details>
     </div>

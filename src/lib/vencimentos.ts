@@ -1,5 +1,6 @@
 import { addDias, hoje } from './datas'
 import { EXIGENCIAS, type Documento, type Funcionario } from './types'
+import { isentoDeRotinas } from './permissoes'
 
 export type Situacao = 'em_dia' | 'vence_logo' | 'vencido' | 'faltando'
 
@@ -41,7 +42,7 @@ export interface Pendencia {
 export function pendencias(pessoas: Funcionario[], docs: Documento[]): Pendencia[] {
   const ordem: Record<Situacao, number> = { vencido: 0, faltando: 1, vence_logo: 2, em_dia: 3 }
   return pessoas
-    .filter((p) => p.status === 'ativo')
+    .filter((p) => p.status === 'ativo' && !isentoDeRotinas(p.nivel))
     .flatMap((p) => exigenciasDe(docs.filter((d) => d.funcionarioId === p.id)).map((item) => ({ pessoa: p, item })))
     .filter((x) => x.item.situacao !== 'em_dia')
     .sort((a, b) => ordem[a.item.situacao] - ordem[b.item.situacao] || (a.item.vence ?? '').localeCompare(b.item.vence ?? ''))

@@ -9,6 +9,9 @@ export const podeVerPainel = (n: Nivel) => n === 'proprietario' || n === 'gerent
 
 export const podeGerenciar = (n: Nivel) => GESTAO.includes(n)
 
+// O proprietário não entra no controle de exames nem assina o regulamento (pedido de 07/10).
+export const isentoDeRotinas = (n: Nivel) => n === 'proprietario'
+
 // Chamados: o manutencista e a gestão veem todos e mudam o andamento.
 export const atendeChamados = (n: Nivel) => n === 'manutencao' || podeGerenciar(n)
 

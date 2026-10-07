@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -8,7 +8,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
-  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id,
+  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix,
 })
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
@@ -42,7 +42,7 @@ const paraOcorrencia = (r: any): Ocorrencia => ({
 const deFuncionario = (f: Partial<Funcionario>) => ({
   nome: f.nome, celular: f.celular ? soDigitos(f.celular) : undefined, cargo: f.cargo, unidade_id: f.unidadeId,
   nivel: f.nivel, status: f.status, data_admissao: f.dataAdmissao, data_desligamento: f.dataDesligamento || null,
-  responde_para: f.respondePara || null, setor: f.setor || null,
+  responde_para: f.respondePara || null, setor: f.setor || null, pix: f.pix?.trim() || null,
 })
 
 const ok = <T,>({ data, error }: { data: T; error: { message: string } | null }) => {
@@ -304,5 +304,47 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         })),
       }
     },
+    async freelancers() {
+      return (ok(await sb.from('freelancers').select('*').order('nome')) ?? []).map(paraFreelancer)
+    },
+    async salvarFreelancer(f) {
+      const linha = { nome: f.nome.trim(), cpf: soDigitos(f.cpf), pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular) : null, ativo: f.ativo }
+      const r = f.id
+        ? ok(await sb.from('freelancers').update(linha).eq('id', f.id).select().single())
+        : ok(await sb.from('freelancers').insert({ ...linha, criado_por: exigeEu().id }).select().single())
+      return paraFreelancer(r)
+    },
+    async diariasFreela(inicio, fim) {
+      return (ok(await sb.from('freela_diarias').select('*').gte('data', inicio).lte('data', fim).order('data')) ?? []).map(paraDiaria)
+    },
+    async lancarDiaria(d) {
+      const { data, error } = await sb.from('freela_diarias').insert({
+        freelancer_id: d.freelancerId, data: d.data, turno: d.turno, unidade_id: d.unidadeId, funcao: d.funcao.trim(),
+        valor: d.valor, observacao: d.observacao?.trim() || null,
+      }).select().single()
+      if (error?.code === '23505') throw new Error('Esse freelancer já tem diária lançada nesse dia e turno.')
+      return paraDiaria(ok({ data, error }))
+    },
+    async excluirDiaria(id) {
+      ok(await sb.from('freela_diarias').delete().eq('id', id))
+    },
+    async pagamentosFreela(semana) {
+      return (ok(await sb.from('freela_pagamentos').select('*').eq('semana', semana)) ?? []).map((r: any) => ({
+        freelancerId: r.freelancer_id, semana: r.semana, valor: Number(r.valor), pagoEm: r.pago_em, pagoPor: r.pago_por,
+      }))
+    },
+    async marcarPagoFreela(freelancerId, semana, valor) {
+      ok(await sb.from('freela_pagamentos').insert({ freelancer_id: freelancerId, semana, valor }))
+    },
+    async desfazerPagoFreela(freelancerId, semana) {
+      ok(await sb.from('freela_pagamentos').delete().eq('freelancer_id', freelancerId).eq('semana', semana))
+    },
   }
 }
+
+const paraFreelancer = (r: any): Freelancer => ({ id: r.id, nome: r.nome, cpf: r.cpf, pix: r.pix, celular: r.celular, ativo: r.ativo })
+
+const paraDiaria = (r: any): DiariaFreela => ({
+  id: r.id, freelancerId: r.freelancer_id, data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao,
+  valor: Number(r.valor), observacao: r.observacao, lancadoPor: r.lancado_por,
+})

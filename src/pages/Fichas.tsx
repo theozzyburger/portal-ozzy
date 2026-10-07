@@ -180,6 +180,13 @@ function Detalhe({ ficha, gestao, porId, abrir }: { ficha: Ficha; gestao: boolea
 
       {ficha.itens.length === 0 && <Vazio>Esta ficha está sem itens no Lucro Fácil.</Vazio>}
 
+      {custos && faltando(custos) > 0.05 && (
+        <p className="rounded-xl bg-ozzy-100 p-3 text-sm text-stone-800">
+          O Lucro Fácil não mandou todos os itens desta ficha: {reais(faltando(custos))} do custo são de itens que não aparecem aqui.
+          Confira a ficha lá.
+        </p>
+      )}
+
       {tamanhos.map((t) => (
         <div key={t}>
           {t && <h3 className="mb-1.5 text-sm font-bold">{NOME_TAMANHO[t] ?? t}</h3>}
@@ -244,4 +251,6 @@ function Filtro({ ativo, onClick, children }: { ativo: boolean; onClick: () => v
 // Tira os marcadores que o Lucro Fácil usa para ordenar ("# Pizza Atum", "! TAMANHO…").
 const limpo = (nome: string) => nome.replace(/^[#!]\s*/, '')
 const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+// Diferença entre o custo da ficha e a soma dos itens que vieram (o Lucro Fácil às vezes omite itens).
+const faltando = (c: NonNullable<Ficha['custo']>) => c.total - c.itens.reduce((s, i) => s + i.total, 0)
 const insumosUnicos = (itens: ItemFicha[]) => new Set(itens.map((i) => i.nome)).size

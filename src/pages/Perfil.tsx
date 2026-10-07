@@ -3,7 +3,7 @@ import { Avatar, Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from 
 import FormFuncionario from '../components/FormFuncionario'
 import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
-import { podeGerenciar, podeVerDocumentosDe, podeVerEquipe } from '../lib/permissoes'
+import { podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } from '../lib/permissoes'
 import { ir } from '../lib/rota'
 import {
   TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
@@ -82,6 +82,12 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             <dt className="text-stone-500">Celular</dt>
             <dd className="font-medium">{pessoa.celular.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')}</dd>
           </div>
+          {verDocs && (
+            <div>
+              <dt className="text-stone-500">Pix</dt>
+              <dd className="font-medium break-all">{pessoa.pix || '—'}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-stone-500">Admissão</dt>
             <dd className="font-medium">{dataLonga(pessoa.dataAdmissao)}</dd>
@@ -138,6 +144,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         <section className="space-y-3">
           {!verDocs ? (
             <Vazio>Exames são visíveis só para a própria pessoa e para a gestão.</Vazio>
+          ) : isentoDeRotinas(pessoa.nivel) ? (
+            <Vazio>O proprietário não entra no controle de exames.</Vazio>
           ) : (
             <>
               <Cartao>
@@ -254,7 +262,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         aoEnviar={async () => {
           setModal(null)
           await carregar()
-          avisar(souEu ? 'Enviado! O RH já consegue ver.' : 'Documento anexado')
+          avisar(souEu ? 'Enviado! O Departamento Pessoal já consegue ver.' : 'Documento anexado')
         }}
       />
       <NovaOcorrencia

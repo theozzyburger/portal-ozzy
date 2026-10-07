@@ -20,8 +20,10 @@ export interface Funcionario {
   respondePara?: string | null
   // Setor, usado na caixinha (grupos de bônus). 'geral' = gerente que atende as duas lojas.
   setor?: Setor | null
-  // Turno-padrão em que a pessoa trabalha (RH › Turnos).
+  // Turno-padrão em que a pessoa trabalha (Departamento Pessoal › Turnos).
   turnoId?: string | null
+  // Chave Pix para pagamentos (só a própria pessoa e a gestão veem).
+  pix?: string | null
 }
 
 export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao'
@@ -339,4 +341,37 @@ export interface ResultadoMes {
   custosOperacionais: number
   lucroOperacional: number
   ticketMedio: number
+}
+
+// Freelancers: cadastro e diárias. Semana de segunda a domingo, paga na segunda seguinte.
+export interface Freelancer {
+  id: string
+  nome: string
+  cpf: string
+  pix: string
+  celular: string | null
+  ativo: boolean
+}
+
+export type TurnoFreela = 'manha' | 'noite'
+
+export interface DiariaFreela {
+  id: string
+  freelancerId: string
+  data: string
+  turno: TurnoFreela
+  unidadeId: string
+  funcao: string
+  valor: number
+  observacao: string | null
+  lancadoPor: string | null
+}
+
+export interface PagamentoFreela {
+  freelancerId: string
+  // Segunda-feira que abre a semana trabalhada.
+  semana: string
+  valor: number
+  pagoEm: string
+  pagoPor: string | null
 }

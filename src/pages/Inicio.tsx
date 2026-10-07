@@ -7,7 +7,7 @@ import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana, tempoDesde } from '../lib/datas'
-import { podeGerenciar, podeVerPainel } from '../lib/permissoes'
+import { isentoDeRotinas, podeGerenciar, podeVerPainel } from '../lib/permissoes'
 import Painel from './Painel'
 import { ir } from '../lib/rota'
 import type { Comunicado, Documento, EntregaUniforme, Folga, Ocorrencia } from '../lib/types'
@@ -52,7 +52,7 @@ export default function Inicio() {
         <h1 className="text-2xl font-bold tracking-tight">{eu.nome.split(' ')[0]}</h1>
       </div>
 
-      <MeusAvisos docs={meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento} />
+      <MeusAvisos docs={isentoDeRotinas(eu.nivel) ? null : meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento && !isentoDeRotinas(eu.nivel)} />
 
       {atendeChamados(eu.nivel) && <ResumoChamados />}
 
@@ -185,8 +185,9 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
 }
 
 // Avisos pessoais: exame vencendo ou faltando, e termo de uniforme para assinar.
-function MeusAvisos({ docs, uniformes, regulamento }: { docs: Documento[]; uniformes: EntregaUniforme[]; regulamento: boolean }) {
-  const exames = exigenciasDe(docs).filter((i) => i.situacao !== 'em_dia')
+function MeusAvisos({ docs, uniformes, regulamento }: { docs: Documento[] | null; uniformes: EntregaUniforme[]; regulamento: boolean }) {
+  // docs = null: a pessoa não entra no controle de exames.
+  const exames = docs === null ? [] : exigenciasDe(docs).filter((i) => i.situacao !== 'em_dia')
   const termos = uniformes.filter((u) => !u.assinatura)
   if (!exames.length && !termos.length && !regulamento) return null
   return (

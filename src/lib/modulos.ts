@@ -21,7 +21,7 @@ export interface Modulo {
 // Ordem do menu lateral. Os "em breve" seguem o plano e o roteiro da reunião de regras.
 export const MODULOS: Modulo[] = [
   { id: 'inicio', nome: 'Início', pronto: true },
-  { id: 'rh', nome: 'RH', pronto: true },
+  { id: 'rh', nome: 'Departamento Pessoal', pronto: true },
   { id: 'fichas', nome: 'Fichas técnicas', pronto: true },
   {
     id: 'financeiro', nome: 'Financeiro', pronto: true, ve: vejoResultado,

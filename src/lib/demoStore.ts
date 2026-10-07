@@ -1,6 +1,6 @@
 import { atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -150,6 +150,25 @@ const uniformes: EntregaUniforme[] = [
 const arquivosDemo = new Map<string, string>()
 
 // Valores reais de setembro/2026, da planilha.
+// Freelancers de exemplo (nomes, CPFs e Pix fictícios), com diárias nesta semana e na anterior.
+const freelas: Freelancer[] = [
+  { id: 'fl1', nome: 'Rafael Mendes Teixeira', cpf: '52998224725', pix: '11988887777', celular: '11988887777', ativo: true },
+  { id: 'fl2', nome: 'Bruna Carvalho Lopes', cpf: '11144477735', pix: 'bruna.lopes@email.com', celular: null, ativo: true },
+  { id: 'fl3', nome: 'Diego Ferreira Santos', cpf: '39053344705', pix: '39053344705', celular: '11977776666', ativo: true },
+]
+const diarias: DiariaFreela[] = (() => {
+  const seg = inicioDaSemana(hoje())
+  const d = (dia: number, fl: string, turno: 'manha' | 'noite', unidadeId: string, funcao: string, valor: number, semana = 0): DiariaFreela => ({
+    id: `dd-${semana}-${dia}-${fl}-${turno}`, freelancerId: fl, data: addDias(seg, dia + semana * 7), turno, unidadeId, funcao, valor, observacao: null, lancadoPor: 'p-maria-costa',
+  })
+  return [
+    d(4, 'fl1', 'noite', 'burger-psd', 'Chapeiro', 130, -1), d(5, 'fl1', 'noite', 'burger-psd', 'Chapeiro', 130, -1),
+    d(6, 'fl2', 'noite', 'pizza', 'Atendente', 110, -1), d(5, 'fl3', 'noite', 'burger-va', 'Entregador', 100, -1),
+    d(0, 'fl1', 'noite', 'burger-psd', 'Chapeiro', 130), d(1, 'fl2', 'manha', 'burger-va', 'Atendente', 100),
+  ].filter((x) => x.data <= hoje())
+})()
+const pagamentos: PagamentoFreela[] = []
+
 const caixinhas: Record<string, Record<string, number>> = {
   '2026-09': { 'burger-psd': 3616.18, 'burger-va': 1118.34 },
 }
@@ -485,6 +504,48 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const u = exigeEu()
       if (!vejoResultado(u.nivel)) throw new Error('Só Proprietário e Administrativo veem o resultado.')
       return espera({ linhas: resultadosDemo(), atualizadoEm: agora() })
+    },
+    async freelancers() {
+      exigeGestao()
+      return espera([...freelas].sort((a, b) => a.nome.localeCompare(b.nome)))
+    },
+    async salvarFreelancer(f) {
+      exigeGestao()
+      const cpf = soDigitos(f.cpf)
+      if (freelas.some((x) => x.cpf === cpf && x.id !== f.id)) throw new Error('Já existe freelancer com esse CPF.')
+      const novo: Freelancer = { ...f, id: f.id ?? novoId('fl'), cpf, celular: f.celular ? soDigitos(f.celular) : null }
+      const i = freelas.findIndex((x) => x.id === novo.id)
+      if (i >= 0) freelas[i] = novo
+      else freelas.push(novo)
+      return espera(novo)
+    },
+    async diariasFreela(inicio, fim) {
+      exigeGestao()
+      return espera(diarias.filter((d) => d.data >= inicio && d.data <= fim).map((d) => ({ ...d })))
+    },
+    async lancarDiaria(d) {
+      const u = exigeGestao()
+      if (diarias.some((x) => x.freelancerId === d.freelancerId && x.data === d.data && x.turno === d.turno))
+        throw new Error('Esse freelancer já tem diária lançada nesse dia e turno.')
+      const nova: DiariaFreela = { ...d, id: novoId('d'), lancadoPor: u.id }
+      diarias.push(nova)
+      return espera(nova)
+    },
+    async excluirDiaria(id) {
+      exigeGestao()
+      diarias.splice(diarias.findIndex((d) => d.id === id), 1)
+    },
+    async pagamentosFreela(semana) {
+      exigeGestao()
+      return espera(pagamentos.filter((p) => p.semana === semana))
+    },
+    async marcarPagoFreela(freelancerId, semana, valor) {
+      const u = exigeGestao()
+      pagamentos.push({ freelancerId, semana, valor, pagoEm: agora(), pagoPor: u.id })
+    },
+    async desfazerPagoFreela(freelancerId, semana) {
+      exigeGestao()
+      pagamentos.splice(pagamentos.findIndex((p) => p.freelancerId === freelancerId && p.semana === semana), 1)
     },
   }
 }

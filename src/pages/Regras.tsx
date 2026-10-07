@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type React
 import Assinatura from '../components/Assinatura'
 import { Botao, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
-import { podeGerenciar } from '../lib/permissoes'
+import { isentoDeRotinas, podeGerenciar } from '../lib/permissoes'
 import { lerRegulamento, mudancas, termoRegulamento, type Secao } from '../lib/regulamento'
 import { nomeCurto, type LeituraRegulamento, type VersaoRegulamento } from '../lib/types'
 
@@ -38,7 +38,9 @@ export default function Regras() {
   const minha = daVersao.find((l) => l.funcionarioId === eu.id)
   const minhaAnterior = !minha && leituras.some((l) => l.funcionarioId === eu.id)
   const anterior = versoes[1]
-  const ativos = equipe.filter((f) => f.status === 'ativo')
+  // O proprietário não assina o regulamento.
+  const isento = isentoDeRotinas(eu.nivel)
+  const ativos = equipe.filter((f) => f.status === 'ativo' && !isentoDeRotinas(f.nivel))
   const faltam = ativos.filter((f) => !daVersao.some((l) => l.funcionarioId === f.id))
 
   const ir = (id: string) => document.getElementById('reg-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -71,7 +73,7 @@ export default function Regras() {
         )}
       </div>
 
-      {minha ? (
+      {isento ? null : minha ? (
         <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-800 ring-1 ring-emerald-200 print:hidden">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-600 font-bold text-white">✓</span>
           <span className="text-sm">
@@ -141,6 +143,7 @@ export default function Regras() {
         <ConteudoRegulamento secoes={doc.secoes} />
       </article>
 
+      {!isento && (
       <div ref={fim} className="scroll-mt-32 rounded-2xl bg-white p-5 ring-1 ring-stone-200 print:break-inside-avoid print:ring-0">
         <h2 className="mb-2 font-bold">Assinatura</h2>
         <p className="rounded-xl bg-stone-50 p-3 text-sm leading-relaxed text-stone-700">{termoRegulamento(eu.nome, atual.numero, dia(atual.publicadoEm))}</p>
@@ -179,6 +182,7 @@ export default function Regras() {
           </div>
         )}
       </div>
+      )}
 
       <p className="text-center text-xs text-stone-500 print:hidden">Em breve aqui: POPs por área, manual de exceções e um assistente que tira dúvidas só com base nas regras oficiais.</p>
 

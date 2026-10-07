@@ -16,6 +16,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     dataAdmissao: existente?.dataAdmissao ?? hoje(),
     respondePara: existente?.respondePara ?? '',
     setor: existente?.setor ?? '',
+    pix: existente?.pix ?? '',
   }))
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
@@ -60,6 +61,9 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
         </Campo>
         <Campo rotulo="Celular (é o login)">
           <input className={estiloEntrada} inputMode="tel" value={f.celular} onChange={mudar('celular')} required />
+        </Campo>
+        <Campo rotulo="Chave Pix" dica="CPF, celular, e-mail ou chave aleatória. Só a pessoa e a gestão veem.">
+          <input className={estiloEntrada} value={f.pix} onChange={mudar('pix')} />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo="Cargo" dica="Na caixinha: Auxiliar, Atendente, Supervisor ou Gerente.">
