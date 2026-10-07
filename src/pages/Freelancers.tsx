@@ -11,6 +11,8 @@ const NOME_TURNO: Record<TurnoFreela, string> = { manha: 'Manhã', noite: 'Noite
 
 export { cpfValido, formatarCpf } from '../lib/cpf'
 import { cpfValido, formatarCpf } from '../lib/cpf'
+import ArquivoBanco from '../components/ArquivoBanco'
+import type { PagamentoBanco } from '../lib/sispag'
 
 type Aba = 'lancamentos' | 'relatorio' | 'cadastro'
 
@@ -217,6 +219,11 @@ function Relatorio({
   }, [diarias, porId])
   const total = linhas.reduce((s, l) => s + l.total, 0)
   const pagamento = addDias(semana, 7)
+  const [pix, setPix] = useState(false)
+  // Quem ainda não foi pago nesta semana, no formato do arquivo do banco (e da API, depois).
+  const aPagar: PagamentoBanco[] = linhas
+    .filter((l) => !pagos.some((p) => p.freelancerId === l.f.id))
+    .map((l) => ({ nome: l.f.nome, cpf: l.f.cpf ?? '', chavePix: l.f.pix ?? '', valor: l.total, seuNumero: `DIARIA ${semana}` }))
 
   // Relatório para copiar, separado por loja. Quem trabalhou em mais de uma loja aparece em cada uma com a sua parte.
   const plural = (n: number) => `${n} ${n === 1 ? 'diária' : 'diárias'}`
@@ -302,10 +309,21 @@ function Relatorio({
         )
       })}
 
-      <div className="flex gap-2 print:hidden">
+      <div className="flex flex-wrap gap-2 print:hidden">
+        <Botao className="basis-full" onClick={() => setPix(true)} disabled={!aPagar.length}>Pix em lote das diárias</Botao>
         <Botao variante="secundario" className="flex-1" onClick={() => copiar(texto, 'Relatório copiado')}>Copiar relatório</Botao>
         <Botao variante="secundario" className="flex-1" onClick={() => print()}>Imprimir</Botao>
       </div>
+      {pix && (
+        <ArquivoBanco
+          tipo="freelancer"
+          referencia={semana}
+          dataPagamento={pagamento}
+          historico="DIARIAS"
+          pagamentos={aPagar}
+          aoFechar={() => setPix(false)}
+        />
+      )}
     </div>
   )
 }

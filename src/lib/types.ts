@@ -412,6 +412,39 @@ export interface PagamentoFreela {
 // Pagamento do mês de referência ('AAAA-MM'), com os valores que a contabilidade manda.
 // Adiantamento sai no dia 20; salário no dia 05 do mês seguinte. A pessoa só vê depois de liberado.
 export type TipoPagamento = 'adiantamento' | 'salario'
+// Conta da empresa que paga os salários e as diárias pelo banco.
+export interface ContaPagamento {
+  id: string
+  nome: string
+  banco: string
+  empresaCnpj: string
+  empresaNome: string
+  agencia: string
+  conta: string
+  dac: string
+  endereco: string | null
+  numero: string | null
+  cidade: string | null
+  cep: string | null
+  estado: string | null
+  padrao: boolean
+}
+
+// Arquivo (ou envio por API) de pagamento já gerado.
+export interface RemessaPagamento {
+  id: string
+  numero: number
+  contaId: string
+  tipo: 'salario' | 'adiantamento' | 'freelancer'
+  referencia: string
+  dataPagamento: string
+  quantidade: number
+  valorTotal: number
+  via: 'arquivo' | 'api'
+  arquivo: string | null
+  criadoEm: string
+}
+
 export interface RubricaHolerite {
   descricao: string
   valor: number

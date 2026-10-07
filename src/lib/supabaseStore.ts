@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -22,6 +22,7 @@ const paraPreventiva = (r: any): Preventiva => ({
   id: r.id, unidadeId: r.unidade_id, equipamentoId: r.equipamento_id, titulo: r.titulo, descricao: r.descricao, frequenciaDias: r.frequencia_dias, primeiraEm: r.primeira_em, ativo: r.ativo,
 })
 const texto = (v: string | null | undefined) => v?.trim() || null
+const so = (v: string) => v.replace(/\D/g, '')
 
 const paraSolicitacao = (r: any): SolicitacaoUniforme => ({
   id: r.id, funcionarioId: r.funcionario_id, itens: r.itens ?? [], motivo: r.motivo, foto: r.foto, status: r.status, resposta: r.resposta,
@@ -300,6 +301,30 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       if (!x.foto) return null
       const { data } = await sb.storage.from('fotos').createSignedUrl(x.foto, 300)
       return data?.signedUrl ?? null
+    },
+    async contasPagamento() {
+      return (ok(await sb.from('contas_pagamento').select('*').order('padrao', { ascending: false }).order('nome')) ?? []).map(paraConta)
+    },
+    async salvarContaPagamento(c) {
+      const linha = {
+        nome: c.nome.trim(), banco: c.banco, empresa_cnpj: so(c.empresaCnpj), empresa_nome: c.empresaNome.trim(),
+        agencia: so(c.agencia), conta: so(c.conta), dac: so(c.dac), endereco: texto(c.endereco), numero: texto(c.numero),
+        cidade: texto(c.cidade), cep: c.cep ? so(c.cep) : null, estado: c.estado?.toUpperCase() || null, padrao: c.padrao,
+      }
+      // Só uma conta fica marcada como padrão.
+      if (c.padrao) ok(await sb.from('contas_pagamento').update({ padrao: false }).eq('padrao', true))
+      return paraConta(c.id
+        ? ok(await sb.from('contas_pagamento').update(linha).eq('id', c.id).select().single())
+        : ok(await sb.from('contas_pagamento').insert(linha).select().single()))
+    },
+    async remessasPagamento(tipo, referencia) {
+      return (ok(await sb.from('remessas_pagamento').select('*').eq('tipo', tipo).eq('referencia', referencia).order('criado_em', { ascending: false })) ?? []).map(paraRemessa)
+    },
+    async registrarRemessa(r) {
+      return paraRemessa(ok(await sb.from('remessas_pagamento').insert({
+        conta_id: r.contaId, tipo: r.tipo, referencia: r.referencia, data_pagamento: r.dataPagamento,
+        quantidade: r.quantidade, valor_total: r.valorTotal, via: r.via, arquivo: r.arquivo, gerado_por: exigeEu().id,
+      }).select().single()))
     },
     async pedidosUniforme() {
       return (ok(await sb.from('uniforme_pedidos').select('*').order('criado_em', { ascending: false })) ?? []).map(paraPedidoUniforme)
@@ -629,6 +654,16 @@ const paraFreelancer = (r: any): Freelancer => ({
 const paraDiaria = (r: any): DiariaFreela => ({
   id: r.id, freelancerId: r.freelancer_id, data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao,
   valor: Number(r.valor), observacao: r.observacao, lancadoPor: r.lancado_por,
+})
+
+const paraConta = (r: any): ContaPagamento => ({
+  id: r.id, nome: r.nome, banco: r.banco, empresaCnpj: r.empresa_cnpj, empresaNome: r.empresa_nome, agencia: r.agencia,
+  conta: r.conta, dac: r.dac, endereco: r.endereco, numero: r.numero, cidade: r.cidade, cep: r.cep, estado: r.estado, padrao: r.padrao,
+})
+
+const paraRemessa = (r: any): RemessaPagamento => ({
+  id: r.id, numero: r.numero, contaId: r.conta_id, tipo: r.tipo, referencia: r.referencia, dataPagamento: r.data_pagamento,
+  quantidade: r.quantidade, valorTotal: Number(r.valor_total), via: r.via, arquivo: r.arquivo, criadoEm: r.criado_em,
 })
 
 const paraSalario = (r: any): Salario => ({

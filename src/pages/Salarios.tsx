@@ -10,6 +10,8 @@ import {
 import { apelidoUnidade, type Funcionario, type Salario } from '../lib/types'
 import { reais } from './Fichas'
 import ImportarHolerites from '../components/ImportarHolerites'
+import ArquivoBanco from '../components/ArquivoBanco'
+import type { PagamentoBanco } from '../lib/sispag'
 import { lerHolerites, aplicarValores } from '../lib/holerite'
 
 const num = (n: number) => (n ? n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')
@@ -25,6 +27,7 @@ export default function Salarios() {
   const [editando, setEditando] = useState<Funcionario | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [importando, setImportando] = useState<File[] | null>(null)
+  const [pix, setPix] = useState(false)
 
   const carregar = () => store.salarios(mes).then(setTodas)
   useEffect(() => {
@@ -80,7 +83,14 @@ export default function Salarios() {
     avisar(liberado ? 'A equipe não vê mais este mês' : 'Cada pessoa já pode ver o seu salário no perfil')
   }
 
-  const arquivoBanco = () => {
+  // Os pagamentos do mês no formato que o arquivo do banco (e amanhã a API) espera.
+  const pagamentosPix = (): PagamentoBanco[] =>
+    lancadas.filter((l) => liquido(l) > 0).map((l) => {
+      const p = equipe.find((x) => x.id === l.funcionarioId)!
+      return { nome: p.nome, cpf: p.cpf ?? '', chavePix: p.pix ?? '', valor: liquido(l), seuNumero: `${tipo === 'adiantamento' ? 'ADT' : 'SAL'} ${mes}` }
+    })
+
+  const planilhaBanco = () => {
     const semPix = lancadas.filter((l) => !equipe.find((p) => p.id === l.funcionarioId)?.pix)
     baixar(
       `${tipo}-${mes}${loja ? '-' + loja : ''}.csv`,
@@ -164,7 +174,8 @@ export default function Salarios() {
             }}
           />
         </label>
-        <Botao variante="secundario" onClick={arquivoBanco} disabled={!lancadas.length}>Arquivo do banco</Botao>
+        <Botao variante="secundario" onClick={() => setPix(true)} disabled={!lancadas.length}>Pix em lote (banco)</Botao>
+        <Botao variante="secundario" onClick={planilhaBanco} disabled={!lancadas.length}>Planilha do banco</Botao>
         <Botao variante="secundario" onClick={planilhaCompleta} disabled={!lancadas.length}>Planilha completa</Botao>
         <Botao variante={liberado ? 'perigo' : 'primario'} onClick={alternarLiberacao} disabled={!linhas.length}>
           {liberado ? 'Tirar da visão da equipe' : 'Liberar para a equipe'}
@@ -206,6 +217,16 @@ export default function Salarios() {
         O arquivo do banco traz nome, chave Pix e valor de cada pessoa (CSV, abre no Excel). Confira os valores antes de subir no banco.
       </p>
 
+      {pix && (
+        <ArquivoBanco
+          tipo={tipo === 'adiantamento' ? 'adiantamento' : 'salario'}
+          referencia={mes}
+          dataPagamento={dataPagamento(pag)}
+          historico={tipo === 'adiantamento' ? 'ADIANT' : 'SALARIO'}
+          pagamentos={pagamentosPix()}
+          aoFechar={() => setPix(false)}
+        />
+      )}
       {importando && (
         <ImportarHolerites
           arquivos={importando}

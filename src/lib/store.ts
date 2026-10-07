@@ -1,4 +1,4 @@
-import type { Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -83,6 +83,11 @@ export interface Store {
   responderTrocaUniforme(id: string, status: StatusTroca, resposta: string): Promise<void>
   fotoSolicitacao(s: SolicitacaoUniforme): Promise<string | null>
   // Pedidos de compra de uniformes por leva (só a gestão).
+  // Pagamento pelo banco (arquivo do Itaú hoje; a API quando estiver liberada).
+  contasPagamento(): Promise<ContaPagamento[]>
+  salvarContaPagamento(c: Omit<ContaPagamento, 'id'> & { id?: string }): Promise<ContaPagamento>
+  remessasPagamento(tipo: RemessaPagamento['tipo'], referencia: string): Promise<RemessaPagamento[]>
+  registrarRemessa(r: Omit<RemessaPagamento, 'id' | 'numero' | 'criadoEm'>): Promise<RemessaPagamento>
   pedidosUniforme(): Promise<PedidoUniforme[]>
   salvarPedidoUniforme(p: Pick<PedidoUniforme, 'titulo' | 'status' | 'fornecedor' | 'observacao' | 'valorTotal' | 'fechadoEm' | 'previsaoEntrega'> & { id?: string }): Promise<PedidoUniforme>
   excluirPedidoUniforme(id: string): Promise<void>

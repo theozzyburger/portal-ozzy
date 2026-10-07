@@ -1,6 +1,6 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -21,7 +21,25 @@ const f = (
   id: string, nome: string, celular: string, cargo: string, unidadeId: string,
   nivel: Funcionario['nivel'], dataAdmissao: string, respondePara: string | null = null,
   status: Funcionario['status'] = 'ativo', dataDesligamento: string | null = null, setor: Funcionario['setor'] = null,
-): Funcionario => ({ id, nome, celular, cargo, unidadeId, nivel, status, dataAdmissao, respondePara, dataDesligamento, setor })
+): Funcionario => ({
+  id, nome, celular, cargo, unidadeId, nivel, status, dataAdmissao, respondePara, dataDesligamento, setor,
+  // Na demonstração a chave Pix é o celular (fictício) e o CPF é inventado, só para dar para testar o arquivo do banco.
+  pix: celular, cpf: cpfDeExemplo(celular),
+})
+
+// CPF fictício com dígito verificador certo, a partir do celular de exemplo.
+function cpfDeExemplo(celular: string): string {
+  const base = celular.slice(-9)
+  const digito = (n: number) => {
+    const s = [...base.slice(0, n - 1)].reduce((t, d, i) => t + Number(d) * (n + 1 - i), 0)
+    const r = 11 - (s % 11)
+    return r >= 10 ? 0 : r
+  }
+  const d1 = digito(10)
+  const s2 = [...(base + d1)].reduce((t, d, i) => t + Number(d) * (11 - i), 0)
+  const r2 = 11 - (s2 % 11)
+  return base + d1 + (r2 >= 10 ? 0 : r2)
+}
 
 // Equipe real, da planilha de caixinha (06/10/2026). Celulares são fictícios.
 // A planilha não tem data de admissão; as de desligamento são a última ocorrência de cada um.
@@ -311,6 +329,15 @@ const vinculosDemo: VinculoAnterior[] = [
   { id: 'va1', funcionarioId: 'p-dora-ramos', admissao: '2023-02-01', desligamento: '2023-11-20', tipoDesligamento: 'pedido', cargo: 'Atendente', observacao: null },
 ]
 const itensPedidoDemo: ItemPedidoUniforme[] = []
+// Conta de EXEMPLO (a de verdade a gestão cadastra no portal).
+const contasDemo: ContaPagamento[] = [
+  {
+    id: 'cp1', nome: 'Itaú · Parque São Domingos', banco: '341', empresaCnpj: '34533354000113',
+    empresaNome: 'The Ozzy Burger Alimentacao Ltda', agencia: '1234', conta: '567890', dac: '1',
+    endereco: 'Rua Brigadeiro Henrique Fontenelle', numero: '601', cidade: 'Sao Paulo', cep: '05125000', estado: 'SP', padrao: true,
+  },
+]
+const remessasDemo: RemessaPagamento[] = []
 
 // Equipamentos e preventiva de EXEMPLO (a lista real o Heitor vai passar e a manutenção preenche no portal).
 const equipamentosDemo: Equipamento[] = [
@@ -719,6 +746,29 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async fotoSolicitacao(x) {
       return arquivosDemo.get(x.id) ?? null
+    },
+    async contasPagamento() {
+      exigeGestao()
+      return espera(contasDemo.map((c) => ({ ...c })))
+    },
+    async salvarContaPagamento(c) {
+      exigeGestao()
+      if (c.padrao) contasDemo.forEach((x) => (x.padrao = false))
+      const nova: ContaPagamento = { ...c, id: c.id ?? 'cp' + (contasDemo.length + 1) }
+      const i = contasDemo.findIndex((x) => x.id === nova.id)
+      if (i >= 0) contasDemo[i] = nova
+      else contasDemo.push(nova)
+      return espera({ ...nova })
+    },
+    async remessasPagamento(tipo, referencia) {
+      exigeGestao()
+      return espera(remessasDemo.filter((r) => r.tipo === tipo && r.referencia === referencia).map((r) => ({ ...r })))
+    },
+    async registrarRemessa(r) {
+      exigeGestao()
+      const nova: RemessaPagamento = { ...r, id: 'rm' + (remessasDemo.length + 1), numero: remessasDemo.length + 1, criadoEm: new Date().toISOString() }
+      remessasDemo.unshift(nova)
+      return espera({ ...nova })
     },
     async pedidosUniforme() {
       exigeGestao()
