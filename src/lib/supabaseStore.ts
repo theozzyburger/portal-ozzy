@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -9,6 +9,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
   status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false, cpf: r.cpf ?? null, sexo: r.sexo ?? null,
+  tamCamiseta: r.tam_camiseta ?? null, tamCalca: r.tam_calca ?? null, tamCalcado: r.tam_calcado ?? null,
   dataNascimento: r.data_nascimento ?? null, experienciaDias1: r.experiencia_dias1 ?? null, experienciaDias2: r.experiencia_dias2 ?? null,
 })
 
@@ -21,6 +22,14 @@ const paraPreventiva = (r: any): Preventiva => ({
   id: r.id, unidadeId: r.unidade_id, equipamentoId: r.equipamento_id, titulo: r.titulo, descricao: r.descricao, frequenciaDias: r.frequencia_dias, primeiraEm: r.primeira_em, ativo: r.ativo,
 })
 const texto = (v: string | null | undefined) => v?.trim() || null
+
+const paraSolicitacao = (r: any): SolicitacaoUniforme => ({
+  id: r.id, funcionarioId: r.funcionario_id, itens: r.itens ?? [], motivo: r.motivo, foto: r.foto, status: r.status, resposta: r.resposta,
+  respondidoPor: r.respondido_por, respondidoEm: r.respondido_em, criadoEm: r.criado_em,
+})
+const paraPedidoUniforme = (r: any): PedidoUniforme => ({
+  id: r.id, numero: r.numero, titulo: r.titulo, status: r.status, fornecedor: r.fornecedor, observacao: r.observacao, criadoEm: r.criado_em,
+})
 
 const paraDesligamento = (r: any): Desligamento => ({
   id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo, itens: r.itens ?? {}, observacao: r.observacao, concluido: r.concluido,
@@ -62,6 +71,7 @@ const deFuncionario = (f: Partial<Funcionario>) => ({
   opta_vt: f.optaVt ?? false,
   cpf: f.cpf ? soDigitos(f.cpf) : null, sexo: f.sexo || null,
   data_nascimento: f.dataNascimento || null,
+  tam_camiseta: f.tamCamiseta || null, tam_calca: f.tamCalca || null, tam_calcado: f.tamCalcado || null,
   experiencia_dias1: f.experienciaDias1 || null, experiencia_dias2: f.experienciaDias1 ? f.experienciaDias2 ?? 0 : null,
 })
 
@@ -263,6 +273,55 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async excluirDecimoTerceiro(id) {
       ok(await sb.from('decimo_terceiro').delete().eq('id', id))
+    },
+    async solicitacoesUniforme(fid) {
+      let q = sb.from('uniforme_solicitacoes').select('*').order('criado_em', { ascending: false })
+      if (fid) q = q.eq('funcionario_id', fid)
+      return (ok(await q) ?? []).map(paraSolicitacao)
+    },
+    async pedirTrocaUniforme(n) {
+      let foto: string | null = null
+      if (n.foto) {
+        foto = `${n.funcionarioId}/uniforme-${Date.now()}.jpg`
+        ok(await sb.storage.from('fotos').upload(foto, n.foto, { contentType: n.foto.type || 'image/jpeg' }))
+      }
+      ok(await sb.from('uniforme_solicitacoes').insert({ funcionario_id: n.funcionarioId, itens: n.itens, motivo: n.motivo.trim(), foto }))
+    },
+    async responderTrocaUniforme(id, status, resposta) {
+      ok(await sb.from('uniforme_solicitacoes').update({
+        status, resposta: texto(resposta), respondido_por: status === 'aberta' ? null : exigeEu().id, respondido_em: status === 'aberta' ? null : new Date().toISOString(),
+      }).eq('id', id))
+    },
+    async fotoSolicitacao(x) {
+      if (!x.foto) return null
+      const { data } = await sb.storage.from('fotos').createSignedUrl(x.foto, 300)
+      return data?.signedUrl ?? null
+    },
+    async pedidosUniforme() {
+      return (ok(await sb.from('uniforme_pedidos').select('*').order('criado_em', { ascending: false })) ?? []).map(paraPedidoUniforme)
+    },
+    async salvarPedidoUniforme(p) {
+      const linha = { titulo: p.titulo.trim(), status: p.status, fornecedor: texto(p.fornecedor), observacao: texto(p.observacao) }
+      return paraPedidoUniforme(p.id
+        ? ok(await sb.from('uniforme_pedidos').update(linha).eq('id', p.id).select().single())
+        : ok(await sb.from('uniforme_pedidos').insert(linha).select().single()))
+    },
+    async excluirPedidoUniforme(id) {
+      ok(await sb.from('uniforme_pedidos').delete().eq('id', id))
+    },
+    async itensPedidoUniforme(pid) {
+      return (ok(await sb.from('uniforme_pedido_itens').select('*').eq('pedido_id', pid)) ?? []).map((r: any): ItemPedidoUniforme => ({
+        id: r.id, pedidoId: r.pedido_id, funcionarioId: r.funcionario_id, item: r.item, cor: r.cor, modelagem: r.modelagem, tamanho: r.tamanho, quantidade: r.quantidade,
+      }))
+    },
+    async definirItensPedido(pid, fid, itens) {
+      let del = sb.from('uniforme_pedido_itens').delete().eq('pedido_id', pid)
+      del = fid ? del.eq('funcionario_id', fid) : del.is('funcionario_id', null)
+      ok(await del)
+      if (itens.length)
+        ok(await sb.from('uniforme_pedido_itens').insert(itens.map((i) => ({
+          pedido_id: pid, funcionario_id: fid, item: i.item, cor: i.cor, modelagem: i.modelagem, tamanho: i.tamanho, quantidade: i.quantidade,
+        }))))
     },
     async equipamentos() {
       return (ok(await sb.from('equipamentos').select('*').order('nome')) ?? []).map(paraEquipamento)

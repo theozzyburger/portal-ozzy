@@ -1,4 +1,4 @@
-import type { Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -75,6 +75,18 @@ export interface Store {
   registrarUniforme(e: NovaEntregaUniforme): Promise<EntregaUniforme>
   // Só a própria pessoa assina pelo portal.
   assinarUniforme(entregaId: string, assinatura: string): Promise<void>
+  // Pedido de troca: a pessoa pede pelo próprio cadastro; a gestão vê todos e responde.
+  solicitacoesUniforme(funcionarioId?: string): Promise<SolicitacaoUniforme[]>
+  pedirTrocaUniforme(s: { funcionarioId: string; itens: string[]; motivo: string; foto?: Blob }): Promise<void>
+  responderTrocaUniforme(id: string, status: StatusTroca, resposta: string): Promise<void>
+  fotoSolicitacao(s: SolicitacaoUniforme): Promise<string | null>
+  // Pedidos de compra de uniformes por leva (só a gestão).
+  pedidosUniforme(): Promise<PedidoUniforme[]>
+  salvarPedidoUniforme(p: Pick<PedidoUniforme, 'titulo' | 'status' | 'fornecedor' | 'observacao'> & { id?: string }): Promise<PedidoUniforme>
+  excluirPedidoUniforme(id: string): Promise<void>
+  itensPedidoUniforme(pedidoId: string): Promise<ItemPedidoUniforme[]>
+  // Troca todas as peças de uma pessoa (ou avulsas, funcionarioId null) dentro do pedido.
+  definirItensPedido(pedidoId: string, funcionarioId: string | null, itens: Omit<ItemPedidoUniforme, 'id' | 'pedidoId' | 'funcionarioId'>[]): Promise<void>
 
   ocorrencias(funcionarioId: string): Promise<Ocorrencia[]>
   // Para o painel da gestão: tudo que eu posso ver num período.

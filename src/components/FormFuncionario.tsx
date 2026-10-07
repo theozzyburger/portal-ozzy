@@ -8,7 +8,7 @@ import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
 import { EXPERIENCIA_PADRAO, experienciaDe, recemAdmitido } from '../lib/pessoal'
 import { ir } from '../lib/rota'
-import { NIVEIS, SETORES, type Funcionario, type Nivel } from '../lib/types'
+import { NIVEIS, SETORES, TAMANHOS_CALCA, TAMANHOS_CALCADO, TAMANHOS_CAMISETA, type Funcionario, type Nivel } from '../lib/types'
 
 export default function FormFuncionario({ aberto, aoFechar, existente }: { aberto: boolean; aoFechar: () => void; existente?: Funcionario }) {
   const { eu, store, unidades, equipe, recarregarEquipe, avisar } = useApp()
@@ -25,6 +25,9 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     cpf: existente?.cpf ? formatarCpf(existente.cpf) : '',
     sexo: existente?.sexo ?? '',
     dataNascimento: existente?.dataNascimento ?? '',
+    tamCamiseta: existente?.tamCamiseta ?? '',
+    tamCalca: existente?.tamCalca ?? '',
+    tamCalcado: existente?.tamCalcado ? String(existente.tamCalcado) : '',
   }))
   const [optaVt, setOptaVt] = useState(existente?.optaVt ?? false)
   // Contrato de experiência: padrão 10 + 80 para quem está chegando; a gestão pode mudar os dias.
@@ -55,6 +58,9 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
           cpf: f.cpf ? soDigitos(f.cpf) : null,
           sexo: (f.sexo || null) as Funcionario['sexo'],
           dataNascimento: f.dataNascimento || null,
+          tamCamiseta: f.tamCamiseta || null,
+          tamCalca: f.tamCalca || null,
+          tamCalcado: f.tamCalcado ? Number(f.tamCalcado) : null,
           experienciaDias1: usaExp ? Number(exp1) : null,
           experienciaDias2: usaExp ? Number(exp2) || 0 : null,
           id: existente?.id,
@@ -105,6 +111,29 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
         <Campo rotulo="Chave Pix" dica="CPF, celular, e-mail ou chave aleatória. Só a pessoa e a gestão veem.">
           <input className={estiloEntrada} value={f.pix} onChange={mudar('pix')} />
         </Campo>
+        <fieldset>
+          <legend className="mb-1 text-sm font-medium text-stone-700">Tamanhos do uniforme</legend>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo rotulo="Camiseta">
+              <select className={estiloEntrada} value={f.tamCamiseta} onChange={mudar('tamCamiseta')}>
+                <option value="">—</option>
+                {TAMANHOS_CAMISETA.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </Campo>
+            <Campo rotulo="Calça">
+              <select className={estiloEntrada} value={f.tamCalca} onChange={mudar('tamCalca')}>
+                <option value="">—</option>
+                {TAMANHOS_CALCA.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </Campo>
+            <Campo rotulo="Calçado">
+              <select className={estiloEntrada} value={f.tamCalcado} onChange={mudar('tamCalcado')}>
+                <option value="">—</option>
+                {TAMANHOS_CALCADO.map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </Campo>
+          </div>
+        </fieldset>
         <label className="flex items-center gap-3 rounded-xl bg-stone-50 px-3 py-2.5 text-sm ring-1 ring-stone-200">
           <input type="checkbox" className="size-5 accent-carvao" checked={optaVt} onChange={(e) => setOptaVt(e.target.checked)} />
           <span>

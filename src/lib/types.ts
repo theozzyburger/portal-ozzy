@@ -32,6 +32,10 @@ export interface Funcionario {
   sexo?: 'feminino' | 'masculino' | null
   // Para a mensagem de aniversário.
   dataNascimento?: string | null
+  // Tamanhos para pedir uniforme.
+  tamCamiseta?: string | null
+  tamCalca?: string | null
+  tamCalcado?: number | null
   // Contrato de experiência: dias do 1º e do 2º período a partir da admissão (padrão 10 + 80). Nulo = sem contrato.
   experienciaDias1?: number | null
   experienciaDias2?: number | null
@@ -523,4 +527,54 @@ export interface ExecucaoPreventiva {
   feitoEm: string
   observacao: string | null
   feitoPor: string | null
+}
+
+// Tamanhos do cadastro.
+export const TAMANHOS_CAMISETA = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG']
+export const TAMANHOS_CALCA = ['34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54']
+export const TAMANHOS_CALCADO = Array.from({ length: 13 }, (_, i) => 34 + i)
+
+// Pedido de troca de uniforme feito pelo próprio funcionário.
+export const ITENS_TROCA = ['Camiseta', 'Calça', 'Sapato', 'Avental', 'Boné / touca', 'Outro']
+export type StatusTroca = 'aberta' | 'atendida' | 'recusada'
+export interface SolicitacaoUniforme {
+  id: string
+  funcionarioId: string
+  itens: string[]
+  motivo: string
+  foto: string | null
+  status: StatusTroca
+  resposta: string | null
+  respondidoPor: string | null
+  respondidoEm: string | null
+  criadoEm: string
+}
+
+// Pedido de compra de uniformes (por leva), para orçamento com o fornecedor.
+export type StatusPedidoUniforme = 'rascunho' | 'orcamento' | 'pedido' | 'recebido'
+export const STATUS_PEDIDO_UNIFORME: { valor: StatusPedidoUniforme; nome: string }[] = [
+  { valor: 'rascunho', nome: 'Montando' },
+  { valor: 'orcamento', nome: 'Em orçamento' },
+  { valor: 'pedido', nome: 'Pedido feito' },
+  { valor: 'recebido', nome: 'Recebido' },
+]
+export type Modelagem = 'feminina' | 'masculina' | 'unissex'
+export interface PedidoUniforme {
+  id: string
+  numero: number
+  titulo: string
+  status: StatusPedidoUniforme
+  fornecedor: string | null
+  observacao: string | null
+  criadoEm: string
+}
+export interface ItemPedidoUniforme {
+  id: string
+  pedidoId: string
+  funcionarioId: string | null
+  item: string
+  cor: string | null
+  modelagem: Modelagem | null
+  tamanho: string | null
+  quantidade: number
 }

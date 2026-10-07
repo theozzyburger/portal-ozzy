@@ -37,7 +37,7 @@ export const MODULOS: Modulo[] = [
     origem: 'Regras definidas na reunião de estrutura e processos.',
   },
   {
-    id: 'compras', soGestao: true, nome: 'Compras', pronto: false,
+    id: 'compras', soGestao: true, nome: 'Compras', pronto: true,
     resumo: 'Do pedido de compra até a conferência da nota.',
     itens: ['Solicitação de compra por unidade', 'Cotação e aprovação por valor', 'Recebimento com conferência e fotos'],
   },

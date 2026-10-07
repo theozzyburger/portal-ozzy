@@ -3,8 +3,10 @@ import Assinatura from '../components/Assinatura'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
-import { possoAlterar } from '../lib/permissoes'
-import { ITENS_UNIFORME, TAMANHOS, termoUniforme, type EntregaUniforme, type Funcionario, type ItemUniforme } from '../lib/types'
+import { podeGerenciar, possoAlterar } from '../lib/permissoes'
+import { FotoTroca } from './Compras'
+import { ir } from '../lib/rota'
+import { ITENS_TROCA, type SolicitacaoUniforme, ITENS_UNIFORME, TAMANHOS, termoUniforme, type EntregaUniforme, type Funcionario, type ItemUniforme } from '../lib/types'
 
 const resumoItens = (itens: ItemUniforme[]) => itens.map((i) => `${i.quantidade}x ${i.item}${i.tamanho ? ` ${i.tamanho}` : ''}`).join(' · ')
 
@@ -22,6 +24,7 @@ export default function Uniformes({ pessoa }: { pessoa: Funcionario }) {
 
   return (
     <section className="space-y-2">
+      {(souEu || podeGerenciar(eu.nivel)) && <Trocas pessoa={pessoa} souEu={souEu} />}
       {gestao && pessoa.status === 'ativo' && (
         <Botao className="w-full" onClick={() => setModal({ tipo: 'nova' })}>
           + Registrar entrega de uniforme
@@ -196,6 +199,112 @@ function Termo({ entrega, pessoa, assinar, aoFechar, aoAssinar }: { entrega: Ent
         )}
         {erro && <p className="text-sm text-red-600">{erro}</p>}
       </div>
+    </Modal>
+  )
+}
+
+const SELO_TROCA = { aberta: 'ambar', atendida: 'verde', recusada: 'cinza' } as const
+const NOME_TROCA = { aberta: 'Aguardando', atendida: 'Atendida', recusada: 'Recusada' } as const
+
+// Pedido de troca de uniforme: a própria pessoa pede (com motivo e foto); vai para a gerência e o administrativo.
+function Trocas({ pessoa, souEu }: { pessoa: Funcionario; souEu: boolean }) {
+  const { eu, store, nomeDe, avisar } = useApp()
+  const [lista, setLista] = useState<SolicitacaoUniforme[]>([])
+  const [pedindo, setPedindo] = useState(false)
+  const carregar = useCallback(() => store.solicitacoesUniforme(pessoa.id).then(setLista), [store, pessoa.id])
+  useEffect(() => {
+    carregar()
+  }, [carregar])
+  if (!souEu && !lista.length) return null
+  return (
+    <div className="space-y-2 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-bold">Trocas de uniforme</h3>
+        {souEu && pessoa.status === 'ativo' && <Botao onClick={() => setPedindo(true)}>Pedir troca</Botao>}
+        {!souEu && podeGerenciar(eu.nivel) && <Botao variante="secundario" onClick={() => ir('compras')}>Ver todas em Compras</Botao>}
+      </div>
+      {lista.length === 0 ? (
+        <p className="text-sm text-stone-500">Uniforme gasto, rasgado ou não serve mais? Peça a troca aqui: vai direto para a gerência e o administrativo.</p>
+      ) : (
+        <ul className="divide-y divide-stone-100">
+          {lista.map((x) => (
+            <li key={x.id} className="space-y-1 py-2 text-sm">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <b>{x.itens.join(', ')}</b>
+                <Selo cor={SELO_TROCA[x.status]}>{NOME_TROCA[x.status]}</Selo>
+                <span className="text-xs text-stone-500">{dataLonga(x.criadoEm.slice(0, 10))}</span>
+              </div>
+              <p className="text-stone-700">{x.motivo}</p>
+              {x.respondidoPor && (
+                <p className="text-xs text-stone-500">
+                  {nomeDe(x.respondidoPor)}: {x.resposta ?? NOME_TROCA[x.status].toLowerCase()}
+                </p>
+              )}
+              {x.foto && <FotoTroca s={x} />}
+            </li>
+          ))}
+        </ul>
+      )}
+      {pedindo && (
+        <PedirTroca
+          aoFechar={() => setPedindo(false)}
+          aoSalvar={async () => {
+            setPedindo(false)
+            await carregar()
+            avisar('Pedido enviado para a gerência e o administrativo')
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function PedirTroca({ aoFechar, aoSalvar }: { aoFechar: () => void; aoSalvar: () => void }) {
+  const { eu, store } = useApp()
+  const [itens, setItens] = useState<string[]>([])
+  const [motivo, setMotivo] = useState('')
+  const [foto, setFoto] = useState<File | null>(null)
+  const [erro, setErro] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const enviar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!itens.length) return setErro('Marque o que precisa trocar.')
+    if (!motivo.trim()) return setErro('Conte o motivo (ex.: sapato gasto, camiseta rasgada).')
+    setEnviando(true)
+    try {
+      await store.pedirTrocaUniforme({ funcionarioId: eu.id, itens, motivo, foto: foto ?? undefined })
+      aoSalvar()
+    } catch (err) {
+      setErro((err as Error).message)
+      setEnviando(false)
+    }
+  }
+  return (
+    <Modal titulo="Pedir troca de uniforme" aberto aoFechar={aoFechar}>
+      <form onSubmit={enviar} className="space-y-4">
+        <fieldset>
+          <legend className="mb-1 text-sm font-medium text-stone-700">O que precisa trocar?</legend>
+          <div className="flex flex-wrap gap-2">
+            {ITENS_TROCA.map((i) => {
+              const marcado = itens.includes(i)
+              return (
+                <label key={i} className={`cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold ring-1 ${marcado ? 'bg-carvao text-white ring-carvao' : 'ring-stone-300'}`}>
+                  <input type="checkbox" className="sr-only" checked={marcado} onChange={() => setItens(marcado ? itens.filter((x) => x !== i) : [...itens, i])} />
+                  {i}
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+        <Campo rotulo="Por quê?">
+          <textarea className={estiloEntrada} rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: meu sapato está gasto, a sola descolou." />
+        </Campo>
+        <Campo rotulo="Foto (opcional)" dica="Uma foto mostrando o estado ajuda a gestão a decidir rápido.">
+          <input type="file" accept="image/*" capture="environment" className="block w-full text-sm" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
+        </Campo>
+        {erro && <p className="text-sm text-red-600">{erro}</p>}
+        <Botao className="w-full" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar pedido'}</Botao>
+      </form>
     </Modal>
   )
 }

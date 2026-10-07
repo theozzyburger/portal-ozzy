@@ -1,6 +1,6 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -290,6 +290,24 @@ for (const p of funcionarios) if (p.nivel !== 'proprietario') p.sexo = MULHERES.
   exp('p-kaua-silva', 85)
 }
 const desligamentosDemo: Desligamento[] = []
+
+// Tamanhos de exemplo para os pedidos de uniforme.
+{
+  const camisetas = ['P', 'M', 'G', 'M', 'GG', 'P', 'M', 'G']
+  funcionarios.filter((p) => p.nivel !== 'proprietario').forEach((p, i) => {
+    const mulher = p.sexo === 'feminino'
+    p.tamCamiseta = camisetas[i % camisetas.length]
+    p.tamCalca = String((mulher ? 36 : 40) + (i % 3) * 2)
+    p.tamCalcado = (mulher ? 35 : 39) + (i % 4)
+  })
+}
+const solicitacoesDemo: SolicitacaoUniforme[] = [
+  { id: 'su1', funcionarioId: 'p-lucas-torres', itens: ['Sapato'], motivo: 'Sapato gasto, a sola está descolando.', foto: null, status: 'aberta', resposta: null, respondidoPor: null, respondidoEm: null, criadoEm: addDias(hoje(), -2) + 'T15:20:00Z' },
+  { id: 'su2', funcionarioId: 'p-dora-ramos', itens: ['Camiseta', 'Avental'], motivo: 'Camiseta manchada de óleo e avental rasgado.', foto: null, status: 'aberta', resposta: null, respondidoPor: null, respondidoEm: null, criadoEm: addDias(hoje(), -1) + 'T11:05:00Z' },
+  { id: 'su3', funcionarioId: 'p-cibeli-costa', itens: ['Calça'], motivo: 'Calça ficou pequena.', foto: null, status: 'atendida', resposta: 'Entregue calça 40.', respondidoPor: 'p-maria-costa', respondidoEm: addDias(hoje(), -20) + 'T10:00:00Z', criadoEm: addDias(hoje(), -25) + 'T10:00:00Z' },
+]
+const pedidosUniformeDemo: PedidoUniforme[] = []
+const itensPedidoDemo: ItemPedidoUniforme[] = []
 
 // Equipamentos e preventiva de EXEMPLO (a lista real o Heitor vai passar e a manutenção preenche no portal).
 const equipamentosDemo: Equipamento[] = [
@@ -650,6 +668,54 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         c.fechadoEm = m.status === 'resolvido' || m.status === 'cancelado' ? agora() : null
       }
       c.eventos.push({ id: novoId('e'), autorId: u.id, em: agora(), texto: m.texto?.trim() || null, status: m.status ?? null })
+    },
+    async solicitacoesUniforme(fid) {
+      const u = exigeEu()
+      return espera(solicitacoesDemo.filter((x) => (fid ? x.funcionarioId === fid : true) && (x.funcionarioId === u.id || podeGerenciar(u.nivel))).sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)).map((x) => ({ ...x })))
+    },
+    async pedirTrocaUniforme(n) {
+      const u = exigeEu()
+      if (n.funcionarioId !== u.id) throw new Error('Cada pessoa pede a própria troca')
+      const id = novoId('su')
+      if (n.foto) arquivosDemo.set(id, URL.createObjectURL(n.foto))
+      solicitacoesDemo.push({ id, funcionarioId: u.id, itens: n.itens, motivo: n.motivo.trim(), foto: n.foto ? 'demo' : null, status: 'aberta', resposta: null, respondidoPor: null, respondidoEm: null, criadoEm: new Date().toISOString() })
+    },
+    async responderTrocaUniforme(id, status, resposta) {
+      const u = exigeGestao()
+      const x = solicitacoesDemo.find((y) => y.id === id)
+      if (x) Object.assign(x, { status, resposta: resposta.trim() || null, respondidoPor: status === 'aberta' ? null : u.id, respondidoEm: status === 'aberta' ? null : new Date().toISOString() })
+    },
+    async fotoSolicitacao(x) {
+      return arquivosDemo.get(x.id) ?? null
+    },
+    async pedidosUniforme() {
+      exigeGestao()
+      return espera([...pedidosUniformeDemo].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)).map((p) => ({ ...p })))
+    },
+    async salvarPedidoUniforme(p) {
+      exigeGestao()
+      const atual = p.id ? pedidosUniformeDemo.find((x) => x.id === p.id) : undefined
+      if (atual) {
+        Object.assign(atual, p)
+        return { ...atual }
+      }
+      const novo: PedidoUniforme = { ...p, id: novoId('pu'), numero: pedidosUniformeDemo.length + 1, criadoEm: new Date().toISOString() }
+      pedidosUniformeDemo.push(novo)
+      return { ...novo }
+    },
+    async excluirPedidoUniforme(id) {
+      exigeGestao()
+      tira(pedidosUniformeDemo, id)
+      for (const i of itensPedidoDemo.filter((x) => x.pedidoId === id)) tira(itensPedidoDemo, i.id)
+    },
+    async itensPedidoUniforme(pid) {
+      exigeGestao()
+      return espera(itensPedidoDemo.filter((i) => i.pedidoId === pid).map((i) => ({ ...i })))
+    },
+    async definirItensPedido(pid, fid, itens) {
+      exigeGestao()
+      for (const i of itensPedidoDemo.filter((x) => x.pedidoId === pid && x.funcionarioId === fid)) tira(itensPedidoDemo, i.id)
+      for (const i of itens) itensPedidoDemo.push({ ...i, id: novoId('ip'), pedidoId: pid, funcionarioId: fid })
     },
     async equipamentos() {
       exigeManutencao()

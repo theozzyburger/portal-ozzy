@@ -79,6 +79,7 @@ export default function Inicio() {
       {avisaFerias(eu.nivel) && <AlertaFerias />}
 
       {gestao && <AlertasDp docs={docsEquipe} />}
+      {gestao && <AlertaTrocas />}
 
       {painel && <Painel />}
 
@@ -475,6 +476,23 @@ function ResumoPreventiva() {
         ))}
         {tarefas.length > 4 && <span className="block text-xs text-stone-500">e mais {tarefas.length - 4}</span>}
       </span>
+      <span className="text-sm font-semibold">Ver ›</span>
+    </button>
+  )
+}
+
+// Pedidos de troca de uniforme em aberto (gestão), com atalho para Compras.
+function AlertaTrocas() {
+  const { store } = useApp()
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    store.solicitacoesUniforme().then((xs) => setN(xs.filter((x) => x.status === 'aberta').length)).catch(() => setN(0))
+  }, [store])
+  if (!n) return null
+  return (
+    <button onClick={() => ir('compras')} className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-stone-200 hover:ring-carvao">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ozzy-400 text-sm font-bold">{n}</span>
+      <span className="min-w-0 flex-1 font-semibold">Pedido{n > 1 ? 's' : ''} de troca de uniforme</span>
       <span className="text-sm font-semibold">Ver ›</span>
     </button>
   )

@@ -19,6 +19,7 @@ import { formatarCpf } from '../lib/cpf'
 import { Contracheque } from './Salarios'
 import { dataPagamento } from '../lib/salarios'
 import ChecklistDesligamento from '../components/ChecklistDesligamento'
+import { tamanhosDe } from './Compras'
 import { textoExperiencia } from '../components/FormFuncionario'
 import { experienciaDe, idadeEm } from '../lib/pessoal'
 
@@ -138,6 +139,12 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             <dt className="text-stone-500">Admissão</dt>
             <dd className="font-medium">{dataLonga(pessoa.dataAdmissao)}</dd>
           </div>
+          {(souEu || verDocs) && (
+            <div>
+              <dt className="text-stone-500">Uniforme</dt>
+              <dd className="font-medium">{tamanhosDe(pessoa)}</dd>
+            </div>
+          )}
           {pessoa.dataNascimento && (souEu || verDocs) && (
             <div>
               <dt className="text-stone-500">Nascimento</dt>
