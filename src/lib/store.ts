@@ -1,4 +1,4 @@
-import type { Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -139,6 +139,20 @@ export interface Store {
   atualizarChamado(id: string, mudanca: { status?: StatusChamado; texto?: string }): Promise<void>
   fotoChamado(c: Chamado): Promise<string | null>
   assinarRegulamento(versaoId: string, assinatura: string): Promise<void>
+
+  // Equipamentos e manutenção preventiva (manutenção e gestão).
+  equipamentos(): Promise<Equipamento[]>
+  salvarEquipamento(e: Omit<Equipamento, 'id' | 'foto'> & { id?: string }, foto?: Blob): Promise<Equipamento>
+  fotoEquipamento(e: Equipamento): Promise<string | null>
+  manutencoesEquipamento(equipamentoId?: string): Promise<ManutencaoEquipamento[]>
+  registrarManutencaoEquipamento(m: Omit<ManutencaoEquipamento, 'id' | 'registradoPor'>): Promise<void>
+  excluirManutencaoEquipamento(id: string): Promise<void>
+  preventivas(): Promise<Preventiva[]>
+  salvarPreventiva(p: Omit<Preventiva, 'id'> & { id?: string }): Promise<void>
+  excluirPreventiva(id: string): Promise<void>
+  execucoesPreventiva(): Promise<ExecucaoPreventiva[]>
+  registrarExecucao(x: Omit<ExecucaoPreventiva, 'id' | 'feitoPor'>): Promise<void>
+  excluirExecucao(id: string): Promise<void>
 
   // Copiados do Lucro Fácil por uma rotina. atualizadoEm = última cópia (null se nunca).
   // Fichas: todos veem; os custos só chegam para a gestão.

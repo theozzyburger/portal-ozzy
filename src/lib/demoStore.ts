@@ -1,6 +1,6 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -290,6 +290,38 @@ for (const p of funcionarios) if (p.nivel !== 'proprietario') p.sexo = MULHERES.
   exp('p-kaua-silva', 85)
 }
 const desligamentosDemo: Desligamento[] = []
+
+// Equipamentos e preventiva de EXEMPLO (a lista real o Heitor vai passar e a manutenção preenche no portal).
+const equipamentosDemo: Equipamento[] = [
+  { id: 'eq1', unidadeId: 'burger-va', nome: 'Liquidificador industrial 1', marcaModelo: 'Skymsen LS-04', numeroSerie: null, local: 'Cozinha', dataCompra: '2024-03-15', valorCompra: 1290, valorAtual: 800, foto: null, observacao: null, ativo: true },
+  { id: 'eq2', unidadeId: 'burger-va', nome: 'Liquidificador industrial 2', marcaModelo: 'Skymsen LS-04', numeroSerie: null, local: 'Cozinha', dataCompra: '2025-01-10', valorCompra: 1390, valorAtual: 1000, foto: null, observacao: null, ativo: true },
+  { id: 'eq3', unidadeId: 'burger-psd', nome: 'Chapa a gás', marcaModelo: 'Venâncio', numeroSerie: null, local: 'Cozinha', dataCompra: '2022-06-01', valorCompra: 3200, valorAtual: 2000, foto: null, observacao: null, ativo: true },
+  { id: 'eq4', unidadeId: 'burger-psd', nome: 'Freezer horizontal', marcaModelo: 'Metalfrio 500 L', numeroSerie: null, local: 'Estoque', dataCompra: '2023-02-20', valorCompra: 4100, valorAtual: 2800, foto: null, observacao: null, ativo: true },
+  { id: 'eq5', unidadeId: 'pizza', nome: 'Forno de pizza', marcaModelo: null, numeroSerie: null, local: 'Cozinha', dataCompra: null, valorCompra: null, valorAtual: null, foto: null, observacao: 'Data de compra a confirmar', ativo: true },
+]
+const manutencoesDemo: ManutencaoEquipamento[] = [
+  { id: 'me1', equipamentoId: 'eq1', data: '2025-08-12', tipo: 'corretiva', descricao: 'Troca do acoplamento (copo travando).', prestador: 'Assistência Skymsen', custo: 180, chamadoId: null, registradoPor: 'p-vanderlei' },
+  { id: 'me2', equipamentoId: 'eq1', data: addDias(hoje(), -20), tipo: 'corretiva', descricao: 'Motor esquentando: troca das escovas.', prestador: 'Vanderlei', custo: 60, chamadoId: null, registradoPor: 'p-vanderlei' },
+  { id: 'me3', equipamentoId: 'eq4', data: addDias(hoje(), -95), tipo: 'preventiva', descricao: 'Limpeza do condensador e troca da borracha da tampa.', prestador: 'Vanderlei', custo: 90, chamadoId: null, registradoPor: 'p-vanderlei' },
+]
+const preventivasDemo: Preventiva[] = [
+  { id: 'pv1', unidadeId: null, equipamentoId: null, titulo: 'Limpeza da coifa e dutos', descricao: 'Exemplo. Desengordurar coifa, filtros e dutos.', frequenciaDias: 90, primeiraEm: '2026-01-01', ativo: true },
+  { id: 'pv2', unidadeId: null, equipamentoId: null, titulo: "Limpeza da caixa d'água", descricao: 'Exemplo. Guardar o certificado da empresa.', frequenciaDias: 180, primeiraEm: '2026-01-01', ativo: true },
+  { id: 'pv3', unidadeId: null, equipamentoId: null, titulo: 'Limpeza do ar-condicionado', descricao: 'Exemplo. Filtros e bandeja.', frequenciaDias: 30, primeiraEm: '2026-01-01', ativo: true },
+  { id: 'pv4', unidadeId: 'burger-psd', equipamentoId: 'eq4', titulo: 'Condensador do freezer', descricao: 'Exemplo. Limpar e conferir a borracha.', frequenciaDias: 90, primeiraEm: '2026-01-01', ativo: true },
+]
+const execucoesDemo: ExecucaoPreventiva[] = [
+  { id: 'ex1', preventivaId: 'pv1', unidadeId: 'burger-psd', feitoEm: addDias(hoje(), -85), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex2', preventivaId: 'pv1', unidadeId: 'burger-va', feitoEm: addDias(hoje(), -100), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex3', preventivaId: 'pv1', unidadeId: 'pizza', feitoEm: addDias(hoje(), -30), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex4', preventivaId: 'pv2', unidadeId: 'burger-psd', feitoEm: addDias(hoje(), -60), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex5', preventivaId: 'pv2', unidadeId: 'burger-va', feitoEm: addDias(hoje(), -60), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex6', preventivaId: 'pv2', unidadeId: 'pizza', feitoEm: addDias(hoje(), -60), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex7', preventivaId: 'pv3', unidadeId: 'burger-psd', feitoEm: addDias(hoje(), -10), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex8', preventivaId: 'pv3', unidadeId: 'burger-va', feitoEm: addDias(hoje(), -27), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex9', preventivaId: 'pv3', unidadeId: 'pizza', feitoEm: addDias(hoje(), -12), observacao: null, feitoPor: 'p-vanderlei' },
+  { id: 'ex10', preventivaId: 'pv4', unidadeId: 'burger-psd', feitoEm: addDias(hoje(), -95), observacao: null, feitoPor: 'p-vanderlei' },
+]
 const feriasDemo: Ferias[] = [
   { id: 'fe1', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2023-03-01', inicio: '2024-07-01', dias: 30, abonoDias: 0, observacao: null },
   { id: 'fe2', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2024-03-01', inicio: '2025-09-01', dias: 20, abonoDias: 10, observacao: 'Vendeu 10 dias' },
@@ -343,6 +375,15 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     return u
   }
   const porId = (id: string) => funcionarios.find((x) => x.id === id)!
+  const exigeManutencao = () => {
+    const u = exigeEu()
+    if (!atendeChamados(u.nivel)) throw new Error('Só a manutenção e a gestão.')
+    return u
+  }
+  const tira = <T extends { id: string }>(lista: T[], id: string) => {
+    const i = lista.findIndex((x) => x.id === id)
+    if (i >= 0) lista.splice(i, 1)
+  }
 
   return {
     modo: 'demo',
@@ -609,6 +650,64 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         c.fechadoEm = m.status === 'resolvido' || m.status === 'cancelado' ? agora() : null
       }
       c.eventos.push({ id: novoId('e'), autorId: u.id, em: agora(), texto: m.texto?.trim() || null, status: m.status ?? null })
+    },
+    async equipamentos() {
+      exigeManutencao()
+      return espera(equipamentosDemo.map((e) => ({ ...e })).sort((a, b) => a.nome.localeCompare(b.nome)))
+    },
+    async salvarEquipamento(e, foto) {
+      exigeManutencao()
+      const atual = e.id ? equipamentosDemo.find((x) => x.id === e.id) : undefined
+      const salvo: Equipamento = { ...e, id: atual?.id ?? novoId('eq'), foto: atual?.foto ?? null }
+      if (foto) {
+        salvo.foto = 'demo'
+        arquivosDemo.set(salvo.id, URL.createObjectURL(foto))
+      }
+      if (atual) Object.assign(atual, salvo)
+      else equipamentosDemo.push(salvo)
+      return espera({ ...salvo })
+    },
+    async fotoEquipamento(e) {
+      return arquivosDemo.get(e.id) ?? null
+    },
+    async manutencoesEquipamento(eid) {
+      exigeManutencao()
+      return espera(manutencoesDemo.filter((m) => !eid || m.equipamentoId === eid).sort((a, b) => b.data.localeCompare(a.data)).map((m) => ({ ...m })))
+    },
+    async registrarManutencaoEquipamento(m) {
+      const u = exigeManutencao()
+      manutencoesDemo.push({ ...m, id: novoId('me'), registradoPor: u.id })
+    },
+    async excluirManutencaoEquipamento(id) {
+      exigeManutencao()
+      tira(manutencoesDemo, id)
+    },
+    async preventivas() {
+      exigeManutencao()
+      return espera(preventivasDemo.map((p) => ({ ...p })))
+    },
+    async salvarPreventiva(p) {
+      exigeManutencao()
+      const atual = p.id ? preventivasDemo.find((x) => x.id === p.id) : undefined
+      if (atual) Object.assign(atual, p)
+      else preventivasDemo.push({ ...p, id: novoId('pv') })
+    },
+    async excluirPreventiva(id) {
+      exigeManutencao()
+      tira(preventivasDemo, id)
+      for (const x of execucoesDemo.filter((x) => x.preventivaId === id)) tira(execucoesDemo, x.id)
+    },
+    async execucoesPreventiva() {
+      exigeManutencao()
+      return espera(execucoesDemo.map((x) => ({ ...x })))
+    },
+    async registrarExecucao(x) {
+      const u = exigeManutencao()
+      execucoesDemo.push({ ...x, id: novoId('ex'), feitoPor: u.id })
+    },
+    async excluirExecucao(id) {
+      exigeManutencao()
+      tira(execucoesDemo, id)
     },
     async fotoChamado(c) {
       return arquivosDemo.get(c.id) ?? null

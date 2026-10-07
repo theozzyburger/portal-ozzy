@@ -477,3 +477,50 @@ export interface Desligamento {
   observacao: string | null
   concluido: boolean
 }
+
+// Equipamentos mais caros de cada loja, com histórico de manutenções (inventário).
+export interface Equipamento {
+  id: string
+  unidadeId: string
+  nome: string
+  marcaModelo: string | null
+  numeroSerie: string | null
+  local: string | null
+  dataCompra: string | null
+  valorCompra: number | null
+  valorAtual: number | null
+  foto: string | null
+  observacao: string | null
+  ativo: boolean
+}
+export type TipoManutencao = 'corretiva' | 'preventiva'
+export interface ManutencaoEquipamento {
+  id: string
+  equipamentoId: string
+  data: string
+  tipo: TipoManutencao
+  descricao: string
+  prestador: string | null
+  custo: number | null
+  chamadoId: string | null
+  registradoPor: string | null
+}
+// Item de manutenção preventiva: o que verificar e a cada quantos dias. unidadeId nulo = todas as lojas.
+export interface Preventiva {
+  id: string
+  unidadeId: string | null
+  equipamentoId: string | null
+  titulo: string
+  descricao: string | null
+  frequenciaDias: number
+  primeiraEm: string
+  ativo: boolean
+}
+export interface ExecucaoPreventiva {
+  id: string
+  preventivaId: string
+  unidadeId: string | null
+  feitoEm: string
+  observacao: string | null
+  feitoPor: string | null
+}

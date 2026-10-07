@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { atendeChamados } from '../lib/permissoes'
 import { chamadoEmAberto, type Chamado } from '../lib/types'
 import { haQuanto } from './Manutencao'
+import { tarefasPreventiva, textoPrazo, type TarefaPreventiva } from '../lib/preventiva'
 import { Avatar, Cartao, Selo, Titulo } from '../components/ui'
 import arte from '../assets/banner-ozzy.jpg'
 import Icone from '../components/Icone'
@@ -71,6 +72,7 @@ export default function Inicio() {
       <MeusAvisos docs={isentoDeRotinas(eu.nivel) ? null : meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento && !isentoDeRotinas(eu.nivel)} />
 
       {atendeChamados(eu.nivel) && <ResumoChamados />}
+      {atendeChamados(eu.nivel) && <ResumoPreventiva />}
 
       {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
 
@@ -446,5 +448,34 @@ function AlertasDp({ docs }: { docs: Documento[] }) {
         </div>
       )}
     </div>
+  )
+}
+
+// Preventiva atrasada ou vencendo (manutenção e gestão), separada dos chamados do que quebrou.
+function ResumoPreventiva() {
+  const { store, unidades } = useApp()
+  const [tarefas, setTarefas] = useState<TarefaPreventiva[]>([])
+  useEffect(() => {
+    Promise.all([store.preventivas(), store.execucoesPreventiva()])
+      .then(([i, x]) => setTarefas(tarefasPreventiva(i, x, unidades, hoje()).filter((t) => t.situacao !== 'em_dia')))
+      .catch(() => setTarefas([]))
+  }, [store, unidades])
+  if (!tarefas.length) return null
+  const atrasadas = tarefas.filter((t) => t.situacao === 'vencida').length
+  const loja = (id: string) => (unidades.find((u) => u.id === id)?.nome ?? id).replace(/^The Ozzy (Burger )?/, '')
+  return (
+    <button onClick={() => ir('manutencao')} className="flex w-full items-start gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-stone-200 hover:ring-carvao">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${atrasadas ? 'bg-red-600 text-white' : 'bg-ozzy-400'}`}>{tarefas.length}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Manutenção preventiva</span>
+        {tarefas.slice(0, 4).map((t) => (
+          <span key={t.preventiva.id + t.unidadeId} className="block truncate text-sm text-stone-600">
+            {t.preventiva.titulo} · {loja(t.unidadeId)}: <span className={t.situacao === 'vencida' ? 'font-semibold text-red-700' : ''}>{textoPrazo(t)}</span>
+          </span>
+        ))}
+        {tarefas.length > 4 && <span className="block text-xs text-stone-500">e mais {tarefas.length - 4}</span>}
+      </span>
+      <span className="text-sm font-semibold">Ver ›</span>
+    </button>
   )
 }

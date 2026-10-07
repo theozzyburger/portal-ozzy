@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
+import Preventiva from './Preventiva'
+import Equipamentos from './Equipamentos'
 import { atendeChamados } from '../lib/permissoes'
 import {
   CATEGORIAS_CHAMADO, GRAVIDADES, STATUS_CHAMADO, apelidoUnidade, chamadoEmAberto, nomeCurto,
@@ -33,7 +35,26 @@ export function haQuanto(iso: string) {
 const ordenarAbertos = (a: Chamado, b: Chamado) =>
   ORDEM_GRAVIDADE[a.gravidade] - ORDEM_GRAVIDADE[b.gravidade] || a.abertoEm.localeCompare(b.abertoEm)
 
+// Manutenção e gestão têm três abas: chamados (corretiva, o que quebrou), preventiva e equipamentos.
 export default function Manutencao() {
+  const { eu } = useApp()
+  const [aba, setAba] = useState<'chamados' | 'preventiva' | 'equipamentos'>('chamados')
+  if (!atendeChamados(eu.nivel)) return <Chamados />
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-stone-200 p-1 text-sm font-semibold">
+        {([['chamados', 'Chamados'], ['preventiva', 'Preventiva'], ['equipamentos', 'Equipamentos']] as const).map(([a, nome]) => (
+          <button key={a} onClick={() => setAba(a)} className={`flex-1 rounded-lg px-3 py-2 whitespace-nowrap ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+            {nome}
+          </button>
+        ))}
+      </div>
+      {aba === 'chamados' ? <Chamados /> : aba === 'preventiva' ? <Preventiva /> : <Equipamentos />}
+    </div>
+  )
+}
+
+function Chamados() {
   const { eu, store, unidades, nomeDe, avisar } = useApp()
   const atende = atendeChamados(eu.nivel)
   const [chamados, setChamados] = useState<Chamado[] | null>(null)

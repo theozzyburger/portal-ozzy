@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -11,6 +11,16 @@ const paraFuncionario = (r: any): Funcionario => ({
   status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false, cpf: r.cpf ?? null, sexo: r.sexo ?? null,
   dataNascimento: r.data_nascimento ?? null, experienciaDias1: r.experiencia_dias1 ?? null, experienciaDias2: r.experiencia_dias2 ?? null,
 })
+
+const paraEquipamento = (r: any): Equipamento => ({
+  id: r.id, unidadeId: r.unidade_id, nome: r.nome, marcaModelo: r.marca_modelo, numeroSerie: r.numero_serie, local: r.local, dataCompra: r.data_compra,
+  valorCompra: r.valor_compra === null ? null : Number(r.valor_compra), valorAtual: r.valor_atual === null ? null : Number(r.valor_atual),
+  foto: r.foto, observacao: r.observacao, ativo: r.ativo,
+})
+const paraPreventiva = (r: any): Preventiva => ({
+  id: r.id, unidadeId: r.unidade_id, equipamentoId: r.equipamento_id, titulo: r.titulo, descricao: r.descricao, frequenciaDias: r.frequencia_dias, primeiraEm: r.primeira_em, ativo: r.ativo,
+})
+const texto = (v: string | null | undefined) => v?.trim() || null
 
 const paraDesligamento = (r: any): Desligamento => ({
   id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo, itens: r.itens ?? {}, observacao: r.observacao, concluido: r.concluido,
@@ -253,6 +263,71 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async excluirDecimoTerceiro(id) {
       ok(await sb.from('decimo_terceiro').delete().eq('id', id))
+    },
+    async equipamentos() {
+      return (ok(await sb.from('equipamentos').select('*').order('nome')) ?? []).map(paraEquipamento)
+    },
+    async salvarEquipamento(e, foto) {
+      let caminho: string | undefined
+      if (foto) {
+        caminho = `equipamentos/${e.unidadeId}/${crypto.randomUUID()}.jpg`
+        ok(await sb.storage.from('chamados').upload(caminho, foto, { contentType: foto.type || 'image/jpeg' }))
+      }
+      const linha = {
+        unidade_id: e.unidadeId, nome: e.nome.trim(), marca_modelo: texto(e.marcaModelo), numero_serie: texto(e.numeroSerie), local: texto(e.local),
+        data_compra: e.dataCompra || null, valor_compra: e.valorCompra, valor_atual: e.valorAtual, observacao: texto(e.observacao), ativo: e.ativo,
+        ...(caminho ? { foto: caminho } : {}),
+      }
+      const r = e.id
+        ? ok(await sb.from('equipamentos').update(linha).eq('id', e.id).select().single())
+        : ok(await sb.from('equipamentos').insert(linha).select().single())
+      return paraEquipamento(r)
+    },
+    async fotoEquipamento(e) {
+      if (!e.foto) return null
+      const { data } = await sb.storage.from('chamados').createSignedUrl(e.foto, 300)
+      return data?.signedUrl ?? null
+    },
+    async manutencoesEquipamento(eid) {
+      let q = sb.from('equipamento_manutencoes').select('*').order('data', { ascending: false })
+      if (eid) q = q.eq('equipamento_id', eid)
+      return (ok(await q) ?? []).map((r: any): ManutencaoEquipamento => ({
+        id: r.id, equipamentoId: r.equipamento_id, data: r.data, tipo: r.tipo, descricao: r.descricao, prestador: r.prestador,
+        custo: r.custo === null ? null : Number(r.custo), chamadoId: r.chamado_id, registradoPor: r.registrado_por,
+      }))
+    },
+    async registrarManutencaoEquipamento(m) {
+      ok(await sb.from('equipamento_manutencoes').insert({
+        equipamento_id: m.equipamentoId, data: m.data, tipo: m.tipo, descricao: m.descricao.trim(), prestador: texto(m.prestador), custo: m.custo, chamado_id: m.chamadoId,
+      }))
+    },
+    async excluirManutencaoEquipamento(id) {
+      ok(await sb.from('equipamento_manutencoes').delete().eq('id', id))
+    },
+    async preventivas() {
+      return (ok(await sb.from('preventivas').select('*').order('titulo')) ?? []).map(paraPreventiva)
+    },
+    async salvarPreventiva(p) {
+      const linha = {
+        unidade_id: p.unidadeId || null, equipamento_id: p.equipamentoId || null, titulo: p.titulo.trim(), descricao: texto(p.descricao),
+        frequencia_dias: p.frequenciaDias, primeira_em: p.primeiraEm, ativo: p.ativo,
+      }
+      if (p.id) ok(await sb.from('preventivas').update(linha).eq('id', p.id))
+      else ok(await sb.from('preventivas').insert(linha))
+    },
+    async excluirPreventiva(id) {
+      ok(await sb.from('preventivas').delete().eq('id', id))
+    },
+    async execucoesPreventiva() {
+      return (ok(await sb.from('preventiva_execucoes').select('*').order('feito_em', { ascending: false })) ?? []).map((r: any): ExecucaoPreventiva => ({
+        id: r.id, preventivaId: r.preventiva_id, unidadeId: r.unidade_id, feitoEm: r.feito_em, observacao: r.observacao, feitoPor: r.feito_por,
+      }))
+    },
+    async registrarExecucao(x) {
+      ok(await sb.from('preventiva_execucoes').insert({ preventiva_id: x.preventivaId, unidade_id: x.unidadeId, feito_em: x.feitoEm, observacao: texto(x.observacao) }))
+    },
+    async excluirExecucao(id) {
+      ok(await sb.from('preventiva_execucoes').delete().eq('id', id))
     },
     async desligamentos(fid) {
       let q = sb.from('desligamentos').select('*').order('data', { ascending: false })
