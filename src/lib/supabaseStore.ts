@@ -8,7 +8,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
-  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix,
+  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto,
 })
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
@@ -54,11 +54,20 @@ export function criarSupabaseStore(url: string, chave: string): Store {
   const sb = createClient(url, chave)
   let eu: Funcionario | null = null
 
+  // Fotos ficam em armazenamento privado: gera endereços temporários de uma vez para a lista toda.
+  const comFotos = async (pessoas: Funcionario[]) => {
+    const caminhos = pessoas.map((p) => p.foto).filter((c): c is string => !!c)
+    if (!caminhos.length) return pessoas
+    const { data } = await sb.storage.from('fotos').createSignedUrls(caminhos, 60 * 60 * 24)
+    const url = new Map((data ?? []).map((d) => [d.path, d.signedUrl]))
+    return pessoas.map((p) => ({ ...p, fotoUrl: p.foto ? url.get(p.foto) ?? null : null }))
+  }
+
   const carregarEu = async () => {
     const { data } = await sb.auth.getUser()
     if (!data.user) return (eu = null)
     const r = ok(await sb.from('funcionarios').select('*').eq('auth_user_id', data.user.id).eq('status', 'ativo').maybeSingle())
-    return (eu = r ? paraFuncionario(r) : null)
+    return (eu = r ? (await comFotos([paraFuncionario(r)]))[0] : null)
   }
   const exigeEu = () => {
     if (!eu) throw new Error('Sessão expirada')
@@ -89,7 +98,12 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return ok(await sb.rpc('nomes_funcionarios')) ?? []
     },
     async funcionarios() {
-      return (ok(await sb.from('funcionarios').select('*').order('nome')) ?? []).map(paraFuncionario)
+      return comFotos((ok(await sb.from('funcionarios').select('*').order('nome')) ?? []).map(paraFuncionario))
+    },
+    async definirFoto(funcionarioId, imagem) {
+      const caminho = `${funcionarioId}/${Date.now()}.jpg`
+      ok(await sb.storage.from('fotos').upload(caminho, imagem, { contentType: 'image/jpeg' }))
+      ok(await sb.rpc('definir_foto', { alvo: funcionarioId, caminho }))
     },
     async salvarFuncionario(f, senhaInicial) {
       const linha = f.id

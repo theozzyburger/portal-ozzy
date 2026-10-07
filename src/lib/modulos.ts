@@ -18,11 +18,12 @@ export interface Modulo {
   ve?: (n: Nivel) => boolean
 }
 
-// Ordem do menu lateral. Os "em breve" seguem o plano e o roteiro da reunião de regras.
+// Ordem do menu lateral. Funcionário, Supervisor e Manutenção não veem Fichas, Administrativo,
+// Compras, Estoque e Eventos (pedido de 07/10). Os "em breve" seguem o plano e o roteiro da reunião de regras.
 export const MODULOS: Modulo[] = [
   { id: 'inicio', nome: 'Início', pronto: true },
   { id: 'rh', nome: 'Departamento Pessoal', pronto: true },
-  { id: 'fichas', nome: 'Fichas técnicas', pronto: true },
+  { id: 'fichas', nome: 'Fichas técnicas', pronto: true, soGestao: true },
   {
     id: 'financeiro', nome: 'Financeiro', pronto: true, ve: vejoResultado,
     resumo: 'Custos e resultados das duas unidades num só lugar.',
@@ -30,18 +31,18 @@ export const MODULOS: Modulo[] = [
     origem: 'Dados puxados do Lucro Fácil, sem tirar nada do sistema atual.',
   },
   {
-    id: 'administrativo', nome: 'Administrativo', pronto: false,
+    id: 'administrativo', soGestao: true, nome: 'Administrativo', pronto: false,
     resumo: 'Rotina do escritório e quem pode decidir o quê.',
     itens: ['Contas a pagar e aprovações', 'Pedidos de reembolso com comprovante', 'Matriz de autoridade com limites de valor'],
     origem: 'Regras definidas na reunião de estrutura e processos.',
   },
   {
-    id: 'compras', nome: 'Compras', pronto: false,
+    id: 'compras', soGestao: true, nome: 'Compras', pronto: false,
     resumo: 'Do pedido de compra até a conferência da nota.',
     itens: ['Solicitação de compra por unidade', 'Cotação e aprovação por valor', 'Recebimento com conferência e fotos'],
   },
   {
-    id: 'estoque', nome: 'Estoque', pronto: false,
+    id: 'estoque', soGestao: true, nome: 'Estoque', pronto: false,
     resumo: 'Entradas, saídas e perdas sob controle.',
     itens: ['Inventário semanal', 'Transferências entre Burger e Pizza', 'Registro de perdas com motivo'],
   },
@@ -68,7 +69,7 @@ export const MODULOS: Modulo[] = [
     itens: ['Cadastro de equipamentos críticos', 'Abertura e acompanhamento de chamados', 'Agenda de manutenção preventiva'],
   },
   {
-    id: 'eventos', nome: 'Eventos', pronto: false,
+    id: 'eventos', soGestao: true, nome: 'Eventos', pronto: false,
     resumo: 'Do orçamento ao resultado de cada evento.',
     itens: ['Orçamento e cálculo de custo', 'Checklist de pré-evento', 'Resultado e aprendizados'],
   },

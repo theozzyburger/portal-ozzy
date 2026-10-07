@@ -61,7 +61,7 @@ export default function Vencimentos() {
               return (
                 <Cartao key={id} onClick={() => ir('rh/equipe/' + id)}>
                   <div className="flex items-start gap-3">
-                    <Avatar nome={pessoa.nome} tamanho={36} />
+                    <Avatar nome={pessoa.nome} foto={pessoa.fotoUrl} tamanho={36} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold">{pessoa.nome}</div>
                       <div className="truncate text-xs text-stone-500">

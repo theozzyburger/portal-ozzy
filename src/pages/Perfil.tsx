@@ -7,7 +7,7 @@ import { podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } fr
 import { ir } from '../lib/rota'
 import {
   TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
-  type Documento, type Ocorrencia, type TipoDocumento, type TipoOcorrencia,
+  type Documento, type Funcionario, type Ocorrencia, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
@@ -66,7 +66,22 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
 
       <Cartao>
         <div className="flex items-start gap-4">
-          <Avatar nome={pessoa.nome} tamanho={56} />
+          {souEu || gestao ? (
+            <TrocarFoto
+              pessoa={pessoa}
+              aoTrocar={async (img) => {
+                try {
+                  await store.definirFoto(pessoa.id, img)
+                  await recarregarEquipe()
+                  avisar('Foto atualizada')
+                } catch (e) {
+                  avisar((e as Error).message)
+                }
+              }}
+            />
+          ) : (
+            <Avatar nome={pessoa.nome} tamanho={56} foto={pessoa.fotoUrl} />
+          )}
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold">{pessoa.nome}</h1>
             <div className="text-stone-600">{pessoa.cargo}</div>
@@ -485,5 +500,45 @@ function NovaOcorrencia({ aberto, funcionarioId, aoFechar, aoSalvar }: { aberto:
         <Botao className="w-full">Salvar</Botao>
       </form>
     </Modal>
+  )
+}
+
+// Recorta o centro em quadrado e reduz para 512 px antes de enviar (foto de celular tem vários MB).
+async function reduzirFoto(arquivo: File): Promise<Blob> {
+  const img = await createImageBitmap(arquivo)
+  const lado = Math.min(img.width, img.height)
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = Math.min(512, lado)
+  canvas.getContext('2d')!.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, canvas.width, canvas.height)
+  return new Promise((ok, falha) => canvas.toBlob((b) => (b ? ok(b) : falha(new Error('Não deu para ler a foto.'))), 'image/jpeg', 0.85))
+}
+
+function TrocarFoto({ pessoa, aoTrocar }: { pessoa: Funcionario; aoTrocar: (img: Blob) => Promise<void> }) {
+  const [enviando, setEnviando] = useState(false)
+  return (
+    <label className="relative shrink-0 cursor-pointer" title="Trocar foto">
+      <Avatar nome={pessoa.nome} tamanho={56} foto={pessoa.fotoUrl} />
+      <span className="absolute -right-1 -bottom-1 flex h-6 w-6 items-center justify-center rounded-full bg-ozzy-500 text-xs text-carvao ring-2 ring-white">
+        {enviando ? '…' : '📷'}
+      </span>
+      <input
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-label="Trocar foto de perfil"
+        disabled={enviando}
+        onChange={async (e) => {
+          const arquivo = e.target.files?.[0]
+          e.target.value = ''
+          if (!arquivo) return
+          setEnviando(true)
+          try {
+            await aoTrocar(await reduzirFoto(arquivo))
+          } finally {
+            setEnviando(false)
+          }
+        }}
+      />
+    </label>
   )
 }

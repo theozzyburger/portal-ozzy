@@ -96,7 +96,10 @@ export function Modal({ titulo, aberto, aoFechar, children }: { titulo: string; 
   )
 }
 
-export function Avatar({ nome, tamanho = 40 }: { nome: string; tamanho?: number }) {
+export function Avatar({ nome, tamanho = 40, foto }: { nome: string; tamanho?: number; foto?: string | null }) {
+  if (foto) {
+    return <img src={foto} alt="" className="shrink-0 rounded-full object-cover" style={{ width: tamanho, height: tamanho }} />
+  }
   const iniciais = nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
   return (
     <span

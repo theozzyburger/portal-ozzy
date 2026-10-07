@@ -58,6 +58,8 @@ export interface Store {
   nomes(): Promise<{ id: string; nome: string }[]>
   funcionarios(): Promise<Funcionario[]>
   salvarFuncionario(f: NovoFuncionario, senhaInicial?: string): Promise<Funcionario>
+  // Foto de perfil (já recortada e reduzida). A própria pessoa ou a gestão.
+  definirFoto(funcionarioId: string, imagem: Blob): Promise<void>
 
   documentos(funcionarioId: string): Promise<Documento[]>
   enviarDocumento(d: NovoDocumento): Promise<Documento>

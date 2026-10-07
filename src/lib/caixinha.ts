@@ -12,6 +12,7 @@ export const MINIMO_BONUS_POR_SETOR = 6 // com menos gente que isso, a loja tem 
 
 export const PONTOS_CARGO: { cargo: string; pontos: number }[] = [
   { cargo: 'Auxiliar', pontos: 1.0 },
+  { cargo: 'Chapeiro', pontos: 1.0 }, // conta como Auxiliar
   { cargo: 'Atendente', pontos: 1.3 },
   { cargo: 'Supervisor', pontos: 1.4 },
   { cargo: 'Gerente', pontos: 2.6 },

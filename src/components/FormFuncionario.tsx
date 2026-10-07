@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Botao, Campo, Modal, estiloEntrada } from './ui'
+import { CARGOS } from '../lib/cargos'
 import { useApp } from '../lib/contexto'
 import { hoje } from '../lib/datas'
 import { ir } from '../lib/rota'
@@ -66,10 +67,10 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
           <input className={estiloEntrada} value={f.pix} onChange={mudar('pix')} />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="Cargo" dica="Na caixinha: Auxiliar, Atendente, Supervisor ou Gerente.">
-            <input className={estiloEntrada} placeholder="Ex.: Atendente" value={f.cargo} onChange={mudar('cargo')} required list="cargos-caixinha" />
-            <datalist id="cargos-caixinha">
-              {['Auxiliar', 'Atendente', 'Supervisor', 'Gerente'].map((c) => (
+          <Campo rotulo="Cargo" dica="Escolha da lista ou digite outro.">
+            <input className={estiloEntrada} placeholder="Ex.: Atendente" value={f.cargo} onChange={mudar('cargo')} required list="cargos" />
+            <datalist id="cargos">
+              {CARGOS.map((c) => (
                 <option key={c} value={c} />
               ))}
             </datalist>

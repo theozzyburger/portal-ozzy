@@ -150,7 +150,7 @@ function Tabela({ titulo, linhas }: { titulo: string; linhas: LinhaCaixinha[] })
       <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200 sm:hidden">
         {linhas.map((l) => (
           <button key={l.pessoa.id} onClick={() => ir('rh/equipe/' + l.pessoa.id)} className="flex w-full items-center gap-3 p-3 text-left">
-            <Avatar nome={l.pessoa.nome} tamanho={32} />
+            <Avatar nome={l.pessoa.nome} foto={l.pessoa.fotoUrl} tamanho={32} />
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold">{l.pessoa.nome}</span>
               <span className="block text-xs text-stone-500 tabular-nums">
@@ -182,7 +182,7 @@ function Tabela({ titulo, linhas }: { titulo: string; linhas: LinhaCaixinha[] })
               <tr key={l.pessoa.id} className="border-b border-stone-100 last:border-0">
                 <td className="px-3 py-2">
                   <button onClick={() => ir('rh/equipe/' + l.pessoa.id)} className="flex items-center gap-2 text-left">
-                    <Avatar nome={l.pessoa.nome} tamanho={28} />
+                    <Avatar nome={l.pessoa.nome} foto={l.pessoa.fotoUrl} tamanho={28} />
                     <span>
                       <span className="block font-semibold hover:underline">{l.pessoa.nome}</span>
                       <span className="block text-xs text-stone-500">{l.pessoa.cargo}{l.pessoa.setor && l.pessoa.setor !== 'geral' ? ` · ${l.pessoa.setor}` : ''}</span>

@@ -24,6 +24,9 @@ export interface Funcionario {
   turnoId?: string | null
   // Chave Pix para pagamentos (só a própria pessoa e a gestão veem).
   pix?: string | null
+  // Foto de perfil: caminho no armazenamento e endereço temporário para mostrar.
+  foto?: string | null
+  fotoUrl?: string | null
 }
 
 export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao'

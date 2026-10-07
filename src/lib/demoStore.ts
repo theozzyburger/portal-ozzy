@@ -505,6 +505,13 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!vejoResultado(u.nivel)) throw new Error('Só Proprietário e Administrativo veem o resultado.')
       return espera({ linhas: resultadosDemo(), atualizadoEm: agora() })
     },
+    async definirFoto(fid, imagem) {
+      const u = exigeEu()
+      if (fid !== u.id && !podeGerenciar(u.nivel)) throw new Error('Sem permissão para trocar esta foto.')
+      const p = porId(fid)
+      p.foto = `${fid}/${Date.now()}.jpg`
+      p.fotoUrl = URL.createObjectURL(imagem)
+    },
     async freelancers() {
       exigeGestao()
       return espera([...freelas].sort((a, b) => a.nome.localeCompare(b.nome)))

@@ -36,7 +36,8 @@ export function ProvedorApp({ store, eu, children }: { store: Store; eu: Funcion
   }, [])
 
   const valor: Contexto = {
-    store, eu, unidades, equipe, recarregarEquipe, avisar,
+    // eu vem da lista atualizada, para refletir na hora uma foto ou dado novo.
+    store, eu: equipe.find((f) => f.id === eu.id) ?? eu, unidades, equipe, recarregarEquipe, avisar,
     nomeDe: (id) => equipe.find((f) => f.id === id)?.nome ?? nomes.find((n) => n.id === id)?.nome ?? '—',
     nomeUnidade: (id) => (id ? unidades.find((u) => u.id === id)?.nome ?? id : 'Todas as unidades'),
   }

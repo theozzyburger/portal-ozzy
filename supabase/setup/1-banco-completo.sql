@@ -812,3 +812,29 @@ create policy "gestao desfaz pagamentos" on freela_pagamentos for delete using (
 alter table freelancers add column funcionario_id uuid unique references funcionarios (id);
 alter table freelancers alter column cpf drop not null;
 alter table freelancers add constraint freelancers_cpf_ou_funcionario check (cpf is not null or funcionario_id is not null);
+
+-- ===== 0012_foto_perfil.sql =====
+-- Foto de perfil (pedido de 07/10). Cada pessoa troca a própria; a gestão pode trocar a de qualquer um.
+alter table funcionarios add column foto text;
+
+insert into storage.buckets (id, name, public) values ('fotos', 'fotos', false);
+create policy "ver fotos de perfil" on storage.objects for select using (bucket_id = 'fotos' and (eu()).id is not null);
+create policy "enviar foto de perfil" on storage.objects for insert with check (
+  bucket_id = 'fotos' and ((storage.foldername(name))[1] = (eu()).id::text or sou_gestao())
+);
+
+-- Funcionário não altera a própria linha em funcionarios; a foto passa por esta função.
+create function definir_foto(alvo uuid, caminho text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if (eu()).id is null or alvo is null or (alvo <> (eu()).id and not sou_gestao()) then
+    raise exception 'Sem permissão para trocar esta foto';
+  end if;
+  update funcionarios set foto = caminho where id = alvo;
+end;
+$$;
+
+-- 0013
+-- Fichas técnicas só para Gerente, Administrativo e Proprietário (pedido de 07/10).
+drop policy "todos leem fichas" on lf_fichas;
+create policy "gestao le fichas" on lf_fichas for select using (sou_gestao());

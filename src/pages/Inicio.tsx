@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { atendeChamados } from '../lib/permissoes'
 import { chamadoEmAberto, type Chamado } from '../lib/types'
 import { haQuanto } from './Manutencao'
-import { Cartao, Selo, Titulo } from '../components/ui'
+import { Avatar, Cartao, Selo, Titulo } from '../components/ui'
+import arte from '../assets/banner-ozzy.jpg'
 import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
 import { useApp } from '../lib/contexto'
@@ -47,9 +48,17 @@ export default function Inicio() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-sm text-stone-500">{saudacao},</p>
-        <h1 className="text-2xl font-bold tracking-tight">{eu.nome.split(' ')[0]}</h1>
+      <div className="relative h-44 overflow-hidden rounded-3xl bg-ozzy-400 sm:h-60">
+        <img src={arte} alt="" className="absolute inset-0 h-full w-full object-cover object-[50%_40%] sm:object-[50%_22%]" />
+        <div className="relative flex h-full items-end p-4 sm:p-6">
+          <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-carvao/90 py-2.5 pr-5 pl-3 shadow-lg ring-2 ring-ozzy-400">
+            <Avatar nome={eu.nome} foto={eu.fotoUrl} tamanho={48} />
+            <div className="min-w-0">
+              <p className="text-sm text-white/80">{saudacao}! Bem-vindo,</p>
+              <h1 className="truncate text-3xl leading-tight font-extrabold tracking-tight text-ozzy-400 uppercase sm:text-4xl">{eu.nome.split(' ')[0]}</h1>
+            </div>
+          </div>
+        </div>
       </div>
 
       <MeusAvisos docs={isentoDeRotinas(eu.nivel) ? null : meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento && !isentoDeRotinas(eu.nivel)} />

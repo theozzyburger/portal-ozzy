@@ -307,7 +307,7 @@ function LinhaPessoa({ p, extra }: { p?: Funcionario; extra: string }) {
   if (!p) return null
   return (
     <button onClick={() => ir('rh/equipe/' + p.id)} className="flex w-full min-w-0 items-center gap-2.5 rounded-xl p-1.5 text-left hover:bg-stone-50">
-      <Avatar nome={p.nome} tamanho={30} />
+      <Avatar nome={p.nome} foto={p.fotoUrl} tamanho={30} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold">{p.nome}</div>
         <div className="truncate text-xs text-stone-500">{p.cargo}</div>
