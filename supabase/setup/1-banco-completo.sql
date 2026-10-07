@@ -975,3 +975,10 @@ create policy "gestao apaga 13" on decimo_terceiro for delete using (posso_alter
 -- Folga normal ou folga de feriado (aparece com outra cor no calendário).
 alter table folgas add column tipo text not null default 'normal' check (tipo in ('normal', 'feriado'));
 create policy "gestao muda folga" on folgas for update using (sou_gestao()) with check (sou_gestao());
+
+-- 0018
+-- CPF e sexo no cadastro; tipo de documento para os termos de exame de gravidez no desligamento (pedido de 07/10).
+alter table funcionarios add column cpf text check (cpf ~ '^\d{11}$');
+create unique index funcionarios_cpf on funcionarios (cpf) where cpf is not null;
+alter table funcionarios add column sexo text check (sexo in ('feminino', 'masculino'));
+alter type tipo_documento add value if not exists 'termo_gravidez';

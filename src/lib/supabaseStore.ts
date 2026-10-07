@@ -8,7 +8,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
-  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false,
+  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false, cpf: r.cpf ?? null, sexo: r.sexo ?? null,
 })
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
@@ -45,6 +45,7 @@ const deFuncionario = (f: Partial<Funcionario>) => ({
   nivel: f.nivel, status: f.status, data_admissao: f.dataAdmissao, data_desligamento: f.dataDesligamento || null,
   responde_para: f.respondePara || null, setor: f.setor || null, pix: f.pix?.trim() || null,
   opta_vt: f.optaVt ?? false,
+  cpf: f.cpf ? soDigitos(f.cpf) : null, sexo: f.sexo || null,
 })
 
 const ok = <T,>({ data, error }: { data: T; error: { message: string } | null }) => {

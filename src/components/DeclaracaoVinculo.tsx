@@ -1,6 +1,7 @@
 import Impressao from './Impressao'
 import logo from '../assets/logo.png'
 import { hoje } from '../lib/datas'
+import { formatarCpf } from '../lib/cpf'
 import { EMPRESAS } from '../lib/empresas'
 import type { Funcionario } from '../lib/types'
 
@@ -25,7 +26,7 @@ export default function DeclaracaoVinculo({ pessoa, aoFechar }: { pessoa: Funcio
       <h1 className="mb-10 text-center text-xl font-bold tracking-wide uppercase">Declaração</h1>
 
       <p className="mb-6 text-justify text-[15px] leading-loose">
-        Declaramos, para os devidos fins, que <strong>{pessoa.nome}</strong>, CPF nº ______________________, é colaborador(a)
+        Declaramos, para os devidos fins, que <strong>{pessoa.nome}</strong>, CPF nº {pessoa.cpf ? formatarCpf(pessoa.cpf) : '______________________'}, é colaborador(a)
         desta empresa desde <strong>{br(pessoa.dataAdmissao)}</strong>, exercendo atualmente o cargo de <strong>{pessoa.cargo}</strong>,
         e mantém vínculo empregatício ativo até a presente data.
       </p>

@@ -1,6 +1,7 @@
 import Impressao from './Impressao'
 import logo from '../assets/logo.png'
 import { addDias, hoje } from '../lib/datas'
+import { formatarCpf } from '../lib/cpf'
 import { EMPRESAS } from '../lib/empresas'
 import type { Funcionario, Ocorrencia } from '../lib/types'
 
@@ -43,7 +44,7 @@ export default function DocumentoOcorrencia({ o, pessoa, aoFechar }: { o: Ocorre
 
       <p>Ilmo(a). Sr(a). <strong>{pessoa.nome}</strong></p>
       <p>Cargo: {pessoa.cargo}</p>
-      <p className="mb-5">CPF: ______________________</p>
+      <p className="mb-5">CPF: {pessoa.cpf ? formatarCpf(pessoa.cpf) : '______________________'}</p>
       <p className="mb-5"><strong>Ref.:</strong> {natureza}{o.data ? `, ocorrido(a) em ${br(o.data)}` : ''}</p>
 
       {suspensao ? (

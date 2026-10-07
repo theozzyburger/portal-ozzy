@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Botao, Campo, Modal, estiloEntrada } from './ui'
 import { CARGOS } from '../lib/cargos'
+import { cpfValido, formatarCpf } from '../lib/cpf'
+import { soDigitos } from '../lib/store'
 import { niveisQuePossoDar } from '../lib/permissoes'
 import { useApp } from '../lib/contexto'
 import { hoje } from '../lib/datas'
@@ -19,6 +21,8 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     respondePara: existente?.respondePara ?? '',
     setor: existente?.setor ?? '',
     pix: existente?.pix ?? '',
+    cpf: existente?.cpf ? formatarCpf(existente.cpf) : '',
+    sexo: existente?.sexo ?? '',
   }))
   const [optaVt, setOptaVt] = useState(existente?.optaVt ?? false)
   const [senha, setSenha] = useState('')
@@ -30,12 +34,15 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
     setErro('')
+    if (f.cpf && !cpfValido(f.cpf)) return setErro('CPF inválido. Confira os números.')
     setSalvando(true)
     try {
       const salvo = await store.salvarFuncionario(
         {
           ...f,
           optaVt,
+          cpf: f.cpf ? soDigitos(f.cpf) : null,
+          sexo: (f.sexo || null) as Funcionario['sexo'],
           id: existente?.id,
           respondePara: f.respondePara || null,
           setor: (f.setor || null) as Funcionario['setor'],
@@ -66,6 +73,18 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
         <Campo rotulo="Celular (é o login)">
           <input className={estiloEntrada} inputMode="tel" value={f.celular} onChange={mudar('celular')} required />
         </Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="CPF">
+            <input className={estiloEntrada} inputMode="numeric" placeholder="000.000.000-00" value={f.cpf} onChange={mudar('cpf')} onBlur={() => cpfValido(f.cpf) && setF({ ...f, cpf: formatarCpf(f.cpf) })} />
+          </Campo>
+          <Campo rotulo="Sexo">
+            <select className={estiloEntrada} value={f.sexo} onChange={mudar('sexo')}>
+              <option value="">—</option>
+              <option value="feminino">Feminino</option>
+              <option value="masculino">Masculino</option>
+            </select>
+          </Campo>
+        </div>
         <Campo rotulo="Chave Pix" dica="CPF, celular, e-mail ou chave aleatória. Só a pessoa e a gestão veem.">
           <input className={estiloEntrada} value={f.pix} onChange={mudar('pix')} />
         </Campo>

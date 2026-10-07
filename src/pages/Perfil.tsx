@@ -14,6 +14,8 @@ import Uniformes from './Uniformes'
 import FeriasPessoa from './FeriasPessoa'
 import DocumentoOcorrencia, { temDocumento } from '../components/DocumentoOcorrencia'
 import DeclaracaoVinculo from '../components/DeclaracaoVinculo'
+import TermosGravidez from '../components/TermosGravidez'
+import { formatarCpf } from '../lib/cpf'
 import { Contracheque } from './Salarios'
 import { dataPagamento } from '../lib/salarios'
 
@@ -32,6 +34,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
   const [declaracao, setDeclaracao] = useState(false)
+  const [termos, setTermos] = useState(false)
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
   // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
   const gestao = !!pessoa && possoAlterar(eu, pessoa)
@@ -113,6 +116,12 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
           )}
           {verDocs && (
             <div>
+              <dt className="text-stone-500">CPF</dt>
+              <dd className="font-medium">{pessoa.cpf ? formatarCpf(pessoa.cpf) : '—'}</dd>
+            </div>
+          )}
+          {verDocs && (
+            <div>
               <dt className="text-stone-500">Vale-transporte</dt>
               <dd className="font-medium">{pessoa.optaVt ? 'Optou' : 'Não optou'}</dd>
             </div>
@@ -143,6 +152,11 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             {pessoa.status === 'ativo' && pessoa.nivel !== 'proprietario' && (
               <Botao variante="secundario" onClick={() => setDeclaracao(true)}>
                 Declaração de vínculo
+              </Botao>
+            )}
+            {pessoa.sexo === 'feminino' && (
+              <Botao variante="secundario" onClick={() => setTermos(true)}>
+                Termos de gravidez
               </Botao>
             )}
             {pessoa.status === 'ativo' && !souEu ? (
@@ -326,6 +340,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
           if (temDocumento(o)) setImprimir(o)
         }}
       />
+      {termos && <TermosGravidez pessoa={pessoa} aoFechar={() => setTermos(false)} />}
       {declaracao && <DeclaracaoVinculo pessoa={pessoa} aoFechar={() => setDeclaracao(false)} />}
       {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
       <Modal titulo="Desligar funcionário" aberto={modal === 'desligar'} aoFechar={() => setModal(null)}>
@@ -335,15 +350,18 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             await recarregarEquipe()
             setModal(null)
             avisar('Funcionário movido para inativos')
+            // Colaboradora: já abre os termos de exame de gravidez para imprimir e colher a assinatura.
+            if (pessoa.sexo === 'feminino') setTermos(true)
           }}
           nome={pessoa.nome}
+          feminino={pessoa.sexo === 'feminino'}
         />
       </Modal>
     </div>
   )
 }
 
-function Desligar({ nome, aoConfirmar }: { nome: string; aoConfirmar: (data: string) => void }) {
+function Desligar({ nome, feminino, aoConfirmar }: { nome: string; feminino: boolean; aoConfirmar: (data: string) => void }) {
   const [data, setData] = useState(hoje())
   return (
     <div className="space-y-4">
@@ -353,6 +371,12 @@ function Desligar({ nome, aoConfirmar }: { nome: string; aoConfirmar: (data: str
       <Campo rotulo="Data do desligamento">
         <input className={estiloEntrada} type="date" value={data} onChange={(e) => setData(e.target.value)} />
       </Campo>
+      {feminino && (
+        <p className="rounded-xl bg-ozzy-50 p-3 text-sm text-stone-700 ring-1 ring-ozzy-200">
+          Ao confirmar, o portal abre os termos de exame de gravidez (oferta e recusa) com os dados dela para imprimir.
+          Depois de assinados, anexe em Documentos.
+        </p>
+      )}
       <Botao variante="perigo" className="w-full" onClick={() => aoConfirmar(data)}>
         Confirmar desligamento
       </Botao>

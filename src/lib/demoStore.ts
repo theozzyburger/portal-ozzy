@@ -265,6 +265,9 @@ const ADMISSOES_DEMO: Record<string, string> = {
   'p-maria-costa': '2023-03-01', 'p-queli-souza': '2024-11-18', 'p-arlene-santos': '2025-03-10', 'p-vanderlei': '2023-08-01',
 }
 for (const p of funcionarios) if (ADMISSOES_DEMO[p.id]) p.dataAdmissao = ADMISSOES_DEMO[p.id]
+// Sexo de exemplo (no portal de verdade a gestão preenche no cadastro).
+const MULHERES = ['p-maria-costa', 'p-queli-souza', 'p-arlene-santos', 'p-cibeli-costa', 'p-dora-ramos', 'p-julia-silva', 'p-larissa-porto', 'p-laura-costa', 'p-julia-bernardo', 'p-lucilene-mathias', 'p-natalia-silva']
+for (const p of funcionarios) if (p.nivel !== 'proprietario') p.sexo = MULHERES.includes(p.id) ? 'feminino' : 'masculino'
 const feriasDemo: Ferias[] = [
   { id: 'fe1', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2023-03-01', inicio: '2024-07-01', dias: 30, abonoDias: 0, observacao: null },
   { id: 'fe2', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2024-03-01', inicio: '2025-09-01', dias: 20, abonoDias: 10, observacao: 'Vendeu 10 dias' },

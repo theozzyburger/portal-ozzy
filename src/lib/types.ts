@@ -26,6 +26,10 @@ export interface Funcionario {
   pix?: string | null
   // Optou pelo vale-transporte (desconto de até 6% do salário).
   optaVt?: boolean
+  // Só números. Sai nos documentos impressos.
+  cpf?: string | null
+  // Feminino: no desligamento, o portal gera os termos de exame de gravidez.
+  sexo?: 'feminino' | 'masculino' | null
   // Foto de perfil: caminho no armazenamento e endereço temporário para mostrar.
   foto?: string | null
   fotoUrl?: string | null
@@ -43,7 +47,7 @@ export const SETORES: { valor: Setor; nome: string }[] = [
 ]
 
 export type TipoDocumento =
-  | 'atestado' | 'contrato' | 'documento_pessoal' | 'exame' | 'outro'
+  | 'atestado' | 'contrato' | 'documento_pessoal' | 'exame' | 'outro' | 'termo_gravidez'
   // Saúde ocupacional (NR-7 e Portaria CVS 3/2026 para manipuladores de alimentos).
   | 'aso_admissional' | 'aso_periodico' | 'aso_retorno' | 'aso_mudanca_funcao' | 'aso_demissional'
   | 'coprocultura' | 'coproparasitologico' | 'curso_manipulador'
@@ -115,6 +119,7 @@ export const TIPOS_DOCUMENTO: { valor: TipoDocumento; nome: string; grupo: 'gera
   { valor: 'atestado', nome: 'Atestado', grupo: 'geral' },
   { valor: 'documento_pessoal', nome: 'Documento pessoal', grupo: 'geral' },
   { valor: 'contrato', nome: 'Contrato', grupo: 'geral' },
+  { valor: 'termo_gravidez', nome: 'Termo de exame de gravidez (desligamento)', grupo: 'geral' },
   { valor: 'outro', nome: 'Outro', grupo: 'geral' },
   { valor: 'aso_admissional', nome: 'ASO admissional', grupo: 'saude', validadeMeses: 12 },
   { valor: 'aso_periodico', nome: 'ASO periódico', grupo: 'saude', validadeMeses: 12 },
