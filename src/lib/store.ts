@@ -50,7 +50,8 @@ export interface NovoComunicado {
 export interface Store {
   modo: 'demo' | 'supabase'
   sessaoAtual(): Promise<Funcionario | null>
-  entrar(celular: string, senha: string): Promise<Funcionario>
+  // lembrar: mantém o acesso neste aparelho até a pessoa tocar em Sair.
+  entrar(celular: string, senha: string, lembrar?: boolean): Promise<Funcionario>
   sair(): Promise<void>
 
   unidades(): Promise<Unidade[]>

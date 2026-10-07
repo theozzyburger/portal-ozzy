@@ -51,8 +51,22 @@ const ok = <T,>({ data, error }: { data: T; error: { message: string } | null })
   return data
 }
 
+// "Lembrar meu acesso": com a opção marcada, a sessão fica guardada no aparelho (localStorage);
+// sem ela, some quando o navegador fecha (sessionStorage).
+const CHAVE_LEMBRAR = 'ozzy-lembrar'
+const tentar = <T,>(f: () => T, padrao: T) => {
+  try { return f() } catch { return padrao }
+}
+const lembrar = () => tentar(() => localStorage.getItem(CHAVE_LEMBRAR) !== 'nao', true)
+const guarda = () => (lembrar() ? localStorage : sessionStorage)
+const armazenamento = {
+  getItem: (k: string) => tentar(() => guarda().getItem(k), null),
+  setItem: (k: string, v: string) => tentar(() => guarda().setItem(k, v), undefined),
+  removeItem: (k: string) => tentar(() => { localStorage.removeItem(k); sessionStorage.removeItem(k) }, undefined),
+}
+
 export function criarSupabaseStore(url: string, chave: string): Store {
-  const sb = createClient(url, chave)
+  const sb = createClient(url, chave, { auth: { storage: armazenamento, persistSession: true, autoRefreshToken: true } })
   let eu: Funcionario | null = null
 
   // Fotos ficam em armazenamento privado: gera endereços temporários de uma vez para a lista toda.
@@ -78,7 +92,8 @@ export function criarSupabaseStore(url: string, chave: string): Store {
   return {
     modo: 'supabase',
     sessaoAtual: carregarEu,
-    async entrar(celular, senha) {
+    async entrar(celular, senha, lembrarAcesso = true) {
+      tentar(() => localStorage.setItem(CHAVE_LEMBRAR, lembrarAcesso ? 'sim' : 'nao'), undefined)
       const { error } = await sb.auth.signInWithPassword({ email: emailDoCelular(celular), password: senha })
       if (error) throw new Error('Celular ou senha incorretos.')
       const f = await carregarEu()

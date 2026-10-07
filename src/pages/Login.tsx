@@ -7,8 +7,18 @@ import { nomeNivel, type Funcionario } from '../lib/types'
 
 type DemoStore = ReturnType<typeof criarDemoStore>
 
+const CHAVE_CELULAR = 'ozzy-celular'
+const lerLocal = (k: string) => {
+  try {
+    return localStorage.getItem(k) ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export default function Login({ store, aoEntrar }: { store: Store; aoEntrar: (f: Funcionario) => void }) {
-  const [celular, setCelular] = useState('')
+  const [celular, setCelular] = useState(() => lerLocal(CHAVE_CELULAR))
+  const [lembrar, setLembrar] = useState(() => lerLocal('ozzy-lembrar') !== 'nao')
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -19,7 +29,14 @@ export default function Login({ store, aoEntrar }: { store: Store; aoEntrar: (f:
     setErro('')
     setEnviando(true)
     try {
-      aoEntrar(await store.entrar(celular, senha))
+      const f = await store.entrar(celular, senha, lembrar)
+      try {
+        if (lembrar) localStorage.setItem(CHAVE_CELULAR, celular)
+        else localStorage.removeItem(CHAVE_CELULAR)
+      } catch {
+        // sem armazenamento (aba anônima): só não lembra o celular
+      }
+      aoEntrar(f)
     } catch (err) {
       setErro((err as Error).message)
     } finally {
@@ -36,11 +53,15 @@ export default function Login({ store, aoEntrar }: { store: Store; aoEntrar: (f:
 
       <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6">
         <Campo rotulo="Celular">
-          <input className={estiloEntrada} inputMode="tel" placeholder="(11) 99999-0000" value={celular} onChange={(e) => setCelular(e.target.value)} required />
+          <input className={estiloEntrada} inputMode="tel" placeholder="(11) 99999-0000" autoComplete="username" name="celular" value={celular} onChange={(e) => setCelular(e.target.value)} required />
         </Campo>
         <Campo rotulo="Senha">
-          <input className={estiloEntrada} type="password" value={senha} onChange={(e) => setSenha(e.target.value)} required />
+          <input className={estiloEntrada} type="password" autoComplete="current-password" name="senha" value={senha} onChange={(e) => setSenha(e.target.value)} required />
         </Campo>
+        <label className="flex items-center gap-2.5 text-sm text-stone-700">
+          <input type="checkbox" className="size-5 accent-carvao" checked={lembrar} onChange={(e) => setLembrar(e.target.checked)} />
+          Lembrar meu acesso neste aparelho
+        </label>
         {erro && <p className="text-sm font-medium text-red-600">{erro}</p>}
         <Botao className="w-full" disabled={enviando}>
           {enviando ? 'Entrando…' : 'Entrar'}
