@@ -257,6 +257,9 @@ const folgas: Folga[] = [
 
 // Salários de exemplo do mês passado, já liberados (valores fictícios).
 const SALARIO_CARGO: Record<string, number> = { Auxiliar: 1850, Atendente: 1950, Supervisor: 2500, Gerente: 4200 }
+const vazio = (funcionarioId: string, mes: string, tipo: Salario['tipo']): Salario => ({
+  funcionarioId, mes, tipo, salario: 0, caixinha: 0, bonusCaixinha: 0, bonusConclui: 0, descAdiantamento: 0, descFaltas: 0, descAtrasos: 0, inss: 0, descVt: 0, observacao: null, liberado: false,
+})
 const salariosDemo: Salario[] = (() => {
   const d = new Date(hoje() + 'T12:00:00'); d.setMonth(d.getMonth() - 1)
   const mes = d.toISOString().slice(0, 7)
@@ -265,14 +268,15 @@ const salariosDemo: Salario[] = (() => {
     .map((p, i) => {
       const salario = SALARIO_CARGO[p.cargo] ?? 1900
       const vt = i % 3 !== 0
-      return {
-        funcionarioId: p.id, mes, salario, caixinha: 380 + (i % 4) * 45, bonusCaixinha: i % 5 === 0 ? 120 : 0, bonusConclui: i % 4 === 0 ? 100 : 0,
+      const adiantamento = Math.round(salario * 0.4)
+      return [{ ...vazio(p.id, mes, 'adiantamento'), salario: adiantamento, liberado: true }, {
+        funcionarioId: p.id, mes, tipo: 'salario' as const, descAdiantamento: adiantamento, salario, caixinha: 380 + (i % 4) * 45, bonusCaixinha: i % 5 === 0 ? 120 : 0, bonusConclui: i % 4 === 0 ? 100 : 0,
         descFaltas: i % 6 === 1 ? Math.round(salario / 30) : 0, descAtrasos: i % 7 === 2 ? 25 : 0,
         inss: Math.round(salario * 0.08 * 100) / 100, descVt: vt ? Math.round(salario * 0.06 * 100) / 100 : 0, observacao: null, liberado: true,
-      }
-    })
+      }]
+    }).flat()
 })()
-for (const s of salariosDemo) { const p = funcionarios.find((x) => x.id === s.funcionarioId); if (p) p.optaVt = s.descVt > 0 }
+for (const s of salariosDemo.filter((x) => x.tipo === 'salario')) { const p = funcionarios.find((x) => x.id === s.funcionarioId); if (p) p.optaVt = s.descVt > 0 }
 
 const espera = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 80))
 
@@ -451,13 +455,13 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async salvarSalario(s) {
       exigeGestao()
-      const i = salariosDemo.findIndex((x) => x.funcionarioId === s.funcionarioId && x.mes === s.mes)
+      const i = salariosDemo.findIndex((x) => x.funcionarioId === s.funcionarioId && x.mes === s.mes && x.tipo === s.tipo)
       if (i >= 0) salariosDemo[i] = { ...s }
       else salariosDemo.push({ ...s })
     },
-    async liberarSalarios(mes, liberado) {
+    async liberarSalarios(mes, tipo, liberado) {
       exigeGestao()
-      salariosDemo.filter((s) => s.mes === mes).forEach((s) => (s.liberado = liberado))
+      salariosDemo.filter((s) => s.mes === mes && s.tipo === tipo).forEach((s) => (s.liberado = liberado))
     },
     async avaliacoes() {
       exigePainel()

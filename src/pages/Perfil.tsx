@@ -12,6 +12,7 @@ import {
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
 import { Contracheque } from './Salarios'
+import { dataPagamento } from '../lib/salarios'
 
 type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias' | 'salario'
 
@@ -562,5 +563,6 @@ function MeusSalarios({ funcionarioId }: { funcionarioId: string }) {
   }, [store, funcionarioId])
   if (!lista) return <p className="text-stone-400">Carregando…</p>
   if (!lista.length) return <Vazio>Nenhum salário liberado ainda.</Vazio>
-  return <section className="space-y-3">{lista.map((s) => <Contracheque key={s.mes} s={s} />)}</section>
+  const ordenada = [...lista].sort((a, b) => dataPagamento(b).localeCompare(dataPagamento(a)))
+  return <section className="space-y-3">{ordenada.map((s) => <Contracheque key={s.mes + s.tipo} s={s} />)}</section>
 }

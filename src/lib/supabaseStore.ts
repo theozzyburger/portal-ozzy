@@ -223,13 +223,13 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async salvarSalario(s) {
       ok(await sb.from('salarios').upsert({
-        funcionario_id: s.funcionarioId, mes: s.mes, salario: s.salario, caixinha: s.caixinha, bonus_caixinha: s.bonusCaixinha,
+        funcionario_id: s.funcionarioId, mes: s.mes, tipo: s.tipo, desc_adiantamento: s.descAdiantamento, salario: s.salario, caixinha: s.caixinha, bonus_caixinha: s.bonusCaixinha,
         bonus_conclui: s.bonusConclui, desc_faltas: s.descFaltas, desc_atrasos: s.descAtrasos, inss: s.inss, desc_vt: s.descVt,
         observacao: s.observacao?.trim() || null, liberado: s.liberado, atualizado_em: new Date().toISOString(),
       }))
     },
-    async liberarSalarios(mes, liberado) {
-      ok(await sb.from('salarios').update({ liberado }).eq('mes', mes))
+    async liberarSalarios(mes, tipo, liberado) {
+      ok(await sb.from('salarios').update({ liberado }).eq('mes', mes).eq('tipo', tipo))
     },
     async turnos() {
       const linhas = ok(await sb.from('turnos').select('*').order('ordem')) ?? []
@@ -386,7 +386,7 @@ const paraDiaria = (r: any): DiariaFreela => ({
 })
 
 const paraSalario = (r: any): Salario => ({
-  funcionarioId: r.funcionario_id, mes: r.mes, salario: Number(r.salario), caixinha: Number(r.caixinha), bonusCaixinha: Number(r.bonus_caixinha),
+  funcionarioId: r.funcionario_id, mes: r.mes, tipo: r.tipo ?? 'salario', descAdiantamento: Number(r.desc_adiantamento ?? 0), salario: Number(r.salario), caixinha: Number(r.caixinha), bonusCaixinha: Number(r.bonus_caixinha),
   bonusConclui: Number(r.bonus_conclui), descFaltas: Number(r.desc_faltas), descAtrasos: Number(r.desc_atrasos), inss: Number(r.inss),
   descVt: Number(r.desc_vt), observacao: r.observacao, liberado: r.liberado,
 })

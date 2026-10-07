@@ -1,4 +1,4 @@
-import type { Salario, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -97,7 +97,7 @@ export interface Store {
   salarios(mes: string): Promise<Salario[]>
   salariosDe(funcionarioId: string): Promise<Salario[]>
   salvarSalario(s: Salario): Promise<void>
-  liberarSalarios(mes: string, liberado: boolean): Promise<void>
+  liberarSalarios(mes: string, tipo: TipoPagamento, liberado: boolean): Promise<void>
 
   // Turnos-padrão (horários). Todos veem; a gestão coloca cada pessoa no seu turno.
   turnos(): Promise<Turno[]>

@@ -385,10 +385,14 @@ export interface PagamentoFreela {
   pagoPor: string | null
 }
 
-// Salário do mês ('AAAA-MM'), com os valores que a contabilidade manda. A pessoa só vê depois de liberado.
+// Pagamento do mês de referência ('AAAA-MM'), com os valores que a contabilidade manda.
+// Adiantamento sai no dia 20; salário no dia 05 do mês seguinte. A pessoa só vê depois de liberado.
+export type TipoPagamento = 'adiantamento' | 'salario'
 export interface Salario {
   funcionarioId: string
   mes: string
+  tipo: TipoPagamento
+  descAdiantamento: number
   salario: number
   caixinha: number
   bonusCaixinha: number
