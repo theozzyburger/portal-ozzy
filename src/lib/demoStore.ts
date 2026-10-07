@@ -1,6 +1,6 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -104,6 +104,9 @@ const novoId = (p: string) => `${p}${++seq}`
 const documentos: Documento[] = [
   { id: 'd1', funcionarioId: 'p-cibeli-costa', tipo: 'atestado', nomeArquivo: 'atestado.pdf', observacao: 'Exemplo', inicio: addDias(hoje(), -9), fim: addDias(hoje(), -8), enviadoPor: 'p-cibeli-costa', criadoEm: addDias(hoje(), -9) + 'T10:12:00Z' },
   { id: 'd2', funcionarioId: 'p-cibeli-costa', tipo: 'documento_pessoal', nomeArquivo: 'rg.jpg', enviadoPor: 'p-maria-costa', criadoEm: '2026-01-05T14:00:00Z' },
+  // Dois atestados que somam 18 dias em 60: o portal avisa do INSS.
+  { id: 'd3', funcionarioId: 'p-dora-ramos', tipo: 'atestado', nomeArquivo: 'atestado-1.pdf', observacao: 'Exemplo', inicio: addDias(hoje(), -40), fim: addDias(hoje(), -31), enviadoPor: 'p-dora-ramos', criadoEm: addDias(hoje(), -40) + 'T09:00:00Z' },
+  { id: 'd4', funcionarioId: 'p-dora-ramos', tipo: 'atestado', nomeArquivo: 'atestado-2.pdf', observacao: 'Exemplo', inicio: addDias(hoje(), -12), fim: addDias(hoje(), -5), enviadoPor: 'p-dora-ramos', criadoEm: addDias(hoje(), -12) + 'T09:00:00Z' },
 ]
 
 // [funcionário, dias desde o exame, faltando coprocultura?]
@@ -268,6 +271,25 @@ for (const p of funcionarios) if (ADMISSOES_DEMO[p.id]) p.dataAdmissao = ADMISSO
 // Sexo de exemplo (no portal de verdade a gestão preenche no cadastro).
 const MULHERES = ['p-maria-costa', 'p-queli-souza', 'p-arlene-santos', 'p-cibeli-costa', 'p-dora-ramos', 'p-julia-silva', 'p-larissa-porto', 'p-laura-costa', 'p-julia-bernardo', 'p-lucilene-mathias', 'p-natalia-silva']
 for (const p of funcionarios) if (p.nivel !== 'proprietario') p.sexo = MULHERES.includes(p.id) ? 'feminino' : 'masculino'
+// Datas de nascimento e contratos de experiência de exemplo (aniversários perto de hoje, para a demonstração mostrar).
+{
+  const ano = Number(hoje().slice(0, 4))
+  const nasc = (fid: string, idade: number, deslocamento: number) => {
+    const p = funcionarios.find((x) => x.id === fid)
+    if (p) p.dataNascimento = `${ano - idade}${addDias(hoje(), deslocamento).slice(4)}`
+  }
+  nasc('p-cibeli-costa', 24, 0)
+  nasc('p-lucas-torres', 31, 2)
+  nasc('p-maria-costa', 38, 40)
+  // Admitidos há pouco: um no 1º período (vence em 3 dias) e um no 2º.
+  const exp = (fid: string, diasAtras: number) => {
+    const p = funcionarios.find((x) => x.id === fid)
+    if (p) Object.assign(p, { dataAdmissao: addDias(hoje(), -diasAtras), experienciaDias1: 10, experienciaDias2: 80 })
+  }
+  exp('p-victor-correa', 6)
+  exp('p-kaua-silva', 85)
+}
+const desligamentosDemo: Desligamento[] = []
 const feriasDemo: Ferias[] = [
   { id: 'fe1', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2023-03-01', inicio: '2024-07-01', dias: 30, abonoDias: 0, observacao: null },
   { id: 'fe2', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2024-03-01', inicio: '2025-09-01', dias: 20, abonoDias: 10, observacao: 'Vendeu 10 dias' },
@@ -490,6 +512,24 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeGestao()
       const i = decimoDemo.findIndex((d) => d.id === id)
       if (i >= 0) decimoDemo.splice(i, 1)
+    },
+    async desligamentos(fid) {
+      exigeGestao()
+      return espera(desligamentosDemo.filter((d) => !fid || d.funcionarioId === fid).sort((a, b) => b.data.localeCompare(a.data)).map((d) => ({ ...d, itens: { ...d.itens } })))
+    },
+    async abrirDesligamento(d) {
+      const u = exigeGestao()
+      if (!possoAlterar(u, porId(d.funcionarioId))) throw new Error('Você não pode alterar quem está acima de você')
+      const novo: Desligamento = { ...d, id: novoId('dl'), itens: {}, observacao: d.observacao?.trim() || null, concluido: false }
+      desligamentosDemo.push(novo)
+      return espera({ ...novo })
+    },
+    async atualizarDesligamento(id, m) {
+      const u = exigeGestao()
+      const d = desligamentosDemo.find((x) => x.id === id)
+      if (!d) throw new Error('Desligamento não encontrado')
+      if (!possoAlterar(u, porId(d.funcionarioId))) throw new Error('Você não pode alterar quem está acima de você')
+      Object.assign(d, m)
     },
     async vendasEntre(inicio, fim) {
       exigePainel()

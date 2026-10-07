@@ -5,7 +5,8 @@ import { cpfValido, formatarCpf } from '../lib/cpf'
 import { soDigitos } from '../lib/store'
 import { niveisQuePossoDar } from '../lib/permissoes'
 import { useApp } from '../lib/contexto'
-import { hoje } from '../lib/datas'
+import { dataLonga, hoje } from '../lib/datas'
+import { EXPERIENCIA_PADRAO, experienciaDe, recemAdmitido } from '../lib/pessoal'
 import { ir } from '../lib/rota'
 import { NIVEIS, SETORES, type Funcionario, type Nivel } from '../lib/types'
 
@@ -23,8 +24,16 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     pix: existente?.pix ?? '',
     cpf: existente?.cpf ? formatarCpf(existente.cpf) : '',
     sexo: existente?.sexo ?? '',
+    dataNascimento: existente?.dataNascimento ?? '',
   }))
   const [optaVt, setOptaVt] = useState(existente?.optaVt ?? false)
+  // Contrato de experiência: padrão 10 + 80 para quem está chegando; a gestão pode mudar os dias.
+  const [temExp, setTemExp] = useState(existente ? !!existente.experienciaDias1 : true)
+  const [exp1, setExp1] = useState(String(existente?.experienciaDias1 ?? EXPERIENCIA_PADRAO[0]))
+  const [exp2, setExp2] = useState(String(existente?.experienciaDias1 ? existente.experienciaDias2 ?? 0 : EXPERIENCIA_PADRAO[1]))
+  const mostraExp = recemAdmitido(f.dataAdmissao, hoje()) || !!existente?.experienciaDias1
+  const usaExp = mostraExp && temExp
+  const previa = usaExp ? experienciaDe({ dataAdmissao: f.dataAdmissao, experienciaDias1: Number(exp1) || 0, experienciaDias2: Number(exp2) || 0 }, hoje()) : null
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -35,6 +44,8 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     e.preventDefault()
     setErro('')
     if (f.cpf && !cpfValido(f.cpf)) return setErro('CPF inválido. Confira os números.')
+    if (usaExp && (!(Number(exp1) >= 1) || Number(exp2) < 0 || Number(exp1) + Number(exp2) > 90))
+      return setErro('Contrato de experiência: o 1º precisa de pelo menos 1 dia e os dois juntos não passam de 90.')
     setSalvando(true)
     try {
       const salvo = await store.salvarFuncionario(
@@ -43,6 +54,9 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
           optaVt,
           cpf: f.cpf ? soDigitos(f.cpf) : null,
           sexo: (f.sexo || null) as Funcionario['sexo'],
+          dataNascimento: f.dataNascimento || null,
+          experienciaDias1: usaExp ? Number(exp1) : null,
+          experienciaDias2: usaExp ? Number(exp2) || 0 : null,
           id: existente?.id,
           respondePara: f.respondePara || null,
           setor: (f.setor || null) as Funcionario['setor'],
@@ -73,9 +87,12 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
         <Campo rotulo="Celular (é o login)">
           <input className={estiloEntrada} inputMode="tel" value={f.celular} onChange={mudar('celular')} required />
         </Campo>
+        <Campo rotulo="CPF">
+          <input className={estiloEntrada} inputMode="numeric" placeholder="000.000.000-00" value={f.cpf} onChange={mudar('cpf')} onBlur={() => cpfValido(f.cpf) && setF({ ...f, cpf: formatarCpf(f.cpf) })} />
+        </Campo>
         <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="CPF">
-            <input className={estiloEntrada} inputMode="numeric" placeholder="000.000.000-00" value={f.cpf} onChange={mudar('cpf')} onBlur={() => cpfValido(f.cpf) && setF({ ...f, cpf: formatarCpf(f.cpf) })} />
+          <Campo rotulo="Nascimento">
+            <input className={estiloEntrada} type="date" value={f.dataNascimento} onChange={mudar('dataNascimento')} max={hoje()} />
           </Campo>
           <Campo rotulo="Sexo">
             <select className={estiloEntrada} value={f.sexo} onChange={mudar('sexo')}>
@@ -108,6 +125,27 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
             <input className={estiloEntrada} type="date" value={f.dataAdmissao} onChange={mudar('dataAdmissao')} required />
           </Campo>
         </div>
+        {mostraExp && (
+          <div className="space-y-3 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+            <label className="flex items-center gap-3 text-sm">
+              <input type="checkbox" className="size-5 accent-carvao" checked={temExp} onChange={(e) => setTemExp(e.target.checked)} />
+              <span className="font-medium">Tem contrato de experiência</span>
+            </label>
+            {temExp && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo rotulo="Contrato 1 (dias)" dica={previa ? `Vence em ${dataLonga(previa.vence1)}` : undefined}>
+                    <input className={estiloEntrada} type="number" min={1} max={90} value={exp1} onChange={(e) => setExp1(e.target.value)} />
+                  </Campo>
+                  <Campo rotulo="Contrato 2 (dias)" dica={previa?.vence2 ? `Vence em ${dataLonga(previa.vence2)}` : 'Sem prorrogação'}>
+                    <input className={estiloEntrada} type="number" min={0} max={89} value={exp2} onChange={(e) => setExp2(e.target.value)} />
+                  </Campo>
+                </div>
+                {previa && <p className="text-xs text-stone-600">{textoExperiencia(previa)}</p>}
+              </>
+            )}
+          </div>
+        )}
         <Campo rotulo="Setor" dica="Define o grupo do bônus da caixinha.">
           <select className={estiloEntrada} value={f.setor} onChange={mudar('setor')}>
             <option value="">—</option>
@@ -161,4 +199,12 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
       </form>
     </Modal>
   )
+}
+
+export function textoExperiencia(e: NonNullable<ReturnType<typeof experienciaDe>>) {
+  if (e.fase === 'encerrado') return `Experiência encerrada em ${dataLonga(e.vence2 ?? e.vence1)} (${e.total} dias).`
+  if (e.dia < 1) return `Começa na admissão; ${e.total} dias no total.`
+  const qual = e.fase === 'periodo1' ? '1º contrato' : '2º contrato'
+  const falta = e.faltam === 0 ? 'vence hoje' : `vence em ${e.faltam} dia${e.faltam === 1 ? '' : 's'}`
+  return `Dia ${e.dia} de ${e.total} · ${qual} ${falta} (${dataLonga(e.proximo!)}).`
 }

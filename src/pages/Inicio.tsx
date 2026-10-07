@@ -16,6 +16,8 @@ import { ir } from '../lib/rota'
 import type { Comunicado, Documento, EntregaUniforme, Folga, Ocorrencia } from '../lib/types'
 import { exigenciasDe, pendencias, textoSituacao, type Pendencia } from '../lib/vencimentos'
 import { nomeTipoOcorrencia } from '../lib/types'
+import type { Desligamento } from '../lib/types'
+import { LIMITE_AFASTAMENTO, JANELA_AFASTAMENTO, alertasAfastamento, alertasExperiencia, aniversariantesDaSemana, prazoRescisao, progressoDesligamento, situacaoAniversario } from '../lib/pessoal'
 
 export default function Inicio() {
   const { eu, store, equipe, nomeDe } = useApp()
@@ -47,6 +49,7 @@ export default function Inicio() {
   const naoLidos = comunicados.filter((c) => !c.lidoPor.includes(eu.id))
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
+  const niver = situacaoAniversario(eu.dataNascimento, hoje())
 
   return (
     <div className="space-y-6">
@@ -56,12 +59,14 @@ export default function Inicio() {
           <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-carvao/90 py-2.5 pr-5 pl-3 shadow-lg ring-2 ring-ozzy-400">
             <Avatar nome={eu.nome} foto={eu.fotoUrl} tamanho={48} />
             <div className="min-w-0">
-              <p className="text-sm text-white/80">{saudacao}! Bem-vindo,</p>
+              <p className="text-sm text-white/80">{niver === 'hoje' ? 'Feliz aniversário,' : `${saudacao}! Bem-vindo,`}</p>
               <h1 className="truncate text-3xl leading-tight font-extrabold tracking-tight text-ozzy-400 uppercase sm:text-4xl">{eu.nome.split(' ')[0]}</h1>
             </div>
           </div>
         </div>
       </div>
+
+      {niver && <Parabens hoje={niver === 'hoje'} nome={eu.nome.split(' ')[0]} />}
 
       <MeusAvisos docs={isentoDeRotinas(eu.nivel) ? null : meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento && !isentoDeRotinas(eu.nivel)} />
 
@@ -70,6 +75,8 @@ export default function Inicio() {
       {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
 
       {avisaFerias(eu.nivel) && <AlertaFerias />}
+
+      {gestao && <AlertasDp docs={docsEquipe} />}
 
       {painel && <Painel />}
 
@@ -103,6 +110,8 @@ export default function Inicio() {
         </Cartao>
         </>)}
       </div>
+
+      <Aniversariantes />
 
       {gestao && !painel && <PainelGestao totalAtivos={equipe.filter((f) => f.status === 'ativo').length} />}
 
@@ -325,5 +334,117 @@ function ResumoChamados() {
       </span>
       <span className="text-sm font-semibold">Ver ›</span>
     </button>
+  )
+}
+
+// Mensagem especial no dia e na semana do aniversário da pessoa.
+function Parabens({ hoje: eHoje, nome }: { hoje: boolean; nome: string }) {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl bg-carvao p-4 text-white ring-2 ring-ozzy-400">
+      <span className="text-4xl" aria-hidden>🎂</span>
+      <div className="min-w-0">
+        <p className="text-lg font-extrabold text-ozzy-400">{eHoje ? `Parabéns, ${nome}!` : `Semana do seu aniversário, ${nome}!`}</p>
+        <p className="text-sm text-stone-200">
+          {eHoje
+            ? 'Hoje o dia é seu. Toda a família The Ozzy deseja muita saúde, alegria e conquistas. Obrigado por fazer parte do time!'
+            : 'A família The Ozzy deseja uma semana incrível para você. Obrigado por fazer parte do time!'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Aniversariantes() {
+  const { eu, equipe } = useApp()
+  const lista = aniversariantesDaSemana(equipe, hoje()).filter((a) => a.pessoa.id !== eu.id)
+  if (!lista.length) return null
+  return (
+    <Cartao>
+      <div className="mb-2 flex items-center gap-2 font-semibold">
+        <span aria-hidden>🎉</span> Aniversariantes da semana
+      </div>
+      <ul className="space-y-1.5">
+        {lista.map(({ pessoa, dia }) => (
+          <li key={pessoa.id} className="flex items-center gap-2 text-sm">
+            <Avatar nome={pessoa.nome} foto={pessoa.fotoUrl} tamanho={28} />
+            <span className="min-w-0 flex-1 truncate">{pessoa.nome}</span>
+            {dia === hoje() ? <Selo cor="ambar">Hoje</Selo> : <span className="text-stone-500">{diaSemana(dia)} {dataCurta(dia)}</span>}
+          </li>
+        ))}
+      </ul>
+    </Cartao>
+  )
+}
+
+// Avisos do Departamento Pessoal para a gestão: experiência vencendo, afastamento acima de 15 dias e desligamentos em aberto.
+function AlertasDp({ docs }: { docs: Documento[] }) {
+  const { store, equipe, nomeDe } = useApp()
+  const [desligamentos, setDesligamentos] = useState<Desligamento[]>([])
+  useEffect(() => {
+    store.desligamentos().then((ds) => setDesligamentos(ds.filter((d) => !d.concluido))).catch(() => setDesligamentos([]))
+  }, [store, equipe])
+  const exp = alertasExperiencia(equipe, hoje())
+  const afast = alertasAfastamento(equipe, docs, hoje())
+  if (!exp.length && !afast.length && !desligamentos.length) return null
+  const todos = (id: string) => equipe.find((f) => f.id === id)
+  const linha = (id: string, titulo: string, sub: string, selo: React.ReactNode) => (
+    <li key={id + titulo}>
+      <button onClick={() => ir('rh/equipe/' + id)} className="flex w-full items-center justify-between gap-2 py-2 text-left text-sm">
+        <span className="min-w-0">
+          <span className="block truncate font-medium">{titulo}</span>
+          <span className="block text-xs text-stone-500">{sub}</span>
+        </span>
+        {selo}
+      </button>
+    </li>
+  )
+  return (
+    <div className="space-y-3">
+      {afast.length > 0 && (
+        <div className="rounded-2xl bg-white p-4 ring-2 ring-red-200">
+          <div className="mb-1 font-semibold">Afastamento acima de {LIMITE_AFASTAMENTO} dias: verificar INSS</div>
+          <p className="mb-2 text-xs text-stone-500">
+            Atestados somados nos últimos {JANELA_AFASTAMENTO} dias. Pela mesma doença, a partir do 16º dia o afastamento é pelo INSS: avise a contabilidade.
+          </p>
+          <ul className="divide-y divide-stone-100">
+            {afast.map((a) => linha(a.pessoa.id, a.pessoa.nome, a.pessoa.cargo, <Selo cor="vermelho">{a.dias} dias</Selo>))}
+          </ul>
+        </div>
+      )}
+      {exp.length > 0 && (
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+          <div className="mb-2 font-semibold">Contrato de experiência vencendo</div>
+          <ul className="divide-y divide-stone-100">
+            {exp.map(({ pessoa, exp: e }) =>
+              linha(
+                pessoa.id,
+                pessoa.nome,
+                `${e.fase === 'periodo1' ? '1º contrato' : '2º contrato'} vence em ${dataBr(e.proximo!)}${e.fase === 'periodo1' && e.vence2 ? ' · prorrogar ou desligar' : ' · efetivar ou desligar'}`,
+                <Selo cor={e.faltam! <= 2 ? 'vermelho' : 'ambar'}>{e.faltam === 0 ? 'hoje' : `${e.faltam} dia${e.faltam === 1 ? '' : 's'}`}</Selo>,
+              ),
+            )}
+          </ul>
+        </div>
+      )}
+      {desligamentos.length > 0 && (
+        <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+          <div className="mb-2 font-semibold">Desligamentos em andamento</div>
+          <ul className="divide-y divide-stone-100">
+            {desligamentos.map((d) => {
+              const p = todos(d.funcionarioId)
+              const { feitas, total, pagamentoFeito } = progressoDesligamento(d, p ?? {})
+              const prazo = prazoRescisao(d)
+              const atrasado = !pagamentoFeito && hoje() > prazo
+              return linha(
+                d.funcionarioId,
+                p?.nome ?? nomeDe(d.funcionarioId),
+                `${feitas} de ${total} etapas${pagamentoFeito ? ' · rescisão paga' : ` · pagar rescisão até ${dataBr(prazo)}`}`,
+                <Selo cor={atrasado ? 'vermelho' : 'ambar'}>{atrasado ? 'Atrasado' : 'Em aberto'}</Selo>,
+              )
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }

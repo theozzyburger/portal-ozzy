@@ -6,8 +6,8 @@ import { addDias, dataLonga, hoje } from '../lib/datas'
 import { possoAlterar, podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } from '../lib/permissoes'
 import { ir } from '../lib/rota'
 import {
-  NATUREZAS, TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
-  type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
+  NATUREZAS, TIPOS_DESLIGAMENTO, TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
+  type Desligamento, type TipoDesligamento, type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
@@ -18,6 +18,9 @@ import TermosGravidez from '../components/TermosGravidez'
 import { formatarCpf } from '../lib/cpf'
 import { Contracheque } from './Salarios'
 import { dataPagamento } from '../lib/salarios'
+import ChecklistDesligamento from '../components/ChecklistDesligamento'
+import { textoExperiencia } from '../components/FormFuncionario'
+import { experienciaDe, idadeEm } from '../lib/pessoal'
 
 type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias' | 'ferias' | 'salario'
 
@@ -32,6 +35,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [tipoInicial, setTipoInicial] = useState<TipoDocumento>('atestado')
   const [docs, setDocs] = useState<Documento[]>([])
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
+  const [desligamentos, setDesligamentos] = useState<Desligamento[]>([])
   const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
   const [declaracao, setDeclaracao] = useState(false)
   const [termos, setTermos] = useState(false)
@@ -43,7 +47,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const carregar = useCallback(async () => {
     setDocs(await store.documentos(funcionarioId))
     setOcorrencias(await store.ocorrencias(funcionarioId))
-  }, [store, funcionarioId])
+    if (podeGerenciar(eu.nivel)) setDesligamentos(await store.desligamentos(funcionarioId).catch(() => []))
+  }, [store, funcionarioId, eu.nivel])
   useEffect(() => {
     carregar()
   }, [carregar])
@@ -60,6 +65,9 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
     if (url) window.open(url, '_blank')
     else avisar('Arquivo de exemplo: na versão real ele abre aqui.')
   }
+
+  const exp = pessoa.status === 'ativo' ? experienciaDe(pessoa, hoje()) : null
+  const desligamento = desligamentos[0]
 
   const reativar = async () => {
     await store.salvarFuncionario({ ...pessoa, status: 'ativo', dataDesligamento: null })
@@ -130,6 +138,18 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             <dt className="text-stone-500">Admissão</dt>
             <dd className="font-medium">{dataLonga(pessoa.dataAdmissao)}</dd>
           </div>
+          {pessoa.dataNascimento && (souEu || verDocs) && (
+            <div>
+              <dt className="text-stone-500">Nascimento</dt>
+              <dd className="font-medium">{dataLonga(pessoa.dataNascimento)} ({idadeEm(pessoa.dataNascimento, hoje())} anos)</dd>
+            </div>
+          )}
+          {exp && exp.fase !== 'encerrado' && verDocs && (
+            <div className="col-span-2">
+              <dt className="text-stone-500">Contrato de experiência ({pessoa.experienciaDias1} + {pessoa.experienciaDias2 ?? 0})</dt>
+              <dd className="font-medium">{textoExperiencia(exp)}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-stone-500">Responde para</dt>
             <dd className="font-medium">{pessoa.respondePara ? nomeDe(pessoa.respondePara) : '—'}</dd>
@@ -171,6 +191,21 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
           </div>
         )}
       </Cartao>
+
+      {podeGerenciar(eu.nivel) && desligamento && (
+        <ChecklistDesligamento d={desligamento} pessoa={pessoa} podeMarcar={gestao} aoMudar={carregar} aoTermos={() => setTermos(true)} />
+      )}
+      {gestao && !desligamento && pessoa.status === 'inativo' && pessoa.dataDesligamento && (
+        <button
+          onClick={async () => {
+            await store.abrirDesligamento({ funcionarioId: pessoa.id, data: pessoa.dataDesligamento!, tipo: 'sem_justa_causa', observacao: null })
+            await carregar()
+          }}
+          className="w-full rounded-2xl bg-white p-3 text-left text-sm font-semibold ring-1 ring-stone-200 hover:ring-carvao"
+        >
+          Abrir checklist de desligamento ›
+        </button>
+      )}
 
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-stone-200 p-1 text-xs font-semibold sm:text-sm">
         {(
@@ -345,11 +380,13 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
       {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
       <Modal titulo="Desligar funcionário" aberto={modal === 'desligar'} aoFechar={() => setModal(null)}>
         <Desligar
-          aoConfirmar={async (data) => {
+          aoConfirmar={async (data, tipo) => {
             await store.salvarFuncionario({ ...pessoa, status: 'inativo', dataDesligamento: data })
+            await store.abrirDesligamento({ funcionarioId: pessoa.id, data, tipo, observacao: null })
             await recarregarEquipe()
+            await carregar()
             setModal(null)
-            avisar('Funcionário movido para inativos')
+            avisar('Desligamento aberto: siga o checklist')
             // Colaboradora: já abre os termos de exame de gravidez para imprimir e colher a assinatura.
             if (pessoa.sexo === 'feminino') setTermos(true)
           }}
@@ -361,23 +398,30 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   )
 }
 
-function Desligar({ nome, feminino, aoConfirmar }: { nome: string; feminino: boolean; aoConfirmar: (data: string) => void }) {
+function Desligar({ nome, feminino, aoConfirmar }: { nome: string; feminino: boolean; aoConfirmar: (data: string, tipo: TipoDesligamento) => void }) {
   const [data, setData] = useState(hoje())
+  const [tipo, setTipo] = useState<TipoDesligamento>('sem_justa_causa')
   return (
     <div className="space-y-4">
       <p className="text-sm text-stone-600">
         {nome} vai para a lista de inativos e perde o acesso ao portal. O histórico (documentos e ocorrências) continua guardado.
       </p>
-      <Campo rotulo="Data do desligamento">
+      <Campo rotulo="Tipo">
+        <select className={estiloEntrada} value={tipo} onChange={(e) => setTipo(e.target.value as TipoDesligamento)}>
+          {TIPOS_DESLIGAMENTO.map((t) => <option key={t.valor} value={t.valor}>{t.nome}</option>)}
+        </select>
+      </Campo>
+      <Campo rotulo="Último dia de trabalho" dica="A rescisão tem que ser paga em até 10 dias depois dessa data.">
         <input className={estiloEntrada} type="date" value={data} onChange={(e) => setData(e.target.value)} />
       </Campo>
+      <p className="text-sm text-stone-600">Ao confirmar, aparece aqui no cadastro o checklist do desligamento (aviso, exame demissional, uniforme, acessos, rescisão…).</p>
       {feminino && (
         <p className="rounded-xl bg-ozzy-50 p-3 text-sm text-stone-700 ring-1 ring-ozzy-200">
           Ao confirmar, o portal abre os termos de exame de gravidez (oferta e recusa) com os dados dela para imprimir.
           Depois de assinados, anexe em Documentos.
         </p>
       )}
-      <Botao variante="perigo" className="w-full" onClick={() => aoConfirmar(data)}>
+      <Botao variante="perigo" className="w-full" onClick={() => aoConfirmar(data, tipo)}>
         Confirmar desligamento
       </Botao>
     </div>

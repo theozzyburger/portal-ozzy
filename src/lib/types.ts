@@ -30,6 +30,11 @@ export interface Funcionario {
   cpf?: string | null
   // Feminino: no desligamento, o portal gera os termos de exame de gravidez.
   sexo?: 'feminino' | 'masculino' | null
+  // Para a mensagem de aniversário.
+  dataNascimento?: string | null
+  // Contrato de experiência: dias do 1º e do 2º período a partir da admissão (padrão 10 + 80). Nulo = sem contrato.
+  experienciaDias1?: number | null
+  experienciaDias2?: number | null
   // Foto de perfil: caminho no armazenamento e endereço temporário para mostrar.
   foto?: string | null
   fotoUrl?: string | null
@@ -451,3 +456,24 @@ export const NATUREZAS = [
   'Desrespeito a colega ou cliente',
   'Insubordinação',
 ]
+
+// Desligamento em andamento: a gestão marca cada etapa do checklist até concluir.
+export type TipoDesligamento = 'sem_justa_causa' | 'justa_causa' | 'pedido' | 'acordo' | 'fim_experiencia' | 'antecipacao_experiencia'
+export const TIPOS_DESLIGAMENTO: { valor: TipoDesligamento; nome: string }[] = [
+  { valor: 'sem_justa_causa', nome: 'Dispensa sem justa causa' },
+  { valor: 'justa_causa', nome: 'Dispensa por justa causa' },
+  { valor: 'pedido', nome: 'Pedido de demissão' },
+  { valor: 'acordo', nome: 'Acordo (art. 484-A)' },
+  { valor: 'fim_experiencia', nome: 'Fim do contrato de experiência' },
+  { valor: 'antecipacao_experiencia', nome: 'Rescisão antecipada da experiência' },
+]
+export interface Desligamento {
+  id: string
+  funcionarioId: string
+  data: string
+  tipo: TipoDesligamento
+  // Etapas feitas: chave da etapa → quem marcou e quando.
+  itens: Record<string, { por: string; em: string }>
+  observacao: string | null
+  concluido: boolean
+}

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -9,6 +9,11 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
   status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false, cpf: r.cpf ?? null, sexo: r.sexo ?? null,
+  dataNascimento: r.data_nascimento ?? null, experienciaDias1: r.experiencia_dias1 ?? null, experienciaDias2: r.experiencia_dias2 ?? null,
+})
+
+const paraDesligamento = (r: any): Desligamento => ({
+  id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo, itens: r.itens ?? {}, observacao: r.observacao, concluido: r.concluido,
 })
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
@@ -46,6 +51,8 @@ const deFuncionario = (f: Partial<Funcionario>) => ({
   responde_para: f.respondePara || null, setor: f.setor || null, pix: f.pix?.trim() || null,
   opta_vt: f.optaVt ?? false,
   cpf: f.cpf ? soDigitos(f.cpf) : null, sexo: f.sexo || null,
+  data_nascimento: f.dataNascimento || null,
+  experiencia_dias1: f.experienciaDias1 || null, experiencia_dias2: f.experienciaDias1 ? f.experienciaDias2 ?? 0 : null,
 })
 
 const ok = <T,>({ data, error }: { data: T; error: { message: string } | null }) => {
@@ -246,6 +253,25 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async excluirDecimoTerceiro(id) {
       ok(await sb.from('decimo_terceiro').delete().eq('id', id))
+    },
+    async desligamentos(fid) {
+      let q = sb.from('desligamentos').select('*').order('data', { ascending: false })
+      if (fid) q = q.eq('funcionario_id', fid)
+      return (ok(await q) ?? []).map(paraDesligamento)
+    },
+    async abrirDesligamento(d) {
+      return paraDesligamento(ok(await sb.from('desligamentos').insert({
+        funcionario_id: d.funcionarioId, data: d.data, tipo: d.tipo, observacao: d.observacao?.trim() || null,
+      }).select().single()))
+    },
+    async atualizarDesligamento(id, m) {
+      const linha: Record<string, unknown> = {}
+      if (m.itens) linha.itens = m.itens
+      if (m.concluido !== undefined) linha.concluido = m.concluido
+      if (m.observacao !== undefined) linha.observacao = m.observacao?.trim() || null
+      if (m.data) linha.data = m.data
+      if (m.tipo) linha.tipo = m.tipo
+      ok(await sb.from('desligamentos').update(linha).eq('id', id))
     },
     async alternarFolga(fid, data) {
       const existente = ok(await sb.from('folgas').select('id').eq('funcionario_id', fid).eq('data', data).maybeSingle())

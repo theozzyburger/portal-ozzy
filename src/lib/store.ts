@@ -1,4 +1,4 @@
-import type { DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -98,6 +98,11 @@ export interface Store {
   decimoTerceiro(funcionarioId: string): Promise<DecimoTerceiro[]>
   registrarDecimoTerceiro(d: Omit<DecimoTerceiro, 'id'>): Promise<void>
   excluirDecimoTerceiro(id: string): Promise<void>
+
+  // Checklist de desligamento (só a gestão). Sem funcionarioId: todos os que eu vejo.
+  desligamentos(funcionarioId?: string): Promise<Desligamento[]>
+  abrirDesligamento(d: Pick<Desligamento, 'funcionarioId' | 'data' | 'tipo' | 'observacao'>): Promise<Desligamento>
+  atualizarDesligamento(id: string, mudanca: Partial<Pick<Desligamento, 'itens' | 'concluido' | 'observacao' | 'data' | 'tipo'>>): Promise<void>
 
   // Painel (Proprietário e Gerente): pedidos e faturamento por dia/loja/canal, e notas nas plataformas.
   vendasEntre(inicio: string, fim: string): Promise<VendaDia[]>
