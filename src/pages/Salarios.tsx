@@ -212,9 +212,11 @@ export default function Salarios() {
           pessoas={pessoas}
           lancamento={(p) => doMes(p.id) ?? novo(p)}
           aoFechar={() => setImportando(null)}
-          aoConcluir={async (n) => {
+          aoConcluir={async (n, mesHolerite) => {
             setImportando(null)
-            await carregar()
+            // Mostra o pagamento onde os holerites foram lançados.
+            if (mesHolerite && (mesHolerite !== mes || tipo !== 'salario')) setPag({ mes: mesHolerite, tipo: 'salario' })
+            else await carregar()
             avisar(`${n} holerite${n === 1 ? '' : 's'} anexado${n === 1 ? '' : 's'}`)
           }}
         />
@@ -245,8 +247,9 @@ function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionari
   const descontos = descontosDe(atual.tipo)
   const [v, setV] = useState(() => Object.fromEntries([...creditos, ...descontos].map((c) => [c.campo, num(atual[c.campo])])) as Record<CampoValor, string>)
   const [obs, setObs] = useState(atual.observacao ?? '')
+  const [rubricas, setRubricas] = useState(atual.rubricas ?? null)
   const [salvando, setSalvando] = useState(false)
-  const s: Salario = { ...atual, observacao: obs, ...(Object.fromEntries(Object.entries(v).map(([k, t]) => [k, lerValor(t)])) as Record<CampoValor, number>) }
+  const s: Salario = { ...atual, observacao: obs, rubricas, ...(Object.fromEntries(Object.entries(v).map(([k, t]) => [k, lerValor(t)])) as Record<CampoValor, number>) }
 
   const mudar = (campo: CampoValor, texto: string) => {
     const novo = { ...v, [campo]: texto }
@@ -311,7 +314,8 @@ function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionari
                 const paginas = await lerHolerites(f, equipe)
                 const pagina = paginas.find((p) => p.funcionarioId === pessoa.id) ?? paginas[0]
                 if (pagina) {
-                  const novo = aplicarValores(s, pagina.valores)
+                  const novo = aplicarValores(s, pagina.valores, pagina.rubricas)
+                  setRubricas(novo.rubricas ?? null)
                   setV(Object.fromEntries([...creditos, ...descontos].map((c) => [c.campo, num(novo[c.campo])])) as Record<CampoValor, string>)
                   avisar(Object.keys(pagina.valores).length ? 'Valores preenchidos pelo holerite: confira' : 'PDF anexado (não reconheci valores)')
                 }
@@ -340,13 +344,35 @@ function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionari
 // Detalhe de um mês, como a pessoa vê no perfil.
 export function Contracheque({ s }: { s: Salario }) {
   const { store, avisar } = useApp()
-  const linha = (nome: string, valor: number, sinal: '+' | '−') =>
-    valor > 0 && (
-      <div key={nome} className="flex justify-between py-1 text-sm">
-        <span className="text-stone-600">{nome}</span>
-        <span className={`tabular-nums ${sinal === '−' ? 'text-red-700' : ''}`}>{sinal === '−' ? '−' : ''}{reais(valor)}</span>
-      </div>
+  // Detalhe dos "outros" (nome de cada rubrica do holerite), enquanto a soma ainda bate com o valor lançado.
+  const detalhe = (campo: CampoValor) => {
+    const tipo = campo === 'outrosCreditos' ? 'credito' : campo === 'outrosDescontos' ? 'desconto' : null
+    const itens = tipo ? (s.rubricas ?? []).filter((r) => r.tipo === tipo) : []
+    const soma = Math.round(itens.reduce((t, r) => t + r.valor, 0) * 100) / 100
+    return itens.length && soma === s[campo] ? itens : []
+  }
+  const linha = (c: { campo: CampoValor; nome: string }, sinal: '+' | '−') => {
+    const valor = s[c.campo]
+    const itens = detalhe(c.campo)
+    return (
+      valor > 0 && (
+        <div key={c.campo}>
+          {itens.length ? null : (
+            <div className="flex justify-between py-1 text-sm">
+              <span className="text-stone-600">{c.nome}</span>
+              <span className={`tabular-nums ${sinal === '−' ? 'text-red-700' : ''}`}>{sinal === '−' ? '−' : ''}{reais(valor)}</span>
+            </div>
+          )}
+          {itens.map((r, i) => (
+            <div key={i} className="flex justify-between py-1 text-sm">
+              <span className="text-stone-600">{r.descricao}</span>
+              <span className={`tabular-nums ${sinal === '−' ? 'text-red-700' : ''}`}>{sinal === '−' ? '−' : ''}{reais(r.valor)}</span>
+            </div>
+          ))}
+        </div>
+      )
     )
+  }
   return (
     <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -356,14 +382,14 @@ export function Contracheque({ s }: { s: Salario }) {
         </div>
         {!s.liberado && <Selo>Só a gestão vê</Selo>}
       </div>
-      {creditosDe(s.tipo).map((c) => linha(c.nome, s[c.campo], '+'))}
+      {creditosDe(s.tipo).map((c) => linha(c, '+'))}
       {s.tipo === 'salario' && (
         <div className="flex justify-between border-t border-stone-100 py-1 text-sm font-semibold">
           <span>Total bruto</span>
           <span className="tabular-nums">{reais(totalCreditos(s))}</span>
         </div>
       )}
-      {descontosDe(s.tipo).map((d) => linha(d.nome, s[d.campo], '−'))}
+      {descontosDe(s.tipo).map((d) => linha(d, '−'))}
       <div className="mt-1 flex justify-between rounded-xl bg-ozzy-400 px-3 py-2 font-bold">
         <span>Total recebido</span>
         <span className="tabular-nums">{reais(liquido(s))}</span>

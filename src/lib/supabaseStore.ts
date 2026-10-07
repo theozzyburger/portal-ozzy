@@ -470,6 +470,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('salarios').upsert({
         funcionario_id: s.funcionarioId, mes: s.mes, tipo: s.tipo, desc_adiantamento: s.descAdiantamento, salario: s.salario, caixinha: s.caixinha, bonus_caixinha: s.bonusCaixinha,
         bonus_conclui: s.bonusConclui, desc_faltas: s.descFaltas, desc_atrasos: s.descAtrasos, inss: s.inss, desc_vt: s.descVt,
+        outros_creditos: s.outrosCreditos, outros_descontos: s.outrosDescontos, rubricas: s.rubricas ?? null,
         observacao: s.observacao?.trim() || null, liberado: s.liberado, atualizado_em: new Date().toISOString(),
       }))
     },
@@ -633,5 +634,5 @@ const paraDiaria = (r: any): DiariaFreela => ({
 const paraSalario = (r: any): Salario => ({
   funcionarioId: r.funcionario_id, mes: r.mes, tipo: r.tipo ?? 'salario', descAdiantamento: Number(r.desc_adiantamento ?? 0), salario: Number(r.salario), caixinha: Number(r.caixinha), bonusCaixinha: Number(r.bonus_caixinha),
   bonusConclui: Number(r.bonus_conclui), descFaltas: Number(r.desc_faltas), descAtrasos: Number(r.desc_atrasos), inss: Number(r.inss),
-  descVt: Number(r.desc_vt), observacao: r.observacao, liberado: r.liberado, holerite: r.holerite ?? null,
+  descVt: Number(r.desc_vt), outrosCreditos: Number(r.outros_creditos ?? 0), outrosDescontos: Number(r.outros_descontos ?? 0), rubricas: r.rubricas ?? null, observacao: r.observacao, liberado: r.liberado, holerite: r.holerite ?? null,
 })

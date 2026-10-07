@@ -357,7 +357,7 @@ const decimoDemo: DecimoTerceiro[] = [
 // Salários de exemplo do mês passado, já liberados (valores fictícios).
 const SALARIO_CARGO: Record<string, number> = { Auxiliar: 1850, Atendente: 1950, Supervisor: 2500, Gerente: 4200 }
 const vazio = (funcionarioId: string, mes: string, tipo: Salario['tipo']): Salario => ({
-  funcionarioId, mes, tipo, salario: 0, caixinha: 0, bonusCaixinha: 0, bonusConclui: 0, descAdiantamento: 0, descFaltas: 0, descAtrasos: 0, inss: 0, descVt: 0, observacao: null, liberado: false,
+  funcionarioId, mes, tipo, salario: 0, caixinha: 0, bonusCaixinha: 0, bonusConclui: 0, descAdiantamento: 0, descFaltas: 0, descAtrasos: 0, inss: 0, descVt: 0, outrosCreditos: 0, outrosDescontos: 0, observacao: null, liberado: false,
 })
 const salariosDemo: Salario[] = (() => {
   const d = new Date(hoje() + 'T12:00:00'); d.setMonth(d.getMonth() - 1)
@@ -371,7 +371,7 @@ const salariosDemo: Salario[] = (() => {
       return [{ ...vazio(p.id, mes, 'adiantamento'), salario: adiantamento, liberado: true }, {
         funcionarioId: p.id, mes, tipo: 'salario' as const, descAdiantamento: adiantamento, salario, caixinha: 380 + (i % 4) * 45, bonusCaixinha: i % 5 === 0 ? 120 : 0, bonusConclui: i % 4 === 0 ? 100 : 0,
         descFaltas: i % 6 === 1 ? Math.round(salario / 30) : 0, descAtrasos: i % 7 === 2 ? 25 : 0,
-        inss: Math.round(salario * 0.08 * 100) / 100, descVt: vt ? Math.round(salario * 0.06 * 100) / 100 : 0, observacao: null, liberado: true,
+        inss: Math.round(salario * 0.08 * 100) / 100, descVt: vt ? Math.round(salario * 0.06 * 100) / 100 : 0, outrosCreditos: 0, outrosDescontos: 0, observacao: null, liberado: true,
       }]
     }).flat()
 })()

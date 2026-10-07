@@ -28,7 +28,7 @@ export function proximoPagamento(hoje: string): Pagamento {
 type Campo = { campo: CampoValor; nome: string }
 export type CampoValor =
   | 'salario' | 'caixinha' | 'bonusCaixinha' | 'bonusConclui'
-  | 'descAdiantamento' | 'descFaltas' | 'descAtrasos' | 'inss' | 'descVt'
+  | 'descAdiantamento' | 'descFaltas' | 'descAtrasos' | 'inss' | 'descVt' | 'outrosCreditos' | 'outrosDescontos'
 
 // No adiantamento, o valor fica no campo "salario".
 export const creditosDe = (t: TipoPagamento): Campo[] =>
@@ -39,6 +39,7 @@ export const creditosDe = (t: TipoPagamento): Campo[] =>
         { campo: 'caixinha', nome: 'Caixinha' },
         { campo: 'bonusCaixinha', nome: 'Bônus da caixinha' },
         { campo: 'bonusConclui', nome: 'Bônus Conclui' },
+        { campo: 'outrosCreditos', nome: 'Outros créditos (holerite)' },
       ]
 
 export const descontosDe = (t: TipoPagamento): Campo[] =>
@@ -50,6 +51,7 @@ export const descontosDe = (t: TipoPagamento): Campo[] =>
         { campo: 'descAtrasos', nome: 'Atrasos' },
         { campo: 'inss', nome: 'INSS' },
         { campo: 'descVt', nome: 'Vale-transporte (6%)' },
+        { campo: 'outrosDescontos', nome: 'Outros descontos (holerite)' },
       ]
 
 export const totalCreditos = (s: Salario) => creditosDe(s.tipo).reduce((t, c) => t + s[c.campo], 0)
@@ -60,7 +62,7 @@ export const vtDe = (salario: number) => Math.round(salario * PCT_VT * 100) / 10
 
 export const salarioVazio = (p: Funcionario, pg: Pagamento): Salario => ({
   funcionarioId: p.id, mes: pg.mes, tipo: pg.tipo, salario: 0, caixinha: 0, bonusCaixinha: 0, bonusConclui: 0, descAdiantamento: 0,
-  descFaltas: 0, descAtrasos: 0, inss: 0, descVt: 0, observacao: null, liberado: false,
+  descFaltas: 0, descAtrasos: 0, inss: 0, descVt: 0, outrosCreditos: 0, outrosDescontos: 0, observacao: null, liberado: false,
 })
 
 // CSV com ";" e vírgula decimal, que o Excel em português abre direto.

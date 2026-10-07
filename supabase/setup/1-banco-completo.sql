@@ -1170,6 +1170,12 @@ create policy "ver comunicados" on comunicados for select using (
 
 -- Holerite (PDF da contabilidade) de cada pagamento. A pessoa baixa o seu quando o mês é liberado.
 alter table salarios add column holerite text; -- caminho no bucket "holerites": <funcionario_id>/<mes>-<tipo>.pdf
+-- Rubricas do holerite que não têm campo próprio (adicional noturno, auxílio uniforme, consignado…),
+-- somadas para o total bater com o líquido do holerite. "rubricas" guarda o detalhe para a pessoa ver.
+alter table salarios
+  add column outros_creditos numeric(12, 2) not null default 0 check (outros_creditos >= 0),
+  add column outros_descontos numeric(12, 2) not null default 0 check (outros_descontos >= 0),
+  add column rubricas jsonb;
 
 insert into storage.buckets (id, name, public) values ('holerites', 'holerites', false);
 create policy "gestao envia holerites" on storage.objects for insert with check (bucket_id = 'holerites' and sou_gestao());

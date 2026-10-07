@@ -412,6 +412,12 @@ export interface PagamentoFreela {
 // Pagamento do mês de referência ('AAAA-MM'), com os valores que a contabilidade manda.
 // Adiantamento sai no dia 20; salário no dia 05 do mês seguinte. A pessoa só vê depois de liberado.
 export type TipoPagamento = 'adiantamento' | 'salario'
+export interface RubricaHolerite {
+  descricao: string
+  valor: number
+  tipo: 'credito' | 'desconto'
+}
+
 export interface Salario {
   funcionarioId: string
   mes: string
@@ -425,6 +431,10 @@ export interface Salario {
   descAtrasos: number
   inss: number
   descVt: number
+  // Rubricas do holerite sem campo próprio (adicional noturno, auxílio uniforme, consignado…).
+  outrosCreditos: number
+  outrosDescontos: number
+  rubricas?: RubricaHolerite[] | null
   observacao: string | null
   liberado: boolean
   // PDF do holerite enviado pela contabilidade (caminho no armazenamento).
