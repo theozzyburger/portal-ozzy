@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -8,7 +8,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
-  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto,
+  status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false,
 })
 
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
@@ -43,6 +43,7 @@ const deFuncionario = (f: Partial<Funcionario>) => ({
   nome: f.nome, celular: f.celular ? soDigitos(f.celular) : undefined, cargo: f.cargo, unidade_id: f.unidadeId,
   nivel: f.nivel, status: f.status, data_admissao: f.dataAdmissao, data_desligamento: f.dataDesligamento || null,
   responde_para: f.respondePara || null, setor: f.setor || null, pix: f.pix?.trim() || null,
+  opta_vt: f.optaVt ?? false,
 })
 
 const ok = <T,>({ data, error }: { data: T; error: { message: string } | null }) => {
@@ -214,6 +215,22 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async salvarCaixinhaTotal(mes, unidadeId, valor) {
       ok(await sb.from('caixinha_mensal').upsert({ mes, unidade_id: unidadeId, total: valor }))
     },
+    async salarios(mes) {
+      return (ok(await sb.from('salarios').select('*').eq('mes', mes)) ?? []).map(paraSalario)
+    },
+    async salariosDe(funcionarioId) {
+      return (ok(await sb.from('salarios').select('*').eq('funcionario_id', funcionarioId).order('mes', { ascending: false })) ?? []).map(paraSalario)
+    },
+    async salvarSalario(s) {
+      ok(await sb.from('salarios').upsert({
+        funcionario_id: s.funcionarioId, mes: s.mes, salario: s.salario, caixinha: s.caixinha, bonus_caixinha: s.bonusCaixinha,
+        bonus_conclui: s.bonusConclui, desc_faltas: s.descFaltas, desc_atrasos: s.descAtrasos, inss: s.inss, desc_vt: s.descVt,
+        observacao: s.observacao?.trim() || null, liberado: s.liberado, atualizado_em: new Date().toISOString(),
+      }))
+    },
+    async liberarSalarios(mes, liberado) {
+      ok(await sb.from('salarios').update({ liberado }).eq('mes', mes))
+    },
     async turnos() {
       const linhas = ok(await sb.from('turnos').select('*').order('ordem')) ?? []
       return linhas.map((r: any) => ({ id: r.id, local: r.local, nome: r.nome, dias: r.dias }))
@@ -366,4 +383,10 @@ const paraFreelancer = (r: any): Freelancer => ({
 const paraDiaria = (r: any): DiariaFreela => ({
   id: r.id, freelancerId: r.freelancer_id, data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao,
   valor: Number(r.valor), observacao: r.observacao, lancadoPor: r.lancado_por,
+})
+
+const paraSalario = (r: any): Salario => ({
+  funcionarioId: r.funcionario_id, mes: r.mes, salario: Number(r.salario), caixinha: Number(r.caixinha), bonusCaixinha: Number(r.bonus_caixinha),
+  bonusConclui: Number(r.bonus_conclui), descFaltas: Number(r.desc_faltas), descAtrasos: Number(r.desc_atrasos), inss: Number(r.inss),
+  descVt: Number(r.desc_vt), observacao: r.observacao, liberado: r.liberado,
 })

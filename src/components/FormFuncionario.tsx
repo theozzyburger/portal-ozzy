@@ -19,6 +19,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     setor: existente?.setor ?? '',
     pix: existente?.pix ?? '',
   }))
+  const [optaVt, setOptaVt] = useState(existente?.optaVt ?? false)
   const [senha, setSenha] = useState('')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -33,6 +34,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
       const salvo = await store.salvarFuncionario(
         {
           ...f,
+          optaVt,
           id: existente?.id,
           respondePara: f.respondePara || null,
           setor: (f.setor || null) as Funcionario['setor'],
@@ -66,6 +68,13 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
         <Campo rotulo="Chave Pix" dica="CPF, celular, e-mail ou chave aleatória. Só a pessoa e a gestão veem.">
           <input className={estiloEntrada} value={f.pix} onChange={mudar('pix')} />
         </Campo>
+        <label className="flex items-center gap-3 rounded-xl bg-stone-50 px-3 py-2.5 text-sm ring-1 ring-stone-200">
+          <input type="checkbox" className="size-5 accent-carvao" checked={optaVt} onChange={(e) => setOptaVt(e.target.checked)} />
+          <span>
+            <span className="font-medium">Optou pelo vale-transporte</span>
+            <span className="block text-xs text-stone-500">Desconta 6% do salário no mês.</span>
+          </span>
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo="Cargo" dica="Escolha da lista ou digite outro.">
             <input className={estiloEntrada} placeholder="Ex.: Atendente" value={f.cargo} onChange={mudar('cargo')} required list="cargos" />

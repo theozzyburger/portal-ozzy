@@ -1,4 +1,4 @@
-import type { Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Salario, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -92,6 +92,12 @@ export interface Store {
   caixinhaTotais(mes: string): Promise<Record<string, number>>
   salvarCaixinhaTotal(mes: string, unidadeId: string, valor: number): Promise<void>
   avaliacoes(): Promise<Avaliacao[]>
+
+  // Salários do mês. A gestão vê e lança todos; cada pessoa vê os seus meses já liberados.
+  salarios(mes: string): Promise<Salario[]>
+  salariosDe(funcionarioId: string): Promise<Salario[]>
+  salvarSalario(s: Salario): Promise<void>
+  liberarSalarios(mes: string, liberado: boolean): Promise<void>
 
   // Turnos-padrão (horários). Todos veem; a gestão coloca cada pessoa no seu turno.
   turnos(): Promise<Turno[]>

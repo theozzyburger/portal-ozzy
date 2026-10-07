@@ -24,6 +24,8 @@ export interface Funcionario {
   turnoId?: string | null
   // Chave Pix para pagamentos (só a própria pessoa e a gestão veem).
   pix?: string | null
+  // Optou pelo vale-transporte (desconto de até 6% do salário).
+  optaVt?: boolean
   // Foto de perfil: caminho no armazenamento e endereço temporário para mostrar.
   foto?: string | null
   fotoUrl?: string | null
@@ -379,4 +381,20 @@ export interface PagamentoFreela {
   valor: number
   pagoEm: string
   pagoPor: string | null
+}
+
+// Salário do mês ('AAAA-MM'), com os valores que a contabilidade manda. A pessoa só vê depois de liberado.
+export interface Salario {
+  funcionarioId: string
+  mes: string
+  salario: number
+  caixinha: number
+  bonusCaixinha: number
+  bonusConclui: number
+  descFaltas: number
+  descAtrasos: number
+  inss: number
+  descVt: number
+  observacao: string | null
+  liberado: boolean
 }

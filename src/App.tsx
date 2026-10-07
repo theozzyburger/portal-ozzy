@@ -20,6 +20,7 @@ import Regras from './pages/Regras'
 import Manutencao from './pages/Manutencao'
 import Fichas from './pages/Fichas'
 import Freelancers from './pages/Freelancers'
+import Salarios from './pages/Salarios'
 import Financeiro from './pages/Financeiro'
 import Icone from './components/Icone'
 import logo from './assets/logo.png'
@@ -85,7 +86,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
     { id: 'turnos', nome: 'Turnos' },
     { id: 'folgas', nome: 'Folgas' },
     ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe' }] : []),
-    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }, { id: 'caixinha', nome: 'Caixinha' }, { id: 'freelancers', nome: 'Freelancers' }] : []),
+    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }, { id: 'caixinha', nome: 'Caixinha' }, { id: 'freelancers', nome: 'Freelancers' }, { id: 'salarios', nome: 'Salários' }] : []),
     { id: 'ponto', nome: 'Ponto', emBreve: true },
     { id: 'perfil', nome: 'Meu perfil' },
   ]
@@ -105,6 +106,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (abaRh === 'exames') conteudo = <Vencimentos />
   else if (abaRh === 'caixinha') conteudo = <Caixinha />
   else if (abaRh === 'freelancers') conteudo = <Freelancers />
+  else if (abaRh === 'salarios') conteudo = <Salarios />
   else if (abaRh === 'ponto') conteudo = <EmBreve modulo={PONTO} />
   else if (abaRh === 'perfil') conteudo = <Perfil funcionarioId={eu.id} />
   else conteudo = <Comunicados />

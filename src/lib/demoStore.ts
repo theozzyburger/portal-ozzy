@@ -1,6 +1,6 @@
 import { atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -255,6 +255,25 @@ const folgas: Folga[] = [
   ['p-laura-costa', 2], ['p-lucas-torres', 3], ['p-victor-correa', 0], ['p-dora-ramos', 1], ['p-kaua-silva', 2], ['p-queli-souza', 0],
 ].map(([fid, d], i) => ({ id: `g${i}`, funcionarioId: fid as string, data: addDias(semana, d as number) }))
 
+// Salários de exemplo do mês passado, já liberados (valores fictícios).
+const SALARIO_CARGO: Record<string, number> = { Auxiliar: 1850, Atendente: 1950, Supervisor: 2500, Gerente: 4200 }
+const salariosDemo: Salario[] = (() => {
+  const d = new Date(hoje() + 'T12:00:00'); d.setMonth(d.getMonth() - 1)
+  const mes = d.toISOString().slice(0, 7)
+  return funcionarios
+    .filter((p) => p.status === 'ativo' && p.nivel !== 'proprietario')
+    .map((p, i) => {
+      const salario = SALARIO_CARGO[p.cargo] ?? 1900
+      const vt = i % 3 !== 0
+      return {
+        funcionarioId: p.id, mes, salario, caixinha: 380 + (i % 4) * 45, bonusCaixinha: i % 5 === 0 ? 120 : 0, bonusConclui: i % 4 === 0 ? 100 : 0,
+        descFaltas: i % 6 === 1 ? Math.round(salario / 30) : 0, descAtrasos: i % 7 === 2 ? 25 : 0,
+        inss: Math.round(salario * 0.08 * 100) / 100, descVt: vt ? Math.round(salario * 0.06 * 100) / 100 : 0, observacao: null, liberado: true,
+      }
+    })
+})()
+for (const s of salariosDemo) { const p = funcionarios.find((x) => x.id === s.funcionarioId); if (p) p.optaVt = s.descVt > 0 }
+
 const espera = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 80))
 
 export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Funcionario>; perfisDemo(): Funcionario[] } {
@@ -418,6 +437,25 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async salvarCaixinhaTotal(mes, unidadeId, valor) {
       exigeGestao()
       caixinhas[mes] = { ...(caixinhas[mes] ?? {}), [unidadeId]: valor }
+    },
+    async salarios(mes) {
+      exigeGestao()
+      return espera(salariosDemo.filter((s) => s.mes === mes).map((s) => ({ ...s })))
+    },
+    async salariosDe(funcionarioId) {
+      const gestao = eu && podeGerenciar(eu.nivel)
+      if (!gestao && eu?.id !== funcionarioId) return espera([])
+      return espera(salariosDemo.filter((s) => s.funcionarioId === funcionarioId && (gestao || s.liberado)).sort((a, b) => b.mes.localeCompare(a.mes)).map((s) => ({ ...s })))
+    },
+    async salvarSalario(s) {
+      exigeGestao()
+      const i = salariosDemo.findIndex((x) => x.funcionarioId === s.funcionarioId && x.mes === s.mes)
+      if (i >= 0) salariosDemo[i] = { ...s }
+      else salariosDemo.push({ ...s })
+    },
+    async liberarSalarios(mes, liberado) {
+      exigeGestao()
+      salariosDemo.filter((s) => s.mes === mes).forEach((s) => (s.liberado = liberado))
     },
     async avaliacoes() {
       exigePainel()

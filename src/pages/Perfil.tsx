@@ -7,12 +7,13 @@ import { podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } fr
 import { ir } from '../lib/rota'
 import {
   TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
-  type Documento, type Funcionario, type Ocorrencia, type TipoDocumento, type TipoOcorrencia,
+  type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
+import { Contracheque } from './Salarios'
 
-type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias'
+type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias' | 'salario'
 
 const corOcorrencia: Record<TipoOcorrencia, 'vermelho' | 'ambar' | 'verde' | 'cinza'> = {
   falta: 'vermelho', advertencia: 'vermelho', atraso: 'ambar', orientacao: 'cinza', elogio: 'verde', outro: 'cinza',
@@ -103,6 +104,12 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
               <dd className="font-medium break-all">{pessoa.pix || '—'}</dd>
             </div>
           )}
+          {verDocs && (
+            <div>
+              <dt className="text-stone-500">Vale-transporte</dt>
+              <dd className="font-medium">{pessoa.optaVt ? 'Optou' : 'Não optou'}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-stone-500">Admissão</dt>
             <dd className="font-medium">{dataLonga(pessoa.dataAdmissao)}</dd>
@@ -139,23 +146,26 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         )}
       </Cartao>
 
-      <div className="grid grid-cols-4 gap-1 rounded-xl bg-stone-200 p-1 text-xs font-semibold sm:text-sm">
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-stone-200 p-1 text-xs font-semibold sm:text-sm">
         {(
           [
             ['documentos', 'Documentos'],
             ['saude', 'Exames'],
             ['uniformes', 'Uniformes'],
             ['ocorrencias', 'Ocorrências'],
-          ] as const
+            ...(souEu || gestao ? [['salario', 'Salário']] : []),
+          ] as [AbaPerfil, string][]
         ).map(([a, nome]) => (
-          <button key={a} onClick={() => setAba(a)} className={`min-w-0 truncate rounded-lg px-1 py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+          <button key={a} onClick={() => setAba(a)} className={`flex-1 shrink-0 rounded-lg px-2.5 py-2 whitespace-nowrap ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
             {nome}
             {a === 'saude' && verDocs && pendentes > 0 && <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] text-white">{pendentes}</span>}
           </button>
         ))}
       </div>
 
-      {aba === 'saude' ? (
+      {aba === 'salario' ? (
+        <MeusSalarios funcionarioId={funcionarioId} />
+      ) : aba === 'saude' ? (
         <section className="space-y-3">
           {!verDocs ? (
             <Vazio>Exames são visíveis só para a própria pessoa e para a gestão.</Vazio>
@@ -541,4 +551,15 @@ function TrocarFoto({ pessoa, aoTrocar }: { pessoa: Funcionario; aoTrocar: (img:
       />
     </label>
   )
+}
+
+function MeusSalarios({ funcionarioId }: { funcionarioId: string }) {
+  const { store } = useApp()
+  const [lista, setLista] = useState<Salario[] | null>(null)
+  useEffect(() => {
+    store.salariosDe(funcionarioId).then(setLista)
+  }, [store, funcionarioId])
+  if (!lista) return <p className="text-stone-400">Carregando…</p>
+  if (!lista.length) return <Vazio>Nenhum salário liberado ainda.</Vazio>
+  return <section className="space-y-3">{lista.map((s) => <Contracheque key={s.mes} s={s} />)}</section>
 }
