@@ -78,7 +78,11 @@ const deFuncionario = (f: Partial<Funcionario>) => ({
 })
 
 const ok = <T,>({ data, error }: { data: T; error: { message: string } | null }) => {
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Erro de regra de acesso do banco vem em inglês; a gestão precisa entender o que houve.
+    if (/row-level security/.test(error.message)) throw new Error('O banco não deixou salvar: sem permissão para esta alteração. Se você é da gestão, avise o Heitor.')
+    throw new Error(error.message)
+  }
   return data
 }
 
