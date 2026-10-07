@@ -13,6 +13,7 @@ import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, te
 import Uniformes from './Uniformes'
 import FeriasPessoa from './FeriasPessoa'
 import DocumentoOcorrencia, { temDocumento } from '../components/DocumentoOcorrencia'
+import DeclaracaoVinculo from '../components/DeclaracaoVinculo'
 import { Contracheque } from './Salarios'
 import { dataPagamento } from '../lib/salarios'
 
@@ -30,6 +31,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [docs, setDocs] = useState<Documento[]>([])
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
+  const [declaracao, setDeclaracao] = useState(false)
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
   // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
   const gestao = !!pessoa && possoAlterar(eu, pessoa)
@@ -138,6 +140,11 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             <Botao variante="secundario" onClick={() => setModal('ocorrencia')}>
               Registrar ocorrência
             </Botao>
+            {pessoa.status === 'ativo' && pessoa.nivel !== 'proprietario' && (
+              <Botao variante="secundario" onClick={() => setDeclaracao(true)}>
+                Declaração de vínculo
+              </Botao>
+            )}
             {pessoa.status === 'ativo' && !souEu ? (
               <Botao variante="perigo" onClick={() => setModal('desligar')}>
                 Desligar
@@ -319,6 +326,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
           if (temDocumento(o)) setImprimir(o)
         }}
       />
+      {declaracao && <DeclaracaoVinculo pessoa={pessoa} aoFechar={() => setDeclaracao(false)} />}
       {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
       <Modal titulo="Desligar funcionário" aberto={modal === 'desligar'} aoFechar={() => setModal(null)}>
         <Desligar

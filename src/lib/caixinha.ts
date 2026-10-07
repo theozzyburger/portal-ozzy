@@ -59,7 +59,9 @@ export function calcularCaixinha(pessoas: Funcionario[], ocorrenciasDoMes: Ocorr
   const participantes = pessoas.filter((p) => p.status === 'ativo' && pontosDoCargo(p.cargo) > 0 && !SETORES_FORA.includes(p.setor ?? '') && (p.setor === 'geral' || UNIDADES_CAIXINHA.includes(p.unidadeId)))
   const gerais = participantes.filter((p) => p.setor === 'geral')
   const conta = (id: string, tipo: string) => ocorrenciasDoMes.filter((o) => o.funcionarioId === id && o.tipo === tipo).length
-  const nota = (id: string) => conta(id, 'falta') + PESO_ADVERTENCIA * conta(id, 'advertencia')
+  // Suspensão pesa igual a advertência (Heitor, 07/10).
+  const advertencias = (id: string) => conta(id, 'advertencia') + conta(id, 'suspensao')
+  const nota = (id: string) => conta(id, 'falta') + PESO_ADVERTENCIA * advertencias(id)
   const bonus = new Map<string, number>()
 
   const unidades: ResumoUnidade[] = UNIDADES_CAIXINHA.map((u) => {
@@ -94,7 +96,7 @@ export function calcularCaixinha(pessoas: Funcionario[], ocorrenciasDoMes: Ocorr
     const pts = pontosDoCargo(p.cargo)
     const parte = p.setor === 'geral' ? UNIDADES_CAIXINHA.reduce((s, u) => s + (pts / UNIDADES_CAIXINHA.length) * vp(u), 0) : pts * vp(p.unidadeId)
     const b = bonus.get(p.id) ?? 0
-    return { pessoa: p, pontos: pts, parte, faltas: conta(p.id, 'falta'), advertencias: conta(p.id, 'advertencia'), nota: nota(p.id), bonus: b, total: parte + b }
+    return { pessoa: p, pontos: pts, parte, faltas: conta(p.id, 'falta'), advertencias: advertencias(p.id), nota: nota(p.id), bonus: b, total: parte + b }
   })
 
   // Quem está ativo mas ficou de fora (cargo sem pontos, loja sem caixinha).

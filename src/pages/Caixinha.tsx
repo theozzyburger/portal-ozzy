@@ -132,7 +132,7 @@ export default function Caixinha() {
           </li>
           <li>Valor do ponto = valor a dividir ÷ total de pontos. Cada pessoa recebe os pontos dela × valor do ponto. Falta não reduz essa parte.</li>
           <li>
-            O bônus vai para quem tiver a menor nota do grupo no mês (falta = 1, advertência = {PESO_ADVERTENCIA}). Empate divide. Gerente não entra no bônus.
+            O bônus vai para quem tiver a menor nota do grupo no mês (falta = 1, advertência ou suspensão = {PESO_ADVERTENCIA}). Empate divide. Gerente não entra no bônus.
           </li>
           <li>Faltas e advertências vêm das ocorrências lançadas no Departamento Pessoal.</li>
         </ol>
