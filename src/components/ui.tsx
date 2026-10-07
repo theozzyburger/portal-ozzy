@@ -77,10 +77,10 @@ export function Modal({ titulo, aberto, aoFechar, children }: { titulo: string; 
   }, [aberto, aoFechar])
   if (!aberto) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={aoFechar}>
+    // Clicar fora não fecha (pedido de 07/10): só o X ou Esc, para não perder o que foi digitado.
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 sm:max-w-lg sm:rounded-3xl"
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={titulo}
       >
