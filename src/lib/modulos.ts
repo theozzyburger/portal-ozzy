@@ -1,8 +1,8 @@
-import { podeGerenciar } from './permissoes'
+import { podeGerenciar, vejoResultado } from './permissoes'
 import type { Nivel } from './types'
 
 export type IdIcone =
-  | 'inicio' | 'rh' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
+  | 'inicio' | 'rh' | 'fichas' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
   | 'checklists' | 'regras' | 'treinamentos' | 'manutencao' | 'eventos'
 
 export interface Modulo {
@@ -14,14 +14,17 @@ export interface Modulo {
   itens?: string[]
   origem?: string
   soGestao?: boolean
+  // Regra própria de quem vê (no lugar de soGestao).
+  ve?: (n: Nivel) => boolean
 }
 
 // Ordem do menu lateral. Os "em breve" seguem o plano e o roteiro da reunião de regras.
 export const MODULOS: Modulo[] = [
   { id: 'inicio', nome: 'Início', pronto: true },
   { id: 'rh', nome: 'RH', pronto: true },
+  { id: 'fichas', nome: 'Fichas técnicas', pronto: true },
   {
-    id: 'financeiro', nome: 'Financeiro', pronto: false, soGestao: true,
+    id: 'financeiro', nome: 'Financeiro', pronto: true, ve: vejoResultado,
     resumo: 'Custos e resultados das duas unidades num só lugar.',
     itens: ['CMV atualizado por produto', 'Fichas técnicas e custo de cada item', 'Faturamento e despesas por unidade'],
     origem: 'Dados puxados do Lucro Fácil, sem tirar nada do sistema atual.',
@@ -71,4 +74,4 @@ export const MODULOS: Modulo[] = [
   },
 ]
 
-export const modulosVisiveis = (n: Nivel) => MODULOS.filter((m) => !m.soGestao || podeGerenciar(n))
+export const modulosVisiveis = (n: Nivel) => MODULOS.filter((m) => (m.ve ? m.ve(n) : !m.soGestao || podeGerenciar(n)))

@@ -1,8 +1,9 @@
-import { atendeChamados, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
+import { atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
 import type { Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
+import { fichasDemo, resultadosDemo } from './demoLucro'
 import { addMesesData } from './vencimentos'
 import { TURNOS_PADRAO } from './turnos'
 import { sha256 } from './regulamento'
@@ -474,6 +475,16 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!v) throw new Error('Versão não encontrada.')
       if (leituras.some((l) => l.funcionarioId === u.id && l.versaoId === versaoId)) throw new Error('Você já assinou esta versão.')
       leituras.push({ funcionarioId: u.id, versaoId, assinatura, assinadoEm: agora(), hash: v.hash || (await sha256(v.texto)), dispositivo: navigator.userAgent, ip: null })
+    },
+    async fichas() {
+      const u = exigeEu()
+      const fichas = fichasDemo().map((f) => (podeGerenciar(u.nivel) ? f : { ...f, custo: undefined }))
+      return espera({ fichas, atualizadoEm: agora() })
+    },
+    async resultados() {
+      const u = exigeEu()
+      if (!vejoResultado(u.nivel)) throw new Error('Só Proprietário e Administrativo veem o resultado.')
+      return espera({ linhas: resultadosDemo(), atualizadoEm: agora() })
     },
   }
 }

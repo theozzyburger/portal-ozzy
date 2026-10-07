@@ -267,5 +267,42 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         notaHa30Dias: r.nota_ha_30_dias === null ? null : Number(r.nota_ha_30_dias), atualizadoEm: r.atualizado_em,
       }))
     },
+    async fichas() {
+      const [fichas, custos, sinc] = await Promise.all([
+        sb.from('lf_fichas').select('*'),
+        // Para quem não é da gestão o banco devolve vazio (regra de acesso).
+        sb.from('lf_fichas_custo').select('*'),
+        sb.from('lf_sincronizacao').select('em').eq('dado', 'fichas').maybeSingle(),
+      ])
+      const porId = new Map((ok(custos) ?? []).map((c: any) => [c.produto_id, c]))
+      return {
+        atualizadoEm: ok(sinc)?.em ?? null,
+        fichas: (ok(fichas) ?? []).map((r: any) => {
+          const c: any = porId.get(r.produto_id)
+          return {
+            produtoId: r.produto_id, nome: r.nome, categoria: r.categoria, preparo: r.preparo,
+            itens: (r.itens ?? []).map((i: any) => ({ ...i, qtd: Number(i.qtd) })),
+            custo: c && {
+              total: Number(c.custo), preco: Number(c.preco),
+              itens: (c.itens ?? []).map((i: any) => ({ custoUnit: Number(i.custoUnit), total: Number(i.total) })),
+            },
+          }
+        }),
+      }
+    },
+    async resultados() {
+      const [linhas, sinc] = await Promise.all([
+        sb.from('lf_resultados').select('*'),
+        sb.from('lf_sincronizacao').select('em').eq('dado', 'resultados').maybeSingle(),
+      ])
+      return {
+        atualizadoEm: ok(sinc)?.em ?? null,
+        linhas: (ok(linhas) ?? []).map((r: any) => ({
+          unidadeId: r.unidade_id, mes: r.mes, pedidos: r.pedidos, faturamento: Number(r.faturamento), cmv: Number(r.cmv),
+          impostos: Number(r.impostos), comissoes: Number(r.comissoes), taxasPagamento: Number(r.taxas_pagamento),
+          custosOperacionais: Number(r.custos_operacionais), lucroOperacional: Number(r.lucro_operacional), ticketMedio: Number(r.ticket_medio),
+        })),
+      }
+    },
   }
 }

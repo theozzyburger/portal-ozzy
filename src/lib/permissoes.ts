@@ -23,3 +23,6 @@ export const podeVerFuncionario = (eu: Funcionario, alvo: Funcionario) =>
   eu.id === alvo.id ||
   podeGerenciar(eu.nivel) ||
   (eu.nivel === 'supervisor' && eu.unidadeId === alvo.unidadeId)
+
+// Faturamento e resultado (DRE) do Lucro Fácil: só Proprietário e Administrativo.
+export const vejoResultado = (n: Nivel) => n === 'proprietario' || n === 'administrativo'

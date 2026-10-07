@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import Icone from '../components/Icone'
-import { Avatar, Selo, Vazio, estiloEntrada } from '../components/ui'
+import { Avatar, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addMeses, dataCurta, hoje, mesDe, nomeMes, nomeMesAno, primeiroDia, ultimoDia } from '../lib/datas'
 import { ir } from '../lib/rota'
 import { apelidoUnidade, type Avaliacao, type Documento, type Funcionario, type Ocorrencia } from '../lib/types'
 import PainelAvaliacoes from './PainelAvaliacoes'
 import PainelPedidos from './PainelPedidos'
+import Financeiro from './Financeiro'
+import { vejoResultado } from '../lib/permissoes'
 import { ResumoNumeros } from './Vencimentos'
 import { pendencias } from '../lib/vencimentos'
 
@@ -48,7 +50,7 @@ function calcular(pessoas: Funcionario[], ocorrencias: Ocorrencia[], atestados: 
 }
 
 export default function Painel() {
-  const { store, equipe, unidades, nomeUnidade } = useApp()
+  const { eu, store, equipe, unidades, nomeUnidade } = useApp()
   const [mes, setMes] = useState(mesDe(hoje()))
   const [unidade, setUnidade] = useState('')
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
@@ -261,19 +263,12 @@ export default function Painel() {
 
       {aba === 'financeiro' && (
       <div className="rounded-3xl bg-white p-4 ring-1 ring-stone-200 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <h3 className="text-lg font-bold">Financeiro</h3>
-          <Selo>Em breve</Selo>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {['Faturamento', 'CMV', 'Ticket médio', 'Despesas'].map((n) => (
-            <div key={n} className="rounded-2xl border border-dashed border-stone-300 p-3">
-              <div className="text-sm text-stone-500">{n}</div>
-              <div className="mt-1 text-2xl font-bold text-stone-300">—</div>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-sm text-stone-500">Estes números vão vir do Lucro Fácil, por loja e por mês.</p>
+        <h3 className="mb-4 text-lg font-bold">Financeiro</h3>
+        {vejoResultado(eu.nivel) ? (
+          <Financeiro embutido />
+        ) : (
+          <p className="text-sm text-stone-500">O faturamento e o resultado do mês ficam só com Proprietário e Administrativo.</p>
+        )}
       </div>
       )}
     </section>

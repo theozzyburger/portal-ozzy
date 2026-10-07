@@ -1,4 +1,4 @@
-import type { Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -112,6 +112,12 @@ export interface Store {
   atualizarChamado(id: string, mudanca: { status?: StatusChamado; texto?: string }): Promise<void>
   fotoChamado(c: Chamado): Promise<string | null>
   assinarRegulamento(versaoId: string, assinatura: string): Promise<void>
+
+  // Copiados do Lucro Fácil por uma rotina. atualizadoEm = última cópia (null se nunca).
+  // Fichas: todos veem; os custos só chegam para a gestão.
+  fichas(): Promise<{ fichas: Ficha[]; atualizadoEm: string | null }>
+  // Resultado do mês por loja: só Proprietário e Administrativo.
+  resultados(): Promise<{ linhas: ResultadoMes[]; atualizadoEm: string | null }>
 }
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')

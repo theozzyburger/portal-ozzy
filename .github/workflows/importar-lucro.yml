@@ -1,0 +1,27 @@
+# Importa no banco do portal o arquivo que a rotina do Lucro Fácil publica no branch "dados-lucro".
+# Usa o mesmo secret do backup (SUPABASE_DB_URL).
+name: Importar Lucro Fácil
+
+on:
+  push:
+    branches: [dados-lucro]
+  workflow_dispatch:
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    container: postgres:17
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dados-lucro
+
+      - name: Importar
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          test -s lucro.json
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At <<'SQL'
+          \set dados `cat lucro.json`
+          select lf_importar(:'dados'::jsonb);
+          SQL

@@ -305,3 +305,38 @@ export interface Chamado {
   fechadoEm: string | null
   eventos: EventoChamado[]
 }
+
+// Dados copiados do Lucro Fácil (fichas técnicas e resultado do mês).
+export interface ItemFicha {
+  nome: string
+  unidade: string
+  qtd: number
+  // Pizzas por tamanho: broto, media, grande, familia.
+  tamanho: string | null
+  // Quando o item é outro preparo (molho, base), o id da ficha dele.
+  preparoId: number | null
+}
+
+export interface Ficha {
+  produtoId: number
+  nome: string
+  categoria: string | null
+  preparo: boolean
+  itens: ItemFicha[]
+  // Só chega para a gestão.
+  custo?: { total: number; preco: number; itens: { custoUnit: number; total: number }[] }
+}
+
+export interface ResultadoMes {
+  unidadeId: string
+  mes: string
+  pedidos: number
+  faturamento: number
+  cmv: number
+  impostos: number
+  comissoes: number
+  taxasPagamento: number
+  custosOperacionais: number
+  lucroOperacional: number
+  ticketMedio: number
+}
