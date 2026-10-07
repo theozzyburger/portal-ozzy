@@ -224,12 +224,27 @@ function Relatorio({
   const total = linhas.reduce((s, l) => s + l.total, 0)
   const pagamento = addDias(semana, 7)
 
+  // Relatório para copiar, separado por loja. Quem trabalhou em mais de uma loja aparece em cada uma com a sua parte.
+  const plural = (n: number) => `${n} ${n === 1 ? 'diária' : 'diárias'}`
   const texto = [
-    `Freelancers — semana ${dataCurta(semana)} a ${dataCurta(addDias(semana, 6))} (pagar em ${dataCurta(pagamento)})`,
+    `Freelancers, semana ${dataCurta(semana)} a ${dataCurta(addDias(semana, 6))} (pagar em ${dataCurta(pagamento)})`,
+    ...unidades
+      .filter((u) => diarias.some((d) => d.unidadeId === u.id))
+      .flatMap((u) => {
+        const daLoja = linhas
+          .map((l) => ({ ...l, ds: l.ds.filter((d) => d.unidadeId === u.id) }))
+          .filter((l) => l.ds.length)
+          .map((l) => ({ ...l, total: l.ds.reduce((s, d) => s + d.valor, 0) }))
+        const sub = daLoja.reduce((s, l) => s + l.total, 0)
+        return [
+          '',
+          `*${apelidoUnidade(u.nome)}*`,
+          ...daLoja.map((l) => `${l.f.nome}: ${reais(l.total)} (${plural(l.ds.length)}: ${l.ds.map((d) => `${diaSemana(d.data)} ${NOME_TURNO[d.turno].toLowerCase()}`).join(', ')}) · Pix: ${l.f.pix}`),
+          `Subtotal: ${reais(sub)}`,
+        ]
+      }),
     '',
-    ...linhas.map((l) => `${l.f.nome}: ${reais(l.total)} (${l.ds.length} ${l.ds.length === 1 ? 'diária' : 'diárias'}) · Pix: ${l.f.pix}`),
-    '',
-    `Total: ${reais(total)}`,
+    `*Total geral: ${reais(total)}*`,
   ].join('\n')
 
   const copiar = async (t: string, msg: string) => {
