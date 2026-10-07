@@ -1,4 +1,4 @@
-import type { Avaliacao, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Avaliacao, LeituraRegulamento, Turno, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -80,6 +80,14 @@ export interface Store {
   caixinhaTotais(mes: string): Promise<Record<string, number>>
   salvarCaixinhaTotal(mes: string, unidadeId: string, valor: number): Promise<void>
   avaliacoes(): Promise<Avaliacao[]>
+
+  // Turnos-padrão (horários). Todos veem; a gestão coloca cada pessoa no seu turno.
+  turnos(): Promise<Turno[]>
+  atribuirTurno(funcionarioId: string, turnoId: string | null): Promise<void>
+
+  // Regulamento interno: cada pessoa assina a versão vigente; a gestão vê quem já assinou.
+  leiturasRegulamento(): Promise<LeituraRegulamento[]>
+  assinarRegulamento(versao: string, assinatura: string): Promise<void>
 }
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')

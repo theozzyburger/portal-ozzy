@@ -20,6 +20,8 @@ export interface Funcionario {
   respondePara?: string | null
   // Setor, usado na caixinha (grupos de bônus). 'geral' = gerente que atende as duas lojas.
   setor?: Setor | null
+  // Turno-padrão em que a pessoa trabalha (RH › Turnos).
+  turnoId?: string | null
 }
 
 export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral'
@@ -191,4 +193,34 @@ export interface Avaliacao {
   totalAvaliacoes: number
   notaHa30Dias: number | null
   atualizadoEm: string
+}
+
+// Turnos: horário-padrão de cada posto, da segunda (0) ao domingo (6). null = folga.
+// Quem está em cada turno fica em Funcionario.turnoId (a gestão escolhe).
+export interface DiaTurno {
+  inicio: string // 'HH:MM'
+  fim: string // 'HH:MM'; menor que o início = termina depois da meia-noite
+  pausaMin: number
+}
+
+export interface Turno {
+  id: string
+  // Loja (id da unidade) ou 'producao' / 'escritorio', que não são lojas.
+  local: string
+  nome: string
+  dias: (DiaTurno | null)[]
+}
+
+// Regulamento interno: quem leu e assinou cada versão.
+export interface LeituraRegulamento {
+  funcionarioId: string
+  versao: string
+  assinatura: string
+  assinadoEm: string
+}
+
+// Primeiro e último nome: "Queli Souza", "Julia Bernardo" (separa as duas Júlias).
+export const nomeCurto = (nome: string) => {
+  const p = nome.split(' ').filter(Boolean)
+  return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : nome
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { VERSAO_REGULAMENTO } from '../lib/regulamento'
 import { Cartao, Selo, Titulo } from '../components/ui'
 import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
@@ -21,10 +22,12 @@ export default function Inicio() {
   const [meusDocs, setMeusDocs] = useState<Documento[]>([])
   const [meusUniformes, setMeusUniformes] = useState<EntregaUniforme[]>([])
   const [docsEquipe, setDocsEquipe] = useState<Documento[]>([])
+  const [assinouRegulamento, setAssinouRegulamento] = useState(true)
 
   useEffect(() => {
     store.documentos(eu.id).then(setMeusDocs)
     store.uniformes(eu.id).then(setMeusUniformes)
+    store.leiturasRegulamento().then((ls) => setAssinouRegulamento(ls.some((l) => l.funcionarioId === eu.id && l.versao === VERSAO_REGULAMENTO)))
     if (podeGerenciar(eu.nivel)) store.documentosTodos().then(setDocsEquipe)
   }, [store, eu.id, eu.nivel])
 
@@ -45,7 +48,7 @@ export default function Inicio() {
         <h1 className="text-2xl font-bold tracking-tight">{eu.nome.split(' ')[0]}</h1>
       </div>
 
-      <MeusAvisos docs={meusDocs} uniformes={meusUniformes} />
+      <MeusAvisos docs={meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento} />
 
       {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
 
@@ -176,12 +179,22 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
 }
 
 // Avisos pessoais: exame vencendo ou faltando, e termo de uniforme para assinar.
-function MeusAvisos({ docs, uniformes }: { docs: Documento[]; uniformes: EntregaUniforme[] }) {
+function MeusAvisos({ docs, uniformes, regulamento }: { docs: Documento[]; uniformes: EntregaUniforme[]; regulamento: boolean }) {
   const exames = exigenciasDe(docs).filter((i) => i.situacao !== 'em_dia')
   const termos = uniformes.filter((u) => !u.assinatura)
-  if (!exames.length && !termos.length) return null
+  if (!exames.length && !termos.length && !regulamento) return null
   return (
     <section className="space-y-2">
+      {regulamento && (
+        <button onClick={() => ir('regras')} className="flex w-full items-center gap-3 rounded-2xl bg-ozzy-400 p-4 text-left text-carvao">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-carvao text-lg font-bold text-ozzy-400">!</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Leia e assine o regulamento interno</span>
+            <span className="block text-sm">As regras da casa, do ponto às refeições. Toque para ler.</span>
+          </span>
+          <span className="text-xl">›</span>
+        </button>
+      )}
       {termos.map((t) => (
         <button
           key={t.id}

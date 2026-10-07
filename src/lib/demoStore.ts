@@ -1,9 +1,10 @@
 import { podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Comunicado, LeituraRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { addMesesData } from './vencimentos'
+import { TURNOS_PADRAO } from './turnos'
 
 export const SENHA_DEMO = '1234'
 
@@ -38,8 +39,8 @@ const funcionarios: Funcionario[] = [
   f('p-laura-costa', 'Laura Sofia Alves da Costa', '11999990019', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'atendimento'),
   f('p-lucas-torres', 'Lucas Vidal Moreira Torres', '11999990020', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
   f('p-victor-correa', 'Victor Hugo da Silva Correa', '11999990023', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
-  // Não está na planilha de caixinha; Heitor confirmou em 07/10 que é da Produção. Loja e cargo a confirmar.
-  f('p-julia-bernardo', 'Julia Motta Bernardo', '11999990031', 'Colaboradora de produção', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'producao'),
+  // Não está na planilha de caixinha. Heitor confirmou em 07/10: Produção, loja Vila Anastácio, fora da caixinha.
+  f('p-julia-bernardo', 'Julia Motta Bernardo', '11999990031', 'Colaboradora de produção', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'producao'),
   f('p-caciano-souza', 'Caciano Ribeiro Silva Souza', '11999990024', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'inativo', '2026-07-28', 'atendimento'),
   f('p-gilson-silva', 'Gilson Bento Silva', '11999990025', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-23', 'cozinha'),
   f('p-joao-costa', 'João Victor Alves da Costa', '11999990026', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-09', 'atendimento'),
@@ -48,6 +49,10 @@ const funcionarios: Funcionario[] = [
   f('p-natalia-silva', 'Natália dos Santos Silva', '11999990029', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-08-02', 'atendimento'),
   f('p-richard-alexandre', 'Richard Aparecido Fernandes Alexandre', '11999990030', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-12', 'cozinha'),
 ]
+
+// Turnos começam vazios: a gestão coloca cada pessoa (pedido do Heitor em 07/10).
+const turnos = TURNOS_PADRAO.map((t) => ({ ...t }))
+const leituras: LeituraRegulamento[] = []
 
 const agora = () => new Date().toISOString()
 let seq = 100
@@ -356,6 +361,20 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async avaliacoes() {
       exigePainel()
       return espera(avaliacoesDemo())
+    },
+    turnos: () => espera(turnos),
+    async atribuirTurno(fid, turnoId) {
+      exigeGestao()
+      porId(fid).turnoId = turnoId
+    },
+    async leiturasRegulamento() {
+      const u = exigeEu()
+      return espera(leituras.filter((l) => l.funcionarioId === u.id || podeGerenciar(u.nivel)))
+    },
+    async assinarRegulamento(versao, assinatura) {
+      const u = exigeEu()
+      if (leituras.some((l) => l.funcionarioId === u.id && l.versao === versao)) throw new Error('Você já assinou esta versão.')
+      leituras.push({ funcionarioId: u.id, versao, assinatura, assinadoEm: agora() })
     },
   }
 }

@@ -49,7 +49,7 @@ export const MODULOS: Modulo[] = [
     origem: 'Integração com o Conclui.',
   },
   {
-    id: 'regras', nome: 'Regras e processos', pronto: false,
+    id: 'regras', nome: 'Regras e processos', pronto: true,
     resumo: 'A versão oficial de como a The Ozzy funciona.',
     itens: ['POPs e políticas por área', 'Manual de exceções', 'Assistente que responde dúvidas só com base nas regras oficiais'],
     origem: 'Conteúdo da reunião de estrutura, regras e processos.',
