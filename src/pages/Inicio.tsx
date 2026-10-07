@@ -195,8 +195,9 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
 
 // Avisos pessoais: exame vencendo ou faltando, e termo de uniforme para assinar.
 function MeusAvisos({ docs, uniformes, regulamento }: { docs: Documento[] | null; uniformes: EntregaUniforme[]; regulamento: boolean }) {
+  const { eu } = useApp()
   // docs = null: a pessoa não entra no controle de exames.
-  const exames = docs === null ? [] : exigenciasDe(docs).filter((i) => i.situacao !== 'em_dia')
+  const exames = docs === null ? [] : exigenciasDe(docs, eu).filter((i) => i.situacao !== 'em_dia')
   const termos = uniformes.filter((u) => !u.assinatura)
   if (!exames.length && !termos.length && !regulamento) return null
   return (

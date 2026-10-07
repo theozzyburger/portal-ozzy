@@ -1,4 +1,4 @@
-import { atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
+import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
 import type { Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
@@ -318,7 +318,9 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       return espera(funcionarios.filter((x) => podeVerFuncionario(u, x)))
     },
     async salvarFuncionario(dados) {
-      exigeGestao()
+      const u = exigeGestao()
+      const alvo = dados.id ? porId(dados.id) : null
+      if ((alvo && !possoAlterar(u, alvo)) || degrau(dados.nivel) > degrau(u.nivel)) throw new Error('Você não pode alterar quem está acima de você')
       if (dados.id) {
         const i = funcionarios.findIndex((x) => x.id === dados.id)
         funcionarios[i] = { ...funcionarios[i], ...dados, id: dados.id }

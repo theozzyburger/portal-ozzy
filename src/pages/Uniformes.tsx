@@ -3,7 +3,7 @@ import Assinatura from '../components/Assinatura'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
-import { podeGerenciar } from '../lib/permissoes'
+import { possoAlterar } from '../lib/permissoes'
 import { ITENS_UNIFORME, TAMANHOS, termoUniforme, type EntregaUniforme, type Funcionario, type ItemUniforme } from '../lib/types'
 
 const resumoItens = (itens: ItemUniforme[]) => itens.map((i) => `${i.quantidade}x ${i.item}${i.tamanho ? ` ${i.tamanho}` : ''}`).join(' · ')
@@ -12,7 +12,7 @@ export default function Uniformes({ pessoa }: { pessoa: Funcionario }) {
   const { eu, store, nomeDe, avisar } = useApp()
   const [entregas, setEntregas] = useState<EntregaUniforme[]>([])
   const [modal, setModal] = useState<{ tipo: 'nova' } | { tipo: 'assinar' | 'ver'; e: EntregaUniforme } | null>(null)
-  const gestao = podeGerenciar(eu.nivel)
+  const gestao = possoAlterar(eu, pessoa)
   const souEu = pessoa.id === eu.id
 
   const carregar = useCallback(async () => setEntregas(await store.uniformes(pessoa.id)), [store, pessoa.id])

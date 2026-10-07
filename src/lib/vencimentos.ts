@@ -14,6 +14,8 @@ export interface Item {
   situacao: Situacao
   doc?: Documento
   vence?: string | null
+  // Exame que esta pessoa não precisa fazer (conta como em dia).
+  dispensado?: boolean
 }
 
 export function situacaoDoc(vence?: string | null): Situacao {
@@ -24,8 +26,11 @@ export function situacaoDoc(vence?: string | null): Situacao {
 }
 
 // Para cada exigência, o documento mais recente e se ele está em dia.
-export function exigenciasDe(docs: Documento[]): Item[] {
+export const manipulaAlimento = (p?: Pick<Funcionario, 'setor'> | null) => p?.setor !== 'escritorio'
+
+export function exigenciasDe(docs: Documento[], pessoa?: Pick<Funcionario, 'setor'> | null): Item[] {
   return EXIGENCIAS.map((e) => {
+    if (e.manipulador && !manipulaAlimento(pessoa)) return { id: e.id, nome: e.nome, base: e.base, situacao: 'em_dia' as Situacao, dispensado: true }
     const doc = docs
       .filter((d) => e.tipos.includes(d.tipo))
       .sort((a, b) => (b.realizadoEm ?? b.criadoEm).localeCompare(a.realizadoEm ?? a.criadoEm))[0]
@@ -43,12 +48,13 @@ export function pendencias(pessoas: Funcionario[], docs: Documento[]): Pendencia
   const ordem: Record<Situacao, number> = { vencido: 0, faltando: 1, vence_logo: 2, em_dia: 3 }
   return pessoas
     .filter((p) => p.status === 'ativo' && !isentoDeRotinas(p.nivel))
-    .flatMap((p) => exigenciasDe(docs.filter((d) => d.funcionarioId === p.id)).map((item) => ({ pessoa: p, item })))
+    .flatMap((p) => exigenciasDe(docs.filter((d) => d.funcionarioId === p.id), p).map((item) => ({ pessoa: p, item })))
     .filter((x) => x.item.situacao !== 'em_dia')
     .sort((a, b) => ordem[a.item.situacao] - ordem[b.item.situacao] || (a.item.vence ?? '').localeCompare(b.item.vence ?? ''))
 }
 
 export const textoSituacao = (i: Item) => {
+  if (i.dispensado) return 'Não precisa'
   const data = i.vence ? i.vence.split('-').reverse().join('/') : ''
   if (i.situacao === 'faltando') return 'Não enviado'
   if (i.situacao === 'vencido') return `Venceu em ${data}`

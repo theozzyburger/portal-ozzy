@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Botao, Campo, Modal, estiloEntrada } from './ui'
 import { CARGOS } from '../lib/cargos'
+import { niveisQuePossoDar } from '../lib/permissoes'
 import { useApp } from '../lib/contexto'
 import { hoje } from '../lib/datas'
 import { ir } from '../lib/rota'
 import { NIVEIS, SETORES, type Funcionario, type Nivel } from '../lib/types'
 
 export default function FormFuncionario({ aberto, aoFechar, existente }: { aberto: boolean; aoFechar: () => void; existente?: Funcionario }) {
-  const { store, unidades, equipe, recarregarEquipe, avisar } = useApp()
+  const { eu, store, unidades, equipe, recarregarEquipe, avisar } = useApp()
   const [f, setF] = useState(() => ({
     nome: existente?.nome ?? '',
     celular: existente?.celular ?? '',
@@ -110,7 +111,7 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
           </Campo>
           <Campo rotulo="Nível de acesso">
             <select className={estiloEntrada} value={f.nivel} onChange={mudar('nivel')}>
-              {NIVEIS.map((n) => (
+              {NIVEIS.filter((n) => niveisQuePossoDar(eu)(n.valor)).map((n) => (
                 <option key={n.valor} value={n.valor}>
                   {n.nome}
                 </option>

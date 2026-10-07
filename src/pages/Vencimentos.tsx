@@ -106,7 +106,7 @@ export default function Vencimentos() {
                     </button>
                     <div className="text-xs text-stone-500">{p.cargo}</div>
                   </td>
-                  {exigenciasDe(docs.filter((d) => d.funcionarioId === p.id)).map((i) => (
+                  {exigenciasDe(docs.filter((d) => d.funcionarioId === p.id), p).map((i) => (
                     <td key={i.id} className="px-3 py-2">
                       <Selo cor={corSituacao[i.situacao]}>
                         {iconeSituacao[i.situacao]} {textoSituacao(i)}

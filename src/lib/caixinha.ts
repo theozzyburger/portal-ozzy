@@ -53,7 +53,7 @@ export interface LinhaCaixinha {
 }
 
 // Setores que não entram na caixinha da planilha (a Produção não participa).
-export const SETORES_FORA = ['producao', 'manutencao']
+export const SETORES_FORA = ['producao', 'manutencao', 'escritorio']
 
 export function calcularCaixinha(pessoas: Funcionario[], ocorrenciasDoMes: Ocorrencia[], totais: Record<string, number>) {
   const participantes = pessoas.filter((p) => p.status === 'ativo' && pontosDoCargo(p.cargo) > 0 && !SETORES_FORA.includes(p.setor ?? '') && (p.setor === 'geral' || UNIDADES_CAIXINHA.includes(p.unidadeId)))

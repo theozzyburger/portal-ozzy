@@ -3,7 +3,7 @@ import { Avatar, Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from 
 import FormFuncionario from '../components/FormFuncionario'
 import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
-import { podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } from '../lib/permissoes'
+import { possoAlterar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } from '../lib/permissoes'
 import { ir } from '../lib/rota'
 import {
   TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
@@ -27,7 +27,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [docs, setDocs] = useState<Documento[]>([])
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
-  const gestao = podeGerenciar(eu.nivel)
+  // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
+  const gestao = !!pessoa && possoAlterar(eu, pessoa)
   const souEu = funcionarioId === eu.id
 
   const carregar = useCallback(async () => {
@@ -42,7 +43,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const verDocs = podeVerDocumentosDe(eu, pessoa)
   const docsSaude = docs.filter((d) => ehSaude(d.tipo))
   const docsGerais = docs.filter((d) => !ehSaude(d.tipo))
-  const exigencias = exigenciasDe(docs)
+  const exigencias = exigenciasDe(docs, pessoa)
   const pendentes = pessoa.status === 'ativo' ? exigencias.filter((i) => i.situacao !== 'em_dia').length : 0
 
   const abrir = async (d: Documento) => {

@@ -29,3 +29,10 @@ export const podeVerFuncionario = (eu: Funcionario, alvo: Funcionario) =>
 
 // Faturamento e resultado (DRE) do Lucro Fácil: só Proprietário e Administrativo.
 export const vejoResultado = (n: Nivel) => n === 'proprietario' || n === 'administrativo'
+
+// Hierarquia (pedido de 07/10): ninguém altera dados de quem está acima nem dá um nível acima do seu.
+// Gerente e Administrativo ficam no mesmo degrau.
+const DEGRAU: Record<Nivel, number> = { funcionario: 1, manutencao: 1, supervisor: 2, gerente: 3, administrativo: 3, proprietario: 4 }
+export const degrau = (n: Nivel) => DEGRAU[n] ?? 0
+export const possoAlterar = (eu: Funcionario, alvo: Funcionario) => podeGerenciar(eu.nivel) && degrau(alvo.nivel) <= degrau(eu.nivel)
+export const niveisQuePossoDar = (eu: Funcionario) => (n: Nivel) => degrau(n) <= degrau(eu.nivel)

@@ -31,7 +31,7 @@ export interface Funcionario {
   fotoUrl?: string | null
 }
 
-export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao'
+export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao' | 'escritorio'
 export const SETORES: { valor: Setor; nome: string }[] = [
   { valor: 'cozinha', nome: 'Cozinha' },
   { valor: 'atendimento', nome: 'Atendimento' },
@@ -39,6 +39,7 @@ export const SETORES: { valor: Setor; nome: string }[] = [
   { valor: 'unidade', nome: 'Unidade toda' },
   { valor: 'geral', nome: 'Geral (todas as lojas)' },
   { valor: 'manutencao', nome: 'Manutenção' },
+  { valor: 'escritorio', nome: 'Escritório' },
 ]
 
 export type TipoDocumento =
@@ -123,10 +124,11 @@ export const TIPOS_DOCUMENTO: { valor: TipoDocumento; nome: string; grupo: 'gera
 export const ehSaude = (t: TipoDocumento) => TIPOS_DOCUMENTO.find((x) => x.valor === t)?.grupo === 'saude'
 
 // O que todo funcionário ativo precisa ter em dia. Todos aqui manipulam alimentos.
-export const EXIGENCIAS: { id: string; nome: string; tipos: TipoDocumento[]; base: string }[] = [
+// manipulador: só para quem mexe com alimento (o Escritório não precisa, pedido de 07/10).
+export const EXIGENCIAS: { id: string; nome: string; tipos: TipoDocumento[]; base: string; manipulador?: boolean }[] = [
   { id: 'aso', nome: 'ASO (exame clínico)', tipos: ['aso_admissional', 'aso_periodico', 'aso_retorno', 'aso_mudanca_funcao'], base: 'NR-7 (PCMSO)' },
-  { id: 'coprocultura', nome: 'Coprocultura', tipos: ['coprocultura'], base: 'Portaria CVS 3/2026' },
-  { id: 'coproparasitologico', nome: 'Coproparasitológico', tipos: ['coproparasitologico'], base: 'Portaria CVS 3/2026' },
+  { id: 'coprocultura', nome: 'Coprocultura', tipos: ['coprocultura'], base: 'Portaria CVS 3/2026', manipulador: true },
+  { id: 'coproparasitologico', nome: 'Coproparasitológico', tipos: ['coproparasitologico'], base: 'Portaria CVS 3/2026', manipulador: true },
 ]
 
 // Entrega de uniforme com termo assinado na tela.
