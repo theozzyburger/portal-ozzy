@@ -145,8 +145,8 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   )
 
   return (
-    <div className="min-h-full lg:pl-64">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 lg:block">{menu}</aside>
+    <div className="min-h-full lg:pl-64 print:pl-0">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 lg:block print:hidden">{menu}</aside>
 
       {menuAberto && (
         <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setMenuAberto(false)}>
@@ -158,12 +158,12 @@ function Casca({ aoSair }: { aoSair: () => void }) {
       )}
 
       {store.modo === 'demo' && (
-        <div className="bg-ozzy-500 px-4 py-1.5 text-center text-xs font-semibold text-carvao">
+        <div className="bg-ozzy-500 px-4 py-1.5 text-center text-xs font-semibold text-carvao print:hidden">
           Modo demonstração: dados de exemplo, nada é salvo de verdade
         </div>
       )}
 
-      <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/90 backdrop-blur lg:hidden print:hidden">
         <div className="flex items-center gap-3 px-4 py-3">
           <button onClick={() => setMenuAberto(true)} className="-ml-1 rounded-lg p-1.5 text-stone-700 hover:bg-stone-100" aria-label="Abrir menu">
             <Icone nome="menu" tamanho={22} />
@@ -174,7 +174,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
       </header>
 
       {modulo.id === 'rh' && (
-        <div className="sticky top-[57px] z-20 border-b border-stone-200 bg-[#f6f5f3]/95 backdrop-blur lg:top-0">
+        <div className="sticky top-[57px] z-20 border-b border-stone-200 bg-[#f6f5f3]/95 backdrop-blur lg:top-0 print:hidden">
           <div className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-4 py-2">
             <span className="mr-2 hidden text-sm font-bold lg:inline">RH</span>
             {abasRh.map((a) => (

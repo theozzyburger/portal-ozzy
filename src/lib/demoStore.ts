@@ -1,10 +1,12 @@
 import { podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Comunicado, LeituraRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { addMesesData } from './vencimentos'
 import { TURNOS_PADRAO } from './turnos'
+import { sha256 } from './regulamento'
+import REGULAMENTO_2025 from './regulamento-2025.md?raw'
 
 export const SENHA_DEMO = '1234'
 
@@ -53,6 +55,10 @@ const funcionarios: Funcionario[] = [
 // Turnos começam vazios: a gestão coloca cada pessoa (pedido do Heitor em 07/10).
 const turnos = TURNOS_PADRAO.map((t) => ({ ...t }))
 const leituras: LeituraRegulamento[] = []
+// Versão 1 = arquivo "Regulamento_Interno_Revisado-2025.docx". O hash é calculado na primeira leitura.
+const versoes: VersaoRegulamento[] = [
+  { id: 'r1', numero: 1, texto: REGULAMENTO_2025, nota: 'Regulamento revisado 2025.', publicadoEm: '2026-10-07T12:00:00Z', publicadoPor: 'f1', hash: '' },
+]
 
 const agora = () => new Date().toISOString()
 let seq = 100
@@ -367,14 +373,30 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeGestao()
       porId(fid).turnoId = turnoId
     },
+    async versoesRegulamento() {
+      exigeEu()
+      for (const v of versoes) if (!v.hash) v.hash = await sha256(v.texto)
+      return espera([...versoes].sort((a, b) => b.numero - a.numero))
+    },
+    async publicarRegulamento(texto, nota) {
+      const u = exigeGestao()
+      const v: VersaoRegulamento = {
+        id: novoId('r'), numero: Math.max(...versoes.map((x) => x.numero)) + 1, texto, nota: nota || null,
+        publicadoEm: agora(), publicadoPor: u.id, hash: await sha256(texto),
+      }
+      versoes.push(v)
+      return espera(v)
+    },
     async leiturasRegulamento() {
       const u = exigeEu()
       return espera(leituras.filter((l) => l.funcionarioId === u.id || podeGerenciar(u.nivel)))
     },
-    async assinarRegulamento(versao, assinatura) {
+    async assinarRegulamento(versaoId, assinatura) {
       const u = exigeEu()
-      if (leituras.some((l) => l.funcionarioId === u.id && l.versao === versao)) throw new Error('Você já assinou esta versão.')
-      leituras.push({ funcionarioId: u.id, versao, assinatura, assinadoEm: agora() })
+      const v = versoes.find((x) => x.id === versaoId)
+      if (!v) throw new Error('Versão não encontrada.')
+      if (leituras.some((l) => l.funcionarioId === u.id && l.versaoId === versaoId)) throw new Error('Você já assinou esta versão.')
+      leituras.push({ funcionarioId: u.id, versaoId, assinatura, assinadoEm: agora(), hash: v.hash || (await sha256(v.texto)), dispositivo: navigator.userAgent, ip: null })
     },
   }
 }

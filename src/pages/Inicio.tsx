@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { VERSAO_REGULAMENTO } from '../lib/regulamento'
 import { Cartao, Selo, Titulo } from '../components/ui'
 import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
@@ -27,7 +26,9 @@ export default function Inicio() {
   useEffect(() => {
     store.documentos(eu.id).then(setMeusDocs)
     store.uniformes(eu.id).then(setMeusUniformes)
-    store.leiturasRegulamento().then((ls) => setAssinouRegulamento(ls.some((l) => l.funcionarioId === eu.id && l.versao === VERSAO_REGULAMENTO)))
+    Promise.all([store.versoesRegulamento(), store.leiturasRegulamento()]).then(([vs, ls]) =>
+      setAssinouRegulamento(!vs[0] || ls.some((l) => l.funcionarioId === eu.id && l.versaoId === vs[0].id)),
+    )
     if (podeGerenciar(eu.nivel)) store.documentosTodos().then(setDocsEquipe)
   }, [store, eu.id, eu.nivel])
 

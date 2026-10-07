@@ -211,12 +211,28 @@ export interface Turno {
   dias: (DiaTurno | null)[]
 }
 
-// Regulamento interno: quem leu e assinou cada versão.
+// Regulamento interno: cada versão publicada e quem assinou cada uma.
+export interface VersaoRegulamento {
+  id: string
+  numero: number
+  texto: string
+  // Resumo do que mudou, escrito por quem publicou.
+  nota: string | null
+  publicadoEm: string
+  publicadoPor: string | null
+  // SHA-256 do texto: prova qual versão exata foi assinada.
+  hash: string
+}
+
 export interface LeituraRegulamento {
   funcionarioId: string
-  versao: string
+  versaoId: string
   assinatura: string
   assinadoEm: string
+  hash: string
+  // Registro para auditoria: navegador/aparelho e IP de onde assinou.
+  dispositivo: string | null
+  ip: string | null
 }
 
 // Primeiro e último nome: "Queli Souza", "Julia Bernardo" (separa as duas Júlias).

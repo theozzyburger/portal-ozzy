@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Avaliacao, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Avaliacao, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -19,6 +19,10 @@ const paraDocumento = (r: any): Documento & { caminho: string } => ({
 const paraUniforme = (r: any): EntregaUniforme => ({
   id: r.id, funcionarioId: r.funcionario_id, data: r.data, itens: r.itens, observacao: r.observacao, entreguePor: r.entregue_por,
   assinatura: r.assinatura, assinadoEm: r.assinado_em, assinadoVia: r.assinado_via, criadoEm: r.criado_em,
+})
+
+const paraVersao = (r: any): VersaoRegulamento => ({
+  id: r.id, numero: r.numero, texto: r.texto, nota: r.nota, publicadoEm: r.publicado_em, publicadoPor: r.publicado_por, hash: r.hash,
 })
 
 const paraOcorrencia = (r: any): Ocorrencia => ({
@@ -194,12 +198,23 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async atribuirTurno(fid, turnoId) {
       ok(await sb.from('funcionarios').update({ turno_id: turnoId }).eq('id', fid))
     },
+    async versoesRegulamento() {
+      const linhas = ok(await sb.from('regulamento_versoes').select('*').order('numero', { ascending: false })) ?? []
+      return linhas.map(paraVersao)
+    },
+    async publicarRegulamento(texto, nota) {
+      return paraVersao(ok(await sb.from('regulamento_versoes').insert({ texto, nota: nota || null, publicado_por: exigeEu().id }).select().single()))
+    },
     async leiturasRegulamento() {
       const linhas = ok(await sb.from('regulamento_leituras').select('*')) ?? []
-      return linhas.map((r: any) => ({ funcionarioId: r.funcionario_id, versao: r.versao, assinatura: r.assinatura, assinadoEm: r.assinado_em }))
+      return linhas.map((r: any) => ({
+        funcionarioId: r.funcionario_id, versaoId: r.versao_id, assinatura: r.assinatura, assinadoEm: r.assinado_em,
+        hash: r.hash, dispositivo: r.dispositivo, ip: r.ip,
+      }))
     },
-    async assinarRegulamento(versao, assinatura) {
-      ok(await sb.from('regulamento_leituras').insert({ funcionario_id: exigeEu().id, versao, assinatura }))
+    async assinarRegulamento(versaoId, assinatura) {
+      // Data, hash do texto e IP são gravados pelo banco, não pelo aparelho.
+      ok(await sb.from('regulamento_leituras').insert({ funcionario_id: exigeEu().id, versao_id: versaoId, assinatura, dispositivo: navigator.userAgent }))
     },
     async avaliacoes() {
       const linhas = ok(await sb.from('avaliacoes').select('*')) ?? []
