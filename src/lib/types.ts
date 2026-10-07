@@ -1,4 +1,4 @@
-export type Nivel = 'funcionario' | 'supervisor' | 'gerente' | 'administrativo' | 'proprietario'
+export type Nivel = 'funcionario' | 'supervisor' | 'gerente' | 'administrativo' | 'proprietario' | 'manutencao'
 
 export type Status = 'ativo' | 'inativo'
 
@@ -24,13 +24,14 @@ export interface Funcionario {
   turnoId?: string | null
 }
 
-export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral'
+export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao'
 export const SETORES: { valor: Setor; nome: string }[] = [
   { valor: 'cozinha', nome: 'Cozinha' },
   { valor: 'atendimento', nome: 'Atendimento' },
   { valor: 'producao', nome: 'Produção' },
   { valor: 'unidade', nome: 'Unidade toda' },
   { valor: 'geral', nome: 'Geral (todas as lojas)' },
+  { valor: 'manutencao', nome: 'Manutenção' },
 ]
 
 export type TipoDocumento =
@@ -90,6 +91,8 @@ export const NIVEIS: { valor: Nivel; nome: string }[] = [
   { valor: 'gerente', nome: 'Gerente' },
   { valor: 'administrativo', nome: 'Administrativo' },
   { valor: 'proprietario', nome: 'Proprietário' },
+  // Acesso do manutencista (07/10): vê e atende os chamados de todas as lojas.
+  { valor: 'manutencao', nome: 'Manutenção' },
 ]
 
 // validadeMeses: sugestão de vencimento a partir da data do exame (dá para mudar no envio).
@@ -239,4 +242,66 @@ export interface LeituraRegulamento {
 export const nomeCurto = (nome: string) => {
   const p = nome.split(' ').filter(Boolean)
   return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : nome
+}
+
+// Chamados de manutenção (07/10): qualquer pessoa abre; o manutencista e a gestão atendem.
+export type Gravidade = 'urgente' | 'importante' | 'simples'
+export const GRAVIDADES: { valor: Gravidade; nome: string; dica: string }[] = [
+  { valor: 'urgente', nome: 'Urgente', dica: 'Parou a operação ou é risco (gás, choque, vazamento grande)' },
+  { valor: 'importante', nome: 'Importante', dica: 'Atrapalha o trabalho, resolver nos próximos dias' },
+  { valor: 'simples', nome: 'Pode esperar', dica: 'Melhoria ou ajuste sem pressa' },
+]
+
+export type CategoriaChamado =
+  | 'equipamento' | 'refrigeracao' | 'eletrica' | 'hidraulica' | 'gas' | 'reforma'
+  | 'computador' | 'internet' | 'moveis' | 'outro'
+export const CATEGORIAS_CHAMADO: { valor: CategoriaChamado; nome: string; exemplos: string }[] = [
+  { valor: 'equipamento', nome: 'Equipamento e maquinário', exemplos: 'chapa, fritadeira, forno, coifa, máquinas' },
+  { valor: 'refrigeracao', nome: 'Refrigeração', exemplos: 'geladeira, freezer, câmara fria, ar-condicionado' },
+  { valor: 'eletrica', nome: 'Elétrica', exemplos: 'tomada, disjuntor, iluminação' },
+  { valor: 'hidraulica', nome: 'Hidráulica', exemplos: 'pia, vazamento, esgoto, caixa de gordura' },
+  { valor: 'gas', nome: 'Gás', exemplos: 'cheiro de gás, registro, botijão' },
+  { valor: 'reforma', nome: 'Reforma e estrutura', exemplos: 'parede, piso, porta, telhado, pintura' },
+  { valor: 'computador', nome: 'Computador e sistemas', exemplos: 'PDV Eclética, impressora, tablet, computador' },
+  { valor: 'internet', nome: 'Internet e telefone', exemplos: 'Wi-Fi, roteador, telefone' },
+  { valor: 'moveis', nome: 'Móveis e utensílios', exemplos: 'mesa, cadeira, prateleira, utensílios' },
+  { valor: 'outro', nome: 'Outro', exemplos: '' },
+]
+
+export type StatusChamado = 'aberto' | 'andamento' | 'aguardando' | 'resolvido' | 'cancelado'
+export const STATUS_CHAMADO: { valor: StatusChamado; nome: string }[] = [
+  { valor: 'aberto', nome: 'Aberto' },
+  { valor: 'andamento', nome: 'Em andamento' },
+  { valor: 'aguardando', nome: 'Aguardando peça ou terceiro' },
+  { valor: 'resolvido', nome: 'Resolvido' },
+  { valor: 'cancelado', nome: 'Cancelado' },
+]
+export const chamadoEmAberto = (s: StatusChamado) => s !== 'resolvido' && s !== 'cancelado'
+
+export interface EventoChamado {
+  id: string
+  autorId: string
+  em: string
+  texto: string | null
+  // Preenchido quando o evento mudou o status.
+  status: StatusChamado | null
+}
+
+export interface Chamado {
+  id: string
+  numero: number
+  unidadeId: string
+  categoria: CategoriaChamado
+  gravidade: Gravidade
+  titulo: string
+  descricao: string
+  // Local dentro da loja (ex.: cozinha, salão, banheiro). Opcional.
+  local: string | null
+  foto: string | null
+  status: StatusChamado
+  abertoPor: string
+  abertoEm: string
+  responsavelId: string | null
+  fechadoEm: string | null
+  eventos: EventoChamado[]
 }

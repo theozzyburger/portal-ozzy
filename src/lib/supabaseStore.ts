@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Avaliacao, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -23,6 +23,15 @@ const paraUniforme = (r: any): EntregaUniforme => ({
 
 const paraVersao = (r: any): VersaoRegulamento => ({
   id: r.id, numero: r.numero, texto: r.texto, nota: r.nota, publicadoEm: r.publicado_em, publicadoPor: r.publicado_por, hash: r.hash,
+})
+
+const paraChamado = (r: any): Chamado => ({
+  id: r.id, numero: r.numero, unidadeId: r.unidade_id, categoria: r.categoria, gravidade: r.gravidade, titulo: r.titulo,
+  descricao: r.descricao, local: r.local, foto: r.foto, status: r.status, abertoPor: r.aberto_por, abertoEm: r.aberto_em,
+  responsavelId: r.responsavel_id, fechadoEm: r.fechado_em,
+  eventos: (r.chamado_eventos ?? [])
+    .map((e: any) => ({ id: e.id, autorId: e.autor_id, em: e.em, texto: e.texto, status: e.status }))
+    .sort((a: any, b: any) => a.em.localeCompare(b.em)),
 })
 
 const paraOcorrencia = (r: any): Ocorrencia => ({
@@ -197,6 +206,31 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async atribuirTurno(fid, turnoId) {
       ok(await sb.from('funcionarios').update({ turno_id: turnoId }).eq('id', fid))
+    },
+    async chamados() {
+      const linhas = ok(await sb.from('chamados').select('*, chamado_eventos(*)').order('aberto_em', { ascending: false })) ?? []
+      return linhas.map(paraChamado)
+    },
+    async abrirChamado(n) {
+      let foto: string | null = null
+      if (n.foto) {
+        foto = `${n.unidadeId}/${crypto.randomUUID()}-${n.foto.name}`
+        ok(await sb.storage.from('chamados').upload(foto, n.foto))
+      }
+      // Quem abriu, data e hora são preenchidos pelo banco.
+      const r = ok(await sb.from('chamados').insert({
+        unidade_id: n.unidadeId, categoria: n.categoria, gravidade: n.gravidade, titulo: n.titulo,
+        descricao: n.descricao, local: n.local || null, foto,
+      }).select().single())
+      return paraChamado(r)
+    },
+    async atualizarChamado(id, m) {
+      ok(await sb.rpc('atualizar_chamado', { chamado: id, novo_status: m.status ?? null, comentario: m.texto?.trim() || null }))
+    },
+    async fotoChamado(c) {
+      if (!c.foto) return null
+      const { data } = await sb.storage.from('chamados').createSignedUrl(c.foto, 300)
+      return data?.signedUrl ?? null
     },
     async versoesRegulamento() {
       const linhas = ok(await sb.from('regulamento_versoes').select('*').order('numero', { ascending: false })) ?? []

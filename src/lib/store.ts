@@ -1,4 +1,4 @@
-import type { Avaliacao, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -27,6 +27,16 @@ export interface NovaOcorrencia {
   tipo: TipoOcorrencia
   data: string
   descricao: string
+}
+
+export interface NovoChamado {
+  unidadeId: string
+  categoria: CategoriaChamado
+  gravidade: Gravidade
+  titulo: string
+  descricao: string
+  local?: string
+  foto?: File
 }
 
 export interface NovoComunicado {
@@ -90,6 +100,14 @@ export interface Store {
   versoesRegulamento(): Promise<VersaoRegulamento[]>
   publicarRegulamento(texto: string, nota: string): Promise<VersaoRegulamento>
   leiturasRegulamento(): Promise<LeituraRegulamento[]>
+
+  // Chamados de manutenção. Quem abre, data e hora são registrados automaticamente.
+  // Funcionário vê os da sua loja e os que abriu; manutenção e gestão veem todos.
+  chamados(): Promise<Chamado[]>
+  abrirChamado(c: NovoChamado): Promise<Chamado>
+  // Só manutenção e gestão mudam o status; qualquer um que vê o chamado pode comentar.
+  atualizarChamado(id: string, mudanca: { status?: StatusChamado; texto?: string }): Promise<void>
+  fotoChamado(c: Chamado): Promise<string | null>
   assinarRegulamento(versaoId: string, assinatura: string): Promise<void>
 }
 

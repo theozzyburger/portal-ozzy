@@ -60,7 +60,7 @@ export const MODULOS: Modulo[] = [
     itens: ['Trilhas por cargo', 'Treinamento obrigatório para quem entra', 'Progresso de cada funcionário'],
   },
   {
-    id: 'manutencao', nome: 'Manutenção', pronto: false,
+    id: 'manutencao', nome: 'Manutenção', pronto: true,
     resumo: 'Equipamento parado não pode esperar.',
     itens: ['Cadastro de equipamentos críticos', 'Abertura e acompanhamento de chamados', 'Agenda de manutenção preventiva'],
   },

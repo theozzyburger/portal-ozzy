@@ -9,8 +9,11 @@ export const podeVerPainel = (n: Nivel) => n === 'proprietario' || n === 'gerent
 
 export const podeGerenciar = (n: Nivel) => GESTAO.includes(n)
 
+// Chamados: o manutencista e a gestão veem todos e mudam o andamento.
+export const atendeChamados = (n: Nivel) => n === 'manutencao' || podeGerenciar(n)
+
 // Supervisor enxerga a equipe da própria unidade, sem editar.
-export const podeVerEquipe = (n: Nivel) => n !== 'funcionario'
+export const podeVerEquipe = (n: Nivel) => n !== 'funcionario' && n !== 'manutencao'
 
 // Documentos e atestados são dados sensíveis (LGPD): só o próprio funcionário e a gestão.
 export const podeVerDocumentosDe = (eu: Funcionario, alvo: Funcionario) =>

@@ -17,6 +17,7 @@ import Vencimentos from './pages/Vencimentos'
 import Caixinha from './pages/Caixinha'
 import Turnos from './pages/Turnos'
 import Regras from './pages/Regras'
+import Manutencao from './pages/Manutencao'
 import Icone from './components/Icone'
 import logo from './assets/logo.png'
 import { modulosVisiveis } from './lib/modulos'
@@ -90,6 +91,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   let conteudo
   if (modulo.id === 'inicio') conteudo = <Inicio />
   else if (modulo.id === 'regras') conteudo = <Regras />
+  else if (modulo.id === 'manutencao') conteudo = <Manutencao />
   else if (modulo.id !== 'rh') conteudo = <EmBreve modulo={modulo} />
   else if (abaRh === 'turnos') conteudo = <Turnos />
   else if (abaRh === 'folgas') conteudo = <Escala />

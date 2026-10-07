@@ -1,6 +1,6 @@
-import { podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
+import { atendeChamados, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { addMesesData } from './vencimentos'
@@ -43,6 +43,8 @@ const funcionarios: Funcionario[] = [
   f('p-victor-correa', 'Victor Hugo da Silva Correa', '11999990023', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'ativo', null, 'cozinha'),
   // Não está na planilha de caixinha. Heitor confirmou em 07/10: Produção, loja Vila Anastácio, fora da caixinha.
   f('p-julia-bernardo', 'Julia Motta Bernardo', '11999990031', 'Colaboradora de produção', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'producao'),
+  // Manutencista, cadastrado em 07/10. Atende as três lojas; celular fictício.
+  f('p-vanderlei', 'Vanderlei Aparecido', '11999990032', 'Manutencista', 'burger-psd', 'manutencao', ADMISSAO_A_CONFIRMAR, 'f1', 'ativo', null, 'manutencao'),
   f('p-caciano-souza', 'Caciano Ribeiro Silva Souza', '11999990024', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'inativo', '2026-07-28', 'atendimento'),
   f('p-gilson-silva', 'Gilson Bento Silva', '11999990025', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-23', 'cozinha'),
   f('p-joao-costa', 'João Victor Alves da Costa', '11999990026', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-09', 'atendimento'),
@@ -61,6 +63,39 @@ const versoes: VersaoRegulamento[] = [
 ]
 
 const agora = () => new Date().toISOString()
+const haHoras = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
+
+// Chamados de EXEMPLO, só para a demonstração.
+const chamados: Chamado[] = [
+  {
+    id: 'ch1', numero: 1, unidadeId: 'burger-va', categoria: 'refrigeracao', gravidade: 'urgente', titulo: 'Freezer de carnes não está gelando',
+    descricao: 'O freezer horizontal está em -5 °C desde a abertura. Passei as carnes para o outro freezer, mas ele está cheio.', local: 'Cozinha',
+    foto: null, status: 'aberto', abertoPor: 'p-arlene-santos', abertoEm: haHoras(2), responsavelId: null, fechadoEm: null, eventos: [],
+  },
+  {
+    id: 'ch2', numero: 2, unidadeId: 'burger-psd', categoria: 'equipamento', gravidade: 'importante', titulo: 'Chapa esquentando só de um lado',
+    descricao: 'O lado direito da chapa demora muito para esquentar. Dá para trabalhar, mas atrasa os pedidos no pico.', local: 'Cozinha',
+    foto: null, status: 'andamento', abertoPor: 'p-queli-souza', abertoEm: haHoras(26), responsavelId: 'p-vanderlei', fechadoEm: null,
+    eventos: [{ id: 'e1', autorId: 'p-vanderlei', em: haHoras(20), texto: 'Vou passar amanhã cedo para ver o queimador.', status: 'andamento' }],
+  },
+  {
+    id: 'ch3', numero: 3, unidadeId: 'pizza', categoria: 'computador', gravidade: 'importante', titulo: 'Impressora de pedidos falhando',
+    descricao: 'A impressora térmica para de imprimir no meio do pedido. Desligar e ligar resolve por um tempo.', local: 'Balcão',
+    foto: null, status: 'aguardando', abertoPor: 'p-maria-costa', abertoEm: haHoras(70), responsavelId: 'p-vanderlei', fechadoEm: null,
+    eventos: [{ id: 'e2', autorId: 'p-vanderlei', em: haHoras(50), texto: 'Cabo com mau contato. Pedi um cabo novo, chega quinta.', status: 'aguardando' }],
+  },
+  {
+    id: 'ch4', numero: 4, unidadeId: 'burger-psd', categoria: 'reforma', gravidade: 'simples', titulo: 'Pintura descascando no banheiro dos clientes',
+    descricao: 'Parede atrás da pia com a pintura soltando.', local: 'Banheiro do salão',
+    foto: null, status: 'aberto', abertoPor: 'p-larissa-porto', abertoEm: haHoras(120), responsavelId: null, fechadoEm: null, eventos: [],
+  },
+  {
+    id: 'ch5', numero: 5, unidadeId: 'burger-va', categoria: 'hidraulica', gravidade: 'urgente', titulo: 'Pia da cozinha entupida',
+    descricao: 'Água não desce na pia de lavar louça.', local: 'Cozinha',
+    foto: null, status: 'resolvido', abertoPor: 'p-dora-ramos', abertoEm: haHoras(170), responsavelId: 'p-vanderlei', fechadoEm: haHoras(165),
+    eventos: [{ id: 'e3', autorId: 'p-vanderlei', em: haHoras(165), texto: 'Desentupido e caixa de gordura limpa.', status: 'resolvido' }],
+  },
+]
 let seq = 100
 const novoId = (p: string) => `${p}${++seq}`
 
@@ -372,6 +407,37 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async atribuirTurno(fid, turnoId) {
       exigeGestao()
       porId(fid).turnoId = turnoId
+    },
+    async chamados() {
+      const u = exigeEu()
+      const ver = (c: Chamado) => atendeChamados(u.nivel) || c.abertoPor === u.id || c.unidadeId === u.unidadeId
+      return espera(chamados.filter(ver).map((c) => ({ ...c, eventos: [...c.eventos] })).sort((a, b) => b.abertoEm.localeCompare(a.abertoEm)))
+    },
+    async abrirChamado(n) {
+      const u = exigeEu()
+      const c: Chamado = {
+        id: novoId('ch'), numero: Math.max(0, ...chamados.map((x) => x.numero)) + 1, unidadeId: n.unidadeId, categoria: n.categoria,
+        gravidade: n.gravidade, titulo: n.titulo, descricao: n.descricao, local: n.local || null, foto: n.foto?.name ?? null,
+        status: 'aberto', abertoPor: u.id, abertoEm: agora(), responsavelId: null, fechadoEm: null, eventos: [],
+      }
+      if (n.foto) arquivosDemo.set(c.id, URL.createObjectURL(n.foto))
+      chamados.push(c)
+      return espera(c)
+    },
+    async atualizarChamado(id, m) {
+      const u = exigeEu()
+      const c = chamados.find((x) => x.id === id)
+      if (!c) throw new Error('Chamado não encontrado.')
+      if (m.status && !atendeChamados(u.nivel)) throw new Error('Só a manutenção e a gestão mudam o andamento.')
+      if (m.status) {
+        c.status = m.status
+        if (!c.responsavelId && u.nivel === 'manutencao') c.responsavelId = u.id
+        c.fechadoEm = m.status === 'resolvido' || m.status === 'cancelado' ? agora() : null
+      }
+      c.eventos.push({ id: novoId('e'), autorId: u.id, em: agora(), texto: m.texto?.trim() || null, status: m.status ?? null })
+    },
+    async fotoChamado(c) {
+      return arquivosDemo.get(c.id) ?? null
     },
     async versoesRegulamento() {
       exigeEu()

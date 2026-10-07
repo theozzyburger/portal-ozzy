@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { atendeChamados } from '../lib/permissoes'
+import { chamadoEmAberto, type Chamado } from '../lib/types'
+import { haQuanto } from './Manutencao'
 import { Cartao, Selo, Titulo } from '../components/ui'
 import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
@@ -50,6 +53,8 @@ export default function Inicio() {
       </div>
 
       <MeusAvisos docs={meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento} />
+
+      {atendeChamados(eu.nivel) && <ResumoChamados />}
 
       {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
 
@@ -244,6 +249,31 @@ function AlertaEquipe({ pend }: { pend: Pendencia[] }) {
         <span className="block text-sm text-stone-300">{partes.join(' · ')}</span>
       </span>
       <span className="text-sm font-semibold text-ozzy-400">Ver ›</span>
+    </button>
+  )
+}
+
+function ResumoChamados() {
+  const { store } = useApp()
+  const [chamados, setChamados] = useState<Chamado[]>([])
+  useEffect(() => {
+    store.chamados().then(setChamados)
+  }, [store])
+  const abertos = chamados.filter((c) => chamadoEmAberto(c.status))
+  if (!abertos.length) return null
+  const urgentes = abertos.filter((c) => c.gravidade === 'urgente').length
+  return (
+    <button onClick={() => ir('manutencao')} className="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left ring-1 ring-stone-200 hover:ring-carvao">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${urgentes ? 'bg-red-600 text-white' : 'bg-carvao text-ozzy-400'}`}>
+        {abertos.length}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">Chamados de manutenção em aberto</span>
+        <span className="block text-sm text-stone-600">
+          {urgentes ? `${urgentes} urgente${urgentes > 1 ? 's' : ''} · ` : ''}mais antigo aberto {haQuanto(abertos.reduce((a, c) => (c.abertoEm < a ? c.abertoEm : a), abertos[0].abertoEm))}
+        </span>
+      </span>
+      <span className="text-sm font-semibold">Ver ›</span>
     </button>
   )
 }
