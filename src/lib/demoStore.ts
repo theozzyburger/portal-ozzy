@@ -408,6 +408,17 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeGestao()
       porId(fid).turnoId = turnoId
     },
+    async salvarTurno(t, novo) {
+      exigeGestao()
+      const i = turnos.findIndex((x) => x.id === t.id)
+      if (novo || i < 0) turnos.push({ ...t })
+      else turnos[i] = { ...t }
+    },
+    async excluirTurno(id) {
+      exigeGestao()
+      turnos.splice(turnos.findIndex((x) => x.id === id), 1)
+      for (const f of funcionarios) if (f.turnoId === id) f.turnoId = null
+    },
     async chamados() {
       const u = exigeEu()
       const ver = (c: Chamado) => atendeChamados(u.nivel) || c.abertoPor === u.id || c.unidadeId === u.unidadeId

@@ -207,6 +207,16 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async atribuirTurno(fid, turnoId) {
       ok(await sb.from('funcionarios').update({ turno_id: turnoId }).eq('id', fid))
     },
+    async salvarTurno(t, novo) {
+      const dados = { local: t.local, nome: t.nome, dias: t.dias }
+      if (!novo) return void ok(await sb.from('turnos').update(dados).eq('id', t.id))
+      const ultimo = ok(await sb.from('turnos').select('ordem').order('ordem', { ascending: false }).limit(1))
+      ok(await sb.from('turnos').insert({ ...dados, id: t.id, ordem: (ultimo?.[0]?.ordem ?? 0) + 1 }))
+    },
+    async excluirTurno(id) {
+      // Quem estava no turno fica sem turno (turno_id vira nulo pelo banco).
+      ok(await sb.from('turnos').delete().eq('id', id))
+    },
     async chamados() {
       const linhas = ok(await sb.from('chamados').select('*, chamado_eventos(*)').order('aberto_em', { ascending: false })) ?? []
       return linhas.map(paraChamado)

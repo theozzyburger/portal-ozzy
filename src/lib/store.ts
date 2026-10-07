@@ -94,6 +94,9 @@ export interface Store {
   // Turnos-padrão (horários). Todos veem; a gestão coloca cada pessoa no seu turno.
   turnos(): Promise<Turno[]>
   atribuirTurno(funcionarioId: string, turnoId: string | null): Promise<void>
+  // Só a gestão: cria (novo = true) ou altera um turno; apagar tira as pessoas dele.
+  salvarTurno(t: Turno, novo: boolean): Promise<void>
+  excluirTurno(id: string): Promise<void>
 
   // Regulamento interno: versões (a mais nova primeiro). Todos leem; a gestão publica.
   // Cada pessoa assina a versão vigente; a gestão vê as assinaturas de todos.

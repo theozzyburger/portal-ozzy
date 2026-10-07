@@ -1,19 +1,22 @@
-import { useEffect, useState } from 'react'
-import { Selo, Vazio, estiloEntrada } from '../components/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { podeGerenciar } from '../lib/permissoes'
 import { DIAS_SEMANA, LIMITE_SEMANA_MIN, LOCAIS_EXTRAS, horas, minutosSemana, minutosTrabalhados, textoPausa, viraNoite } from '../lib/turnos'
-import { apelidoUnidade, nomeCurto, type Funcionario, type Turno } from '../lib/types'
+import { apelidoUnidade, nomeCurto, type DiaTurno, type Funcionario, type Turno } from '../lib/types'
 
 export default function Turnos() {
   const { eu, store, equipe, unidades, recarregarEquipe, avisar } = useApp()
   const gestao = podeGerenciar(eu.nivel)
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [local, setLocal] = useState('')
+  // Turno aberto no editor; 'novo' = criando um.
+  const [editando, setEditando] = useState<Turno | 'novo' | null>(null)
 
+  const carregar = useCallback(() => store.turnos().then(setTurnos), [store])
   useEffect(() => {
-    store.turnos().then(setTurnos)
-  }, [store])
+    carregar()
+  }, [carregar])
 
   const nomeLocal = (id: string) => LOCAIS_EXTRAS[id] ?? apelidoUnidade(unidades.find((u) => u.id === id)?.nome ?? id)
   const locais = [...new Set(turnos.map((t) => t.local))]
@@ -30,11 +33,18 @@ export default function Turnos() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold">Turnos</h1>
-        <p className="text-sm text-stone-500">
-          Horários-padrão do Cronograma 2026. {gestao ? 'Coloque cada pessoa no turno em que trabalha.' : 'Folgas do dia a dia ficam na aba Folgas.'}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold">Turnos</h1>
+          <p className="text-sm text-stone-500">
+            Horário-padrão de cada posto. {gestao ? 'Coloque cada pessoa no turno em que trabalha.' : 'Folgas do dia a dia ficam na aba Folgas.'}
+          </p>
+        </div>
+        {gestao && (
+          <Botao variante="secundario" onClick={() => setEditando('novo')}>
+            + Novo turno
+          </Botao>
+        )}
       </div>
 
       {meuTurno && (
@@ -90,16 +100,31 @@ export default function Turnos() {
               }}
               gestao={gestao}
               aoAtribuir={atribuir}
+              aoEditar={() => setEditando(t)}
             />
           ))}
         </div>
+      )}
+
+      {editando && (
+        <EditorTurno
+          turno={editando === 'novo' ? null : editando}
+          localInicial={local || unidades[0]?.id || 'burger-psd'}
+          pessoas={editando === 'novo' ? 0 : ativos.filter((f) => f.turnoId === editando.id).length}
+          aoFechar={() => setEditando(null)}
+          aoSalvar={async (msg) => {
+            setEditando(null)
+            await Promise.all([carregar(), recarregarEquipe()])
+            avisar(msg)
+          }}
+        />
       )}
     </div>
   )
 }
 
 function CartaoTurno({
-  turno, local, pessoas, candidatos, nomeTurnoDe, gestao, aoAtribuir,
+  turno, local, pessoas, candidatos, nomeTurnoDe, gestao, aoAtribuir, aoEditar,
 }: {
   turno: Turno
   local: string
@@ -108,6 +133,7 @@ function CartaoTurno({
   nomeTurnoDe: (f: Funcionario) => string | null
   gestao: boolean
   aoAtribuir: (f: Funcionario, t: Turno | null) => void
+  aoEditar: () => void
 }) {
   const semana = minutosSemana(turno)
   const acima = semana > LIMITE_SEMANA_MIN
@@ -119,7 +145,14 @@ function CartaoTurno({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="text-xs font-semibold tracking-wide text-stone-500 uppercase">{local}</div>
-          <h2 className="text-lg font-bold">{turno.nome}</h2>
+          <h2 className="text-lg font-bold">
+            {turno.nome}
+            {gestao && (
+              <button onClick={aoEditar} className="ml-2 align-middle text-sm font-semibold text-stone-500 underline decoration-ozzy-500 decoration-2 underline-offset-4 hover:text-carvao">
+                Editar
+              </button>
+            )}
+          </h2>
         </div>
         <div className="text-right">
           <div className={`text-lg font-bold tabular-nums ${acima ? 'text-red-700' : ''}`}>{horas(semana)}</div>
@@ -207,5 +240,142 @@ function CartaoTurno({
         )}
       </div>
     </section>
+  )
+}
+
+const PAUSAS = [0, 15, 30, 45, 60, 90, 120]
+const PADRAO: DiaTurno = { inicio: '09:00', fim: '18:00', pausaMin: 60 }
+
+function EditorTurno({
+  turno, localInicial, pessoas, aoFechar, aoSalvar,
+}: {
+  turno: Turno | null
+  localInicial: string
+  pessoas: number
+  aoFechar: () => void
+  aoSalvar: (msg: string) => void
+}) {
+  const { store, unidades } = useApp()
+  const [nome, setNome] = useState(turno?.nome ?? '')
+  const [local, setLocal] = useState(turno?.local ?? localInicial)
+  const [dias, setDias] = useState<(DiaTurno | null)[]>(turno?.dias.map((d) => (d ? { ...d } : null)) ?? [null, null, PADRAO, PADRAO, PADRAO, PADRAO, PADRAO])
+  // Guarda o último horário de cada dia, para voltar a ele ao desmarcar a folga.
+  const [ultimo, setUltimo] = useState<DiaTurno[]>(dias.map((d) => d ?? PADRAO))
+  const [apagar, setApagar] = useState(false)
+  const [erro, setErro] = useState('')
+  const rascunho: Turno = { id: turno?.id ?? '', local, nome, dias }
+  const semana = minutosSemana(rascunho)
+  const locais = [...unidades.map((u) => ({ id: u.id, nome: u.nome })), ...Object.entries(LOCAIS_EXTRAS).map(([id, nome]) => ({ id, nome }))]
+
+  const mudarDia = (i: number, d: DiaTurno | null) => {
+    setDias(dias.map((x, k) => (k === i ? d : x)))
+    if (d) setUltimo(ultimo.map((x, k) => (k === i ? d : x)))
+  }
+  const copiarParaTodos = (i: number) => setDias(dias.map((x) => (x ? { ...dias[i]! } : null)))
+
+  const salvar = async () => {
+    if (!nome.trim()) return setErro('Dê um nome ao turno (ex.: Cozinha noite).')
+    if (dias.some((d) => d && minutosTrabalhados(d) <= 0)) return setErro('Algum dia tem a pausa maior que o horário trabalhado.')
+    try {
+      const t = { ...rascunho, nome: nome.trim(), id: turno?.id ?? `t-${crypto.randomUUID().slice(0, 8)}` }
+      await store.salvarTurno(t, !turno)
+      aoSalvar(turno ? `Turno ${t.nome} atualizado` : `Turno ${t.nome} criado`)
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }
+
+  const excluir = async () => {
+    try {
+      await store.excluirTurno(turno!.id)
+      aoSalvar(`Turno ${turno!.nome} apagado`)
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }
+
+  return (
+    <Modal titulo={turno ? 'Editar turno' : 'Novo turno'} aberto aoFechar={aoFechar}>
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Campo rotulo="Nome">
+            <input className={estiloEntrada} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Cozinha noite" />
+          </Campo>
+          <Campo rotulo="Local">
+            <select className={estiloEntrada} value={local} onChange={(e) => setLocal(e.target.value)}>
+              {locais.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nome}
+                </option>
+              ))}
+            </select>
+          </Campo>
+        </div>
+
+        <div className="space-y-1.5">
+          {dias.map((d, i) => (
+            <div key={i} className={`rounded-xl p-2.5 ${d ? 'bg-stone-50' : 'bg-stone-100/60'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <input type="checkbox" className="h-4 w-4 accent-carvao" checked={!!d} onChange={(e) => mudarDia(i, e.target.checked ? ultimo[i] : null)} />
+                  <span className="w-8">{DIAS_SEMANA[i]}</span>
+                  {!d && <span className="font-normal text-stone-500">Folga</span>}
+                </label>
+                {d && (
+                  <span className="flex items-center gap-2 text-xs text-stone-500">
+                    {horas(Math.max(0, minutosTrabalhados(d)))}
+                    {viraNoite(d) && ' · vira a noite'}
+                    <button type="button" onClick={() => copiarParaTodos(i)} className="font-semibold text-stone-600 underline underline-offset-2 hover:text-carvao">
+                      Copiar p/ todos
+                    </button>
+                  </span>
+                )}
+              </div>
+              {d && (
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <input type="time" className={`${estiloEntrada} px-2! py-2! text-sm!`} value={d.inicio} onChange={(e) => mudarDia(i, { ...d, inicio: e.target.value })} aria-label={`Entrada ${DIAS_SEMANA[i]}`} />
+                  <input type="time" className={`${estiloEntrada} px-2! py-2! text-sm!`} value={d.fim} onChange={(e) => mudarDia(i, { ...d, fim: e.target.value })} aria-label={`Saída ${DIAS_SEMANA[i]}`} />
+                  <select className={`${estiloEntrada} px-2! py-2! text-sm!`} value={d.pausaMin} onChange={(e) => mudarDia(i, { ...d, pausaMin: Number(e.target.value) })} aria-label={`Pausa ${DIAS_SEMANA[i]}`}>
+                    {PAUSAS.map((p) => (
+                      <option key={p} value={p}>
+                        {p ? `Pausa ${textoPausa(p)}` : 'Sem pausa'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <p className={`rounded-xl p-3 text-sm ${semana > LIMITE_SEMANA_MIN ? 'bg-red-50 text-red-700' : 'bg-stone-50 text-stone-700'}`}>
+          Total: <b>{horas(semana)}</b> por semana{semana > LIMITE_SEMANA_MIN ? ', acima do limite de 44h da CLT.' : '.'} Saída antes da entrada = termina no dia seguinte.
+        </p>
+
+        {erro && <p className="text-sm text-red-600">{erro}</p>}
+        <Botao className="w-full" onClick={salvar}>
+          {turno ? 'Salvar alterações' : 'Criar turno'}
+        </Botao>
+
+        {turno &&
+          (apagar ? (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
+              Apagar o turno {turno.nome}?{pessoas > 0 && ` ${pessoas} ${pessoas === 1 ? 'pessoa fica' : 'pessoas ficam'} sem turno.`}
+              <div className="mt-2 flex gap-2">
+                <Botao variante="perigo" onClick={excluir}>
+                  Apagar
+                </Botao>
+                <Botao variante="fantasma" onClick={() => setApagar(false)}>
+                  Cancelar
+                </Botao>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setApagar(true)} className="w-full text-center text-sm font-semibold text-red-700">
+              Apagar este turno
+            </button>
+          ))}
+      </div>
+    </Modal>
   )
 }
