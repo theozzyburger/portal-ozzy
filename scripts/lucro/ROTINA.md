@@ -17,5 +17,7 @@ Só LEITURA no Lucro Fácil: nunca chamar ferramentas que criam, alteram ou apag
    - Sem fichas no arquivo, a importação mantém as que já estão no banco.
 4. `node scripts/lucro/montar.mjs /tmp/lucro lucro.json`
 5. Publique só o `lucro.json` no branch `dados-lucro`, num commit único (branch órfão, push forçado),
-   para não acumular histórico de dados financeiros. O workflow "Importar Lucro Fácil" grava no banco.
+   para não acumular histórico de dados financeiros. Depois rode a importação:
+   `gh workflow run importar-lucro.yml -R theozzyburger/portal-ozzy --ref main`
+   (o workflow fica no main e lê o arquivo do branch `dados-lucro`).
 6. Confira em Actions se a importação ficou verde. Se algo falhar, diga o que falhou no resumo final.
