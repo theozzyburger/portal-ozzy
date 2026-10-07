@@ -308,7 +308,10 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return (ok(await sb.from('freelancers').select('*').order('nome')) ?? []).map(paraFreelancer)
     },
     async salvarFreelancer(f) {
-      const linha = { nome: f.nome.trim(), cpf: soDigitos(f.cpf), pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular) : null, ativo: f.ativo }
+      const linha = {
+        nome: f.nome.trim(), cpf: f.cpf ? soDigitos(f.cpf) : null, pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular) : null,
+        ativo: f.ativo, funcionario_id: f.funcionarioId,
+      }
       const r = f.id
         ? ok(await sb.from('freelancers').update(linha).eq('id', f.id).select().single())
         : ok(await sb.from('freelancers').insert({ ...linha, criado_por: exigeEu().id }).select().single())
@@ -342,7 +345,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
   }
 }
 
-const paraFreelancer = (r: any): Freelancer => ({ id: r.id, nome: r.nome, cpf: r.cpf, pix: r.pix, celular: r.celular, ativo: r.ativo })
+const paraFreelancer = (r: any): Freelancer => ({
+  id: r.id, nome: r.nome, cpf: r.cpf, pix: r.pix, celular: r.celular, ativo: r.ativo, funcionarioId: r.funcionario_id,
+})
 
 const paraDiaria = (r: any): DiariaFreela => ({
   id: r.id, freelancerId: r.freelancer_id, data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao,

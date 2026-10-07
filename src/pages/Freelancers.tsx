@@ -9,7 +9,7 @@ import { reais } from './Fichas'
 const FUNCOES = ['Chapeiro', 'Auxiliar de cozinha', 'Pizzaiolo', 'Atendente', 'Caixa', 'Entregador', 'Limpeza']
 const NOME_TURNO: Record<TurnoFreela, string> = { manha: 'Manhã', noite: 'Noite' }
 
-export const formatarCpf = (cpf: string) => soDigitos(cpf).replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')
+export const formatarCpf = (cpf: string | null) => soDigitos(cpf ?? '').replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')
 
 // Confere os dígitos verificadores do CPF.
 export function cpfValido(cpf: string) {
@@ -263,7 +263,7 @@ function Relatorio({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-semibold">{f.nome}</div>
-                <div className="text-xs text-stone-500">CPF {formatarCpf(f.cpf)}</div>
+                <div className="text-xs text-stone-500">{f.funcionarioId ? 'Funcionário, diária na folga' : `CPF ${formatarCpf(f.cpf)}`}</div>
               </div>
               <div className="shrink-0 text-right">
                 <div className="text-lg font-bold tabular-nums">{reais(t)}</div>
@@ -305,7 +305,7 @@ function Cadastro({ freelas, editar }: { freelas: Freelancer[]; editar: (f: Free
   const [busca, setBusca] = useState('')
   if (!freelas.length) return <Vazio>Nenhum freelancer cadastrado ainda.</Vazio>
   const termo = busca.trim().toLowerCase()
-  const lista = freelas.filter((f) => !termo || f.nome.toLowerCase().includes(termo) || f.cpf.includes(soDigitos(termo) || '§'))
+  const lista = freelas.filter((f) => !termo || f.nome.toLowerCase().includes(termo) || (f.cpf ?? '').includes(soDigitos(termo) || '§'))
   return (
     <div className="space-y-2">
       <input className={estiloEntrada} type="search" placeholder="Buscar por nome ou CPF" value={busca} onChange={(e) => setBusca(e.target.value)} />
@@ -313,8 +313,9 @@ function Cadastro({ freelas, editar }: { freelas: Freelancer[]; editar: (f: Free
         <button key={f.id} onClick={() => editar(f)} className="flex w-full items-center gap-3 rounded-2xl bg-white p-3.5 text-left ring-1 ring-stone-200 hover:ring-carvao">
           <div className="min-w-0 flex-1">
             <div className="font-semibold">{f.nome}</div>
-            <div className="truncate text-xs text-stone-500">CPF {formatarCpf(f.cpf)} · Pix {f.pix}</div>
+            <div className="truncate text-xs text-stone-500">{f.cpf ? `CPF ${formatarCpf(f.cpf)} · ` : ''}Pix {f.pix}</div>
           </div>
+          {f.funcionarioId && <Selo cor="azul">Funcionário</Selo>}
           {!f.ativo && <Selo>Inativo</Selo>}
         </button>
       ))}
@@ -325,7 +326,7 @@ function Cadastro({ freelas, editar }: { freelas: Freelancer[]; editar: (f: Free
 function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelancer; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
   const [f, setF] = useState({
-    nome: existente?.nome ?? '', cpf: existente ? formatarCpf(existente.cpf) : '', pix: existente?.pix ?? '',
+    nome: existente?.nome ?? '', cpf: existente?.cpf ? formatarCpf(existente.cpf) : '', pix: existente?.pix ?? '',
     celular: existente?.celular ?? '', ativo: existente?.ativo ?? true,
   })
   const [erro, setErro] = useState('')
@@ -334,11 +335,12 @@ function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelan
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
     if (f.nome.trim().split(/\s+/).length < 2) return setErro('Coloque o nome completo.')
-    if (!cpfValido(f.cpf)) return setErro('CPF inválido. Confira os números.')
+    const doQuadro = !!existente?.funcionarioId
+    if ((!doQuadro || f.cpf) && !cpfValido(f.cpf)) return setErro('CPF inválido. Confira os números.')
     setErro('')
     setSalvando(true)
     try {
-      await store.salvarFreelancer({ ...f, id: existente?.id, celular: f.celular || null })
+      await store.salvarFreelancer({ ...f, id: existente?.id, cpf: f.cpf || null, celular: f.celular || null, funcionarioId: existente?.funcionarioId ?? null })
       aoSalvar()
     } catch (err) {
       const msg = (err as Error).message
@@ -354,7 +356,7 @@ function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelan
         <Campo rotulo="Nome completo">
           <input className={estiloEntrada} value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} required />
         </Campo>
-        <Campo rotulo="CPF">
+        <Campo rotulo={existente?.funcionarioId ? 'CPF (opcional)' : 'CPF'}>
           <input
             className={estiloEntrada}
             inputMode="numeric"
@@ -362,7 +364,7 @@ function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelan
             value={f.cpf}
             onChange={(e) => setF({ ...f, cpf: e.target.value })}
             onBlur={() => cpfValido(f.cpf) && setF({ ...f, cpf: formatarCpf(f.cpf) })}
-            required
+            required={!existente?.funcionarioId}
           />
         </Campo>
         <Campo rotulo="Chave Pix" dica="CPF, celular, e-mail ou chave aleatória.">
@@ -390,7 +392,10 @@ function FormDiaria({
   data: string; semana: string; freelas: Freelancer[]; ultimas: DiariaFreela[]
   aoFechar: () => void; aoSalvar: () => void; novoFreela: () => void
 }) {
-  const { store, unidades, eu } = useApp()
+  const { store, unidades, eu, equipe } = useApp()
+  // Funcionário também pode fazer diária na folga: aparece na lista e ganha um cadastro de freelancer ao lançar.
+  const doQuadro = equipe.filter((f) => f.status === 'ativo' && f.nivel !== 'proprietario' && !freelas.some((x) => x.funcionarioId === f.id)).sort((a, b) => a.nome.localeCompare(b.nome))
+  const [pixFunc, setPixFunc] = useState('')
   const [d, setD] = useState({
     freelancerId: '', data, turno: 'noite' as TurnoFreela, unidadeId: eu.unidadeId, funcao: '', valor: '', observacao: '',
   })
@@ -399,6 +404,7 @@ function FormDiaria({
 
   // Sugere função e valor da última diária da mesma pessoa.
   const escolher = (freelancerId: string) => {
+    setPixFunc(equipe.find((f) => 'func:' + f.id === freelancerId)?.pix ?? '')
     const ultima = [...ultimas].reverse().find((x) => x.freelancerId === freelancerId)
     setD({ ...d, freelancerId, funcao: d.funcao || ultima?.funcao || '', valor: d.valor || (ultima ? String(ultima.valor) : ''), unidadeId: ultima?.unidadeId ?? d.unidadeId })
   }
@@ -410,7 +416,16 @@ function FormDiaria({
     setErro('')
     setSalvando(true)
     try {
-      await store.lancarDiaria({ ...d, valor, observacao: d.observacao || null })
+      let freelancerId = d.freelancerId
+      if (freelancerId.startsWith('func:')) {
+        const func = equipe.find((f) => 'func:' + f.id === freelancerId)!
+        if (!pixFunc.trim()) throw new Error(`Informe o Pix de ${func.nome.split(' ')[0]} para o pagamento.`)
+        const criado = await store.salvarFreelancer({
+          nome: func.nome, cpf: null, pix: pixFunc.trim(), celular: func.celular, ativo: true, funcionarioId: func.id,
+        })
+        freelancerId = criado.id
+      }
+      await store.lancarDiaria({ ...d, freelancerId, valor, observacao: d.observacao || null })
       aoSalvar()
     } catch (err) {
       const msg = (err as Error).message
@@ -422,21 +437,35 @@ function FormDiaria({
 
   return (
     <Modal titulo="Lançar diária" aberto aoFechar={aoFechar}>
-      {freelas.length === 0 ? (
+      {freelas.length === 0 && doQuadro.length === 0 ? (
         <div className="space-y-3">
           <Vazio>Cadastre o freelancer antes de lançar a diária.</Vazio>
           <Botao className="w-full" onClick={novoFreela}>+ Novo freelancer</Botao>
         </div>
       ) : (
         <form onSubmit={salvar} className="space-y-4">
-          <Campo rotulo="Freelancer">
+          <Campo rotulo="Quem trabalhou">
             <select className={estiloEntrada} value={d.freelancerId} onChange={(e) => escolher(e.target.value)} required>
               <option value="">Escolha…</option>
-              {freelas.map((f) => (
-                <option key={f.id} value={f.id}>{f.nome}</option>
-              ))}
+              <optgroup label="Freelancers">
+                {freelas.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nome}{f.funcionarioId ? ' (funcionário)' : ''}</option>
+                ))}
+              </optgroup>
+              {doQuadro.length > 0 && (
+                <optgroup label="Funcionários (diária na folga)">
+                  {doQuadro.map((f) => (
+                    <option key={f.id} value={'func:' + f.id}>{f.nome}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </Campo>
+          {d.freelancerId.startsWith('func:') && (
+            <Campo rotulo="Pix para a diária" dica="Vem do cadastro do funcionário; dá para trocar aqui.">
+              <input className={estiloEntrada} value={pixFunc} onChange={(e) => setPixFunc(e.target.value)} required />
+            </Campo>
+          )}
           <button type="button" onClick={novoFreela} className="-mt-2 text-sm font-semibold text-sky-700">Não está na lista? Cadastrar</button>
           <div className="grid grid-cols-2 gap-3">
             <Campo rotulo="Dia">

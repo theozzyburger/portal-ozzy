@@ -347,10 +347,12 @@ export interface ResultadoMes {
 export interface Freelancer {
   id: string
   nome: string
-  cpf: string
+  // Opcional quando é um funcionário fazendo diária na folga.
+  cpf: string | null
   pix: string
   celular: string | null
   ativo: boolean
+  funcionarioId: string | null
 }
 
 export type TurnoFreela = 'manha' | 'noite'

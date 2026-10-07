@@ -152,9 +152,9 @@ const arquivosDemo = new Map<string, string>()
 // Valores reais de setembro/2026, da planilha.
 // Freelancers de exemplo (nomes, CPFs e Pix fictícios), com diárias nesta semana e na anterior.
 const freelas: Freelancer[] = [
-  { id: 'fl1', nome: 'Rafael Mendes Teixeira', cpf: '52998224725', pix: '11988887777', celular: '11988887777', ativo: true },
-  { id: 'fl2', nome: 'Bruna Carvalho Lopes', cpf: '11144477735', pix: 'bruna.lopes@email.com', celular: null, ativo: true },
-  { id: 'fl3', nome: 'Diego Ferreira Santos', cpf: '39053344705', pix: '39053344705', celular: '11977776666', ativo: true },
+  { id: 'fl1', nome: 'Rafael Mendes Teixeira', cpf: '52998224725', pix: '11988887777', celular: '11988887777', ativo: true, funcionarioId: null },
+  { id: 'fl2', nome: 'Bruna Carvalho Lopes', cpf: '11144477735', pix: 'bruna.lopes@email.com', celular: null, ativo: true, funcionarioId: null },
+  { id: 'fl3', nome: 'Diego Ferreira Santos', cpf: '39053344705', pix: '39053344705', celular: '11977776666', ativo: true, funcionarioId: null },
 ]
 const diarias: DiariaFreela[] = (() => {
   const seg = inicioDaSemana(hoje())
@@ -511,8 +511,9 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async salvarFreelancer(f) {
       exigeGestao()
-      const cpf = soDigitos(f.cpf)
-      if (freelas.some((x) => x.cpf === cpf && x.id !== f.id)) throw new Error('Já existe freelancer com esse CPF.')
+      const cpf = f.cpf ? soDigitos(f.cpf) : null
+      if (cpf && freelas.some((x) => x.cpf === cpf && x.id !== f.id)) throw new Error('Já existe freelancer com esse CPF.')
+      if (f.funcionarioId && freelas.some((x) => x.funcionarioId === f.funcionarioId && x.id !== f.id)) throw new Error('Esse funcionário já está cadastrado como freelancer.')
       const novo: Freelancer = { ...f, id: f.id ?? novoId('fl'), cpf, celular: f.celular ? soDigitos(f.celular) : null }
       const i = freelas.findIndex((x) => x.id === novo.id)
       if (i >= 0) freelas[i] = novo
