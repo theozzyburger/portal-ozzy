@@ -1,0 +1,37 @@
+# Backup diário do banco (Supabase) guardado como arquivo privado no GitHub.
+# Precisa do secret SUPABASE_DB_URL (Settings > Secrets and variables > Actions),
+# com a connection string do "Session pooler" do Supabase.
+name: Backup do banco
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # todo dia às 3h (horário de Brasília)
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    container: postgres:17
+    steps:
+      - name: Gerar backup
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "Secret SUPABASE_DB_URL ainda não foi criado; nada a fazer."
+            exit 0
+          fi
+          mkdir -p backup
+          arquivo="backup/portal-$(date -u +%Y-%m-%d).sql"
+          pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges \
+            --schema=public --schema=auth --schema=storage > "$arquivo"
+          gzip "$arquivo"
+          ls -lh backup
+
+      - name: Guardar no GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_number }}
+          path: backup/
+          retention-days: 90
+          if-no-files-found: ignore
