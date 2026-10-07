@@ -8,7 +8,9 @@ import Icone from '../components/Icone'
 import { modulosVisiveis } from '../lib/modulos'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana, tempoDesde } from '../lib/datas'
-import { isentoDeRotinas, podeGerenciar, podeVerPainel } from '../lib/permissoes'
+import { avisaFerias, isentoDeRotinas, podeGerenciar, podeVerPainel } from '../lib/permissoes'
+import { COR_SITUACAO, TEXTO_SITUACAO, alertasFerias, type AlertaFerias as AlertaFeriasT } from '../lib/ferias'
+const dataBr = (d: string) => d.split('-').reverse().join('/')
 import Painel from './Painel'
 import { ir } from '../lib/rota'
 import type { Comunicado, Documento, EntregaUniforme, Folga, Ocorrencia } from '../lib/types'
@@ -67,13 +69,17 @@ export default function Inicio() {
 
       {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
 
+      {avisaFerias(eu.nivel) && <AlertaFerias />}
+
       {painel && <Painel />}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* O proprietário não tem folga marcada nem manda atestado (pedido de 07/10): só o card de avisos. */}
+      <div className={`grid gap-3 ${isentoDeRotinas(eu.nivel) ? '' : 'sm:grid-cols-3'}`}>
         <Cartao onClick={() => ir('rh/avisos')}>
           <div className="text-sm text-stone-500">Avisos não lidos</div>
           <div className="mt-1 text-3xl font-bold">{naoLidos.length}</div>
         </Cartao>
+        {!isentoDeRotinas(eu.nivel) && (<>
         <Cartao onClick={() => ir('rh/folgas')}>
           <div className="text-sm text-stone-500">Minhas próximas folgas</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -84,7 +90,7 @@ export default function Inicio() {
                 .filter((f) => f.data >= hoje())
                 .sort((a, b) => a.data.localeCompare(b.data))
                 .map((f) => (
-                  <Selo key={f.id} cor="ambar">
+                  <Selo key={f.id} cor={f.tipo === 'feriado' ? 'azul' : 'ambar'}>
                     {diaSemana(f.data)} {dataCurta(f.data)}
                   </Selo>
                 ))
@@ -95,6 +101,7 @@ export default function Inicio() {
           <div className="text-sm text-stone-300">Mandou atestado?</div>
           <div className="mt-1 font-semibold text-ozzy-400">Enviar documento ›</div>
         </Cartao>
+        </>)}
       </div>
 
       {gestao && !painel && <PainelGestao totalAtivos={equipe.filter((f) => f.status === 'ativo').length} />}
@@ -241,6 +248,38 @@ function MeusAvisos({ docs, uniformes, regulamento }: { docs: Documento[] | null
         </button>
       )}
     </section>
+  )
+}
+
+function AlertaFerias() {
+  const { store, equipe } = useApp()
+  const [alertas, setAlertas] = useState<AlertaFeriasT[]>([])
+  useEffect(() => {
+    store.ferias().then((fs) => setAlertas(alertasFerias(equipe, fs, hoje())))
+  }, [store, equipe])
+  if (!alertas.length) return null
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ozzy-400 text-sm font-bold">{alertas.length}</span>
+        <span className="font-semibold">Férias vencendo nos próximos 3 meses</span>
+      </div>
+      <ul className="divide-y divide-stone-100">
+        {alertas.map((a) => (
+          <li key={a.pessoa.id + a.periodo.inicio}>
+            <button onClick={() => ir('rh/equipe/' + a.pessoa.id)} className="flex w-full items-center justify-between gap-2 py-2 text-left text-sm">
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{a.pessoa.nome}</span>
+                <span className="block text-xs text-stone-500">
+                  {a.periodo.saldo} dias a tirar · {a.periodo.situacao === 'vencida' ? `venceu em ${dataBr(a.periodo.concessivoFim)}` : `começar até ${dataBr(a.periodo.comecarAte)}`}
+                </span>
+              </span>
+              <Selo cor={COR_SITUACAO[a.periodo.situacao]}>{TEXTO_SITUACAO[a.periodo.situacao]}</Selo>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

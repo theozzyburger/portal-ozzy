@@ -64,7 +64,7 @@ export interface Documento {
   criadoEm: string
 }
 
-export type TipoOcorrencia = 'falta' | 'atraso' | 'advertencia' | 'orientacao' | 'elogio' | 'outro'
+export type TipoOcorrencia = 'falta' | 'atraso' | 'advertencia' | 'suspensao' | 'orientacao' | 'elogio' | 'outro'
 
 export interface Ocorrencia {
   id: string
@@ -74,6 +74,10 @@ export interface Ocorrencia {
   descricao: string
   registradoPor: string
   criadoEm: string
+  // Advertência e suspensão: motivo (natureza) e, na suspensão, a partir de quando e por quantos dias.
+  natureza?: string | null
+  suspensaoInicio?: string | null
+  suspensaoDias?: number | null
 }
 
 export interface Comunicado {
@@ -87,10 +91,12 @@ export interface Comunicado {
   lidoPor: string[]
 }
 
+export type TipoFolga = 'normal' | 'feriado'
 export interface Folga {
   id: string
   funcionarioId: string
   data: string
+  tipo: TipoFolga
 }
 
 export const NIVEIS: { valor: Nivel; nome: string }[] = [
@@ -165,6 +171,7 @@ export const TIPOS_OCORRENCIA: { valor: TipoOcorrencia; nome: string }[] = [
   { valor: 'falta', nome: 'Falta' },
   { valor: 'atraso', nome: 'Atraso' },
   { valor: 'advertencia', nome: 'Advertência' },
+  { valor: 'suspensao', nome: 'Suspensão' },
   { valor: 'orientacao', nome: 'Orientação' },
   { valor: 'elogio', nome: 'Elogio' },
   { valor: 'outro', nome: 'Outro' },
@@ -404,3 +411,38 @@ export interface Salario {
   observacao: string | null
   liberado: boolean
 }
+
+// Férias gozadas, ligadas ao período aquisitivo (que começa no aniversário da admissão).
+export interface Ferias {
+  id: string
+  funcionarioId: string
+  aquisitivoInicio: string
+  inicio: string
+  dias: number
+  abonoDias: number
+  observacao: string | null
+}
+
+// Parcela do 13º paga (a 1ª pode ser adiantada).
+export interface DecimoTerceiro {
+  id: string
+  funcionarioId: string
+  ano: number
+  parcela: 1 | 2
+  valor: number
+  pagoEm: string
+  observacao: string | null
+}
+
+// Motivos mais comuns de advertência e suspensão (o documento cita a natureza).
+export const NATUREZAS = [
+  'Atraso',
+  'Falta injustificada',
+  'Uso de celular durante o trabalho',
+  'Uniforme incompleto ou fora do padrão',
+  'Higiene e manipulação de alimentos',
+  'Descumprimento de procedimento',
+  'Saída sem autorização',
+  'Desrespeito a colega ou cliente',
+  'Insubordinação',
+]

@@ -1,4 +1,4 @@
-import type { Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -27,6 +27,9 @@ export interface NovaOcorrencia {
   tipo: TipoOcorrencia
   data: string
   descricao: string
+  natureza?: string | null
+  suspensaoInicio?: string | null
+  suspensaoDias?: number | null
 }
 
 export interface NovoChamado {
@@ -85,6 +88,16 @@ export interface Store {
 
   folgas(inicio: string, fim: string): Promise<Folga[]>
   alternarFolga(funcionarioId: string, data: string): Promise<void>
+  // Só a gestão: tipo null tira a folga do dia.
+  definirFolga(funcionarioId: string, data: string, tipo: TipoFolga | null): Promise<void>
+
+  // Férias e 13º (só a gestão vê e registra).
+  ferias(funcionarioId?: string): Promise<Ferias[]>
+  registrarFerias(f: Omit<Ferias, 'id'>): Promise<void>
+  excluirFerias(id: string): Promise<void>
+  decimoTerceiro(funcionarioId: string): Promise<DecimoTerceiro[]>
+  registrarDecimoTerceiro(d: Omit<DecimoTerceiro, 'id'>): Promise<void>
+  excluirDecimoTerceiro(id: string): Promise<void>
 
   // Painel (Proprietário e Gerente): pedidos e faturamento por dia/loja/canal, e notas nas plataformas.
   vendasEntre(inicio: string, fim: string): Promise<VendaDia[]>

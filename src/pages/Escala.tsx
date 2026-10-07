@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
+import Impressao from '../components/Impressao'
 import { Botao, Titulo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, dataLonga, diaSemana, hoje, inicioDaSemana } from '../lib/datas'
 import { podeGerenciar } from '../lib/permissoes'
-import type { Folga } from '../lib/types'
+import { apelidoUnidade, type Folga, type TipoFolga } from '../lib/types'
 
 export default function Escala() {
   const { eu, store, equipe, unidades, avisar } = useApp()
   const gestao = podeGerenciar(eu.nivel)
+  const [visao, setVisao] = useState<'semana' | '30'>('semana')
   const [inicio, setInicio] = useState(inicioDaSemana(hoje()))
   const [folgas, setFolgas] = useState<Folga[]>([])
   const [unidade, setUnidade] = useState(gestao ? '' : eu.unidadeId)
@@ -22,18 +24,39 @@ export default function Escala() {
     .filter((f) => f.status === 'ativo' && (!unidade || f.unidadeId === unidade))
     .sort((a, b) => (a.id === eu.id ? -1 : b.id === eu.id ? 1 : a.nome.localeCompare(b.nome)))
 
-  const temFolga = (fid: string, d: string) => folgas.some((g) => g.funcionarioId === fid && g.data === d)
+  const folgaDe = (fid: string, d: string) => folgas.find((g) => g.funcionarioId === fid && g.data === d)?.tipo ?? null
 
+  // Cada toque passa para o próximo: sem folga → folga → folga de feriado → sem folga.
   const alternar = async (fid: string, d: string) => {
     if (!gestao) return
-    await store.alternarFolga(fid, d)
+    const atual = folgaDe(fid, d)
+    const proximo: TipoFolga | null = atual === null ? 'normal' : atual === 'normal' ? 'feriado' : null
+    await store.definirFolga(fid, d, proximo)
     await carregar()
-    avisar(temFolga(fid, d) ? 'Folga removida' : 'Folga marcada')
+    avisar(proximo === 'normal' ? 'Folga marcada' : proximo === 'feriado' ? 'Folga de feriado marcada' : 'Folga removida')
   }
 
   return (
     <div>
-      <Titulo>Folgas da semana</Titulo>
+      <Titulo
+        acao={
+          gestao && (
+            <div className="flex rounded-xl bg-stone-200 p-1 text-sm font-semibold">
+              {(['semana', '30'] as const).map((v) => (
+                <button key={v} onClick={() => setVisao(v)} className={`rounded-lg px-3 py-1.5 ${visao === v ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+                  {v === 'semana' ? 'Semana' : 'Próximos 30 dias'}
+                </button>
+              ))}
+            </div>
+          )
+        }
+      >
+        Folgas
+      </Titulo>
+      {visao === '30' ? (
+        <Proximos30 unidade={unidade} setUnidade={setUnidade} />
+      ) : (
+      <>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Botao variante="secundario" onClick={() => setInicio(addDias(inicio, -7))} aria-label="Semana anterior">
           ‹
@@ -55,7 +78,13 @@ export default function Escala() {
           </select>
         )}
       </div>
-      {gestao && <p className="mb-3 text-sm text-stone-500">Toque num dia para marcar ou tirar a folga.</p>}
+      {gestao && (
+        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-stone-500">
+          <span>Toque num dia para trocar:</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-ozzy-500" /> folga</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-sky-600" /> folga de feriado</span>
+        </p>
+      )}
 
       {pessoas.length === 0 ? (
         <Vazio>Ninguém nesta unidade.</Vazio>
@@ -81,17 +110,17 @@ export default function Escala() {
                     <div className="text-xs text-stone-500">{p.cargo}</div>
                   </td>
                   {dias.map((d) => {
-                    const folga = temFolga(p.id, d)
+                    const folga = folgaDe(p.id, d)
                     return (
                       <td key={d} className="px-1 py-1.5 text-center">
                         <button
                           disabled={!gestao}
                           onClick={() => alternar(p.id, d)}
                           className={`h-9 w-full min-w-11 rounded-lg text-xs font-bold transition ${
-                            folga ? 'bg-ozzy-500 text-carvao' : 'bg-stone-50 text-stone-300'
+                            folga === 'feriado' ? 'bg-sky-600 text-white' : folga ? 'bg-ozzy-500 text-carvao' : 'bg-stone-50 text-stone-300'
                           } ${gestao ? 'hover:ring-2 hover:ring-carvao' : 'cursor-default'}`}
                         >
-                          {folga ? 'FOLGA' : '·'}
+                          {folga === 'feriado' ? 'FERIADO' : folga ? 'FOLGA' : '·'}
                         </button>
                       </td>
                     )
@@ -101,6 +130,115 @@ export default function Escala() {
             </tbody>
           </table>
         </div>
+      )}
+      </>
+      )}
+    </div>
+  )
+}
+
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+const diaMes = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
+
+// Calendário dos próximos 30 dias para mandar no grupo (Gerente, Administrativo e Proprietário).
+function Proximos30({ unidade, setUnidade }: { unidade: string; setUnidade: (u: string) => void }) {
+  const { store, equipe, unidades, nomeUnidade, avisar } = useApp()
+  const [folgas, setFolgas] = useState<Folga[] | null>(null)
+  const [imprimir, setImprimir] = useState(false)
+  const ini = hoje()
+  const fim = addDias(ini, 29)
+  const dias = Array.from({ length: 30 }, (_, i) => addDias(ini, i))
+
+  useEffect(() => {
+    store.folgas(ini, fim).then(setFolgas)
+  }, [store, ini, fim])
+  if (!folgas) return <p className="text-stone-400">Carregando…</p>
+
+  const pessoa = (id: string) => equipe.find((p) => p.id === id)
+  const doDia = (d: string) =>
+    folgas
+      .filter((g) => g.data === d)
+      .map((g) => ({ g, p: pessoa(g.funcionarioId) }))
+      .filter((x) => x.p && x.p.status === 'ativo' && (!unidade || x.p.unidadeId === unidade))
+      .sort((a, b) => a.p!.nome.localeCompare(b.p!.nome))
+  // Primeiro nome + o seguinte ("Kauã de Oliveira", não "Kauã de").
+  const curto = (nome: string) => {
+    const ps = nome.split(' ')
+    return ps.slice(0, /^(de|da|do|dos|das|e)$/i.test(ps[1] ?? '') ? 3 : 2).join(' ')
+  }
+  const comLoja = (id: string) => (unidade ? '' : ` (${apelidoUnidade(nomeUnidade(pessoa(id)!.unidadeId))})`)
+
+  const texto = () => {
+    const linhas = [`*Folgas de ${diaMes(ini)} a ${diaMes(fim)}*${unidade ? ` · ${apelidoUnidade(nomeUnidade(unidade))}` : ''}`, '']
+    for (const d of dias) {
+      const xs = doDia(d)
+      if (!xs.length) continue
+      linhas.push(`*${diaSemana(d)} ${diaMes(d)}*`)
+      for (const { g, p } of xs) linhas.push(`• ${curto(p!.nome)}${comLoja(p!.id)}${g.tipo === 'feriado' ? ' 🎉 feriado' : ''}`)
+      linhas.push('')
+    }
+    return linhas.join('\n').trim()
+  }
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(texto())
+      avisar('Copiado! É só colar no grupo.')
+    } catch {
+      avisar('Não deu para copiar neste aparelho')
+    }
+  }
+
+  const lista = (
+    <div className="grid gap-2 sm:grid-cols-2 print:grid-cols-3 print:gap-1">
+      {dias.map((d) => {
+        const xs = doDia(d)
+        return (
+          <div key={d} className={`rounded-xl p-3 ring-1 ring-stone-200 print:break-inside-avoid print:rounded-none print:p-1.5 ${d === hoje() ? 'bg-ozzy-50' : 'bg-white'}`}>
+            <div className="mb-1 text-sm font-bold">
+              {diaSemana(d)} {Number(d.slice(8, 10))} {MESES[Number(d.slice(5, 7)) - 1]}
+            </div>
+            {xs.length === 0 ? (
+              <div className="text-xs text-stone-400">Ninguém de folga</div>
+            ) : (
+              <ul className="space-y-0.5 text-sm">
+                {xs.map(({ g, p }) => (
+                  <li key={g.id} className="flex items-center gap-1.5">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${g.tipo === 'feriado' ? 'bg-sky-600' : 'bg-ozzy-500'}`} />
+                    <span className="truncate">{curto(p!.nome)}<span className="text-stone-500">{comLoja(p!.id)}</span></span>
+                    {g.tipo === 'feriado' && <span className="text-xs font-semibold text-sky-700">feriado</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select className={`${estiloEntrada} w-auto! py-2!`} value={unidade} onChange={(e) => setUnidade(e.target.value)} aria-label="Unidade">
+          <option value="">Todas as unidades</option>
+          {unidades.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+        </select>
+        <Botao onClick={copiar}>Copiar para o WhatsApp</Botao>
+        <Botao variante="secundario" onClick={() => setImprimir(true)}>Imprimir</Botao>
+      </div>
+      <p className="flex flex-wrap items-center gap-x-3 text-sm text-stone-500">
+        <span>De {dataLonga(ini)} a {dataLonga(fim)}.</span>
+        <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-ozzy-500" /> folga</span>
+        <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-sky-600" /> folga de feriado</span>
+      </p>
+      {lista}
+      {imprimir && (
+        <Impressao titulo="Folgas dos próximos 30 dias" aoFechar={() => setImprimir(false)}>
+          <h1 className="mb-1 text-lg font-bold">Folgas de {dataLonga(ini)} a {dataLonga(fim)}</h1>
+          <p className="mb-3 text-xs">{unidade ? nomeUnidade(unidade) : 'Todas as unidades'} · amarelo = folga, azul = folga de feriado</p>
+          {lista}
+        </Impressao>
       )}
     </div>
   )

@@ -36,3 +36,6 @@ const DEGRAU: Record<Nivel, number> = { funcionario: 1, manutencao: 1, superviso
 export const degrau = (n: Nivel) => DEGRAU[n] ?? 0
 export const possoAlterar = (eu: Funcionario, alvo: Funcionario) => podeGerenciar(eu.nivel) && degrau(alvo.nivel) <= degrau(eu.nivel)
 export const niveisQuePossoDar = (eu: Funcionario) => (n: Nivel) => degrau(n) <= degrau(eu.nivel)
+
+// Aviso de férias vencendo na página inicial: Administrativo e Gerente (o Proprietário não, pedido de 07/10).
+export const avisaFerias = (n: Nivel) => n === 'administrativo' || n === 'gerente'

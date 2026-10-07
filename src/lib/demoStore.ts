@@ -1,6 +1,6 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -253,7 +253,28 @@ const semana = inicioDaSemana(hoje())
 const folgas: Folga[] = [
   ['p-cibeli-costa', 1], ['p-gustavo-lima', 2], ['p-julia-silva', 3], ['p-kaue-oliveira', 0], ['p-larissa-porto', 1],
   ['p-laura-costa', 2], ['p-lucas-torres', 3], ['p-victor-correa', 0], ['p-dora-ramos', 1], ['p-kaua-silva', 2], ['p-queli-souza', 0],
-].map(([fid, d], i) => ({ id: `g${i}`, funcionarioId: fid as string, data: addDias(semana, d as number) }))
+].flatMap(([fid, d], i) =>
+  // Mesmo dia de folga por 5 semanas, para o calendário de 30 dias ter o que mostrar.
+  [0, 7, 14, 21, 28].map((s): Folga => ({ id: `g${i}-${s}`, funcionarioId: fid as string, data: addDias(semana, (d as number) + s), tipo: 'normal' })),
+)
+// Folga de feriado (12/10, Nossa Senhora Aparecida) para mostrar a outra cor.
+for (const fid of ['p-larissa-porto', 'p-dora-ramos']) folgas.push({ id: 'gf-' + fid, funcionarioId: fid, data: '2026-10-12', tipo: 'feriado' })
+
+// Admissões de exemplo para a aba Férias mostrar períodos (as demais seguem "a confirmar").
+const ADMISSOES_DEMO: Record<string, string> = {
+  'p-maria-costa': '2023-03-01', 'p-queli-souza': '2024-11-18', 'p-arlene-santos': '2025-03-10', 'p-vanderlei': '2023-08-01',
+}
+for (const p of funcionarios) if (ADMISSOES_DEMO[p.id]) p.dataAdmissao = ADMISSOES_DEMO[p.id]
+const feriasDemo: Ferias[] = [
+  { id: 'fe1', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2023-03-01', inicio: '2024-07-01', dias: 30, abonoDias: 0, observacao: null },
+  { id: 'fe2', funcionarioId: 'p-maria-costa', aquisitivoInicio: '2024-03-01', inicio: '2025-09-01', dias: 20, abonoDias: 10, observacao: 'Vendeu 10 dias' },
+  { id: 'fe3', funcionarioId: 'p-arlene-santos', aquisitivoInicio: '2025-03-10', inicio: '2026-07-06', dias: 15, abonoDias: 0, observacao: null },
+  { id: 'fe4', funcionarioId: 'p-vanderlei', aquisitivoInicio: '2023-08-01', inicio: '2024-12-02', dias: 30, abonoDias: 0, observacao: null },
+  { id: 'fe5', funcionarioId: 'p-vanderlei', aquisitivoInicio: '2024-08-01', inicio: '2026-01-12', dias: 20, abonoDias: 0, observacao: null },
+]
+const decimoDemo: DecimoTerceiro[] = [
+  { id: 'dt1', funcionarioId: 'p-maria-costa', ano: 2026, parcela: 1, valor: 2100, pagoEm: '2026-07-10', observacao: 'Adiantada junto com as férias' },
+]
 
 // Salários de exemplo do mês passado, já liberados (valores fictícios).
 const SALARIO_CARGO: Record<string, number> = { Auxiliar: 1850, Atendente: 1950, Supervisor: 2500, Gerente: 4200 }
@@ -430,7 +451,42 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeGestao()
       const i = folgas.findIndex((g) => g.funcionarioId === fid && g.data === data)
       if (i >= 0) folgas.splice(i, 1)
-      else folgas.push({ id: novoId('g'), funcionarioId: fid, data })
+      else folgas.push({ id: novoId('g'), funcionarioId: fid, data, tipo: 'normal' })
+    },
+    async definirFolga(fid, data, tipo) {
+      exigeGestao()
+      const i = folgas.findIndex((g) => g.funcionarioId === fid && g.data === data)
+      if (i >= 0) folgas.splice(i, 1)
+      if (tipo) folgas.push({ id: novoId('g'), funcionarioId: fid, data, tipo })
+    },
+    async ferias(fid) {
+      exigeGestao()
+      return espera(feriasDemo.filter((f) => !fid || f.funcionarioId === fid).sort((a, b) => b.inicio.localeCompare(a.inicio)).map((f) => ({ ...f })))
+    },
+    async registrarFerias(f) {
+      const u = exigeGestao()
+      if (!possoAlterar(u, porId(f.funcionarioId))) throw new Error('Você não pode alterar quem está acima de você')
+      feriasDemo.push({ ...f, id: novoId('fe') })
+    },
+    async excluirFerias(id) {
+      exigeGestao()
+      const i = feriasDemo.findIndex((f) => f.id === id)
+      if (i >= 0) feriasDemo.splice(i, 1)
+    },
+    async decimoTerceiro(fid) {
+      exigeGestao()
+      return espera(decimoDemo.filter((d) => d.funcionarioId === fid).sort((a, b) => b.ano - a.ano || a.parcela - b.parcela).map((d) => ({ ...d })))
+    },
+    async registrarDecimoTerceiro(d) {
+      const u = exigeGestao()
+      if (!possoAlterar(u, porId(d.funcionarioId))) throw new Error('Você não pode alterar quem está acima de você')
+      if (decimoDemo.some((x) => x.funcionarioId === d.funcionarioId && x.ano === d.ano && x.parcela === d.parcela)) throw new Error('Essa parcela já foi registrada')
+      decimoDemo.push({ ...d, id: novoId('dt') })
+    },
+    async excluirDecimoTerceiro(id) {
+      exigeGestao()
+      const i = decimoDemo.findIndex((d) => d.id === id)
+      if (i >= 0) decimoDemo.splice(i, 1)
     },
     async vendasEntre(inicio, fim) {
       exigePainel()

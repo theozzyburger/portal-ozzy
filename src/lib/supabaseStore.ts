@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -36,6 +36,7 @@ const paraChamado = (r: any): Chamado => ({
 
 const paraOcorrencia = (r: any): Ocorrencia => ({
   id: r.id, funcionarioId: r.funcionario_id, tipo: r.tipo, data: r.data, descricao: r.descricao,
+  natureza: r.natureza, suspensaoInicio: r.suspensao_inicio, suspensaoDias: r.suspensao_dias,
   registradoPor: r.registrado_por, criadoEm: r.criado_em,
 })
 
@@ -187,6 +188,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       const r = ok(
         await sb.from('ocorrencias').insert({
           funcionario_id: o.funcionarioId, tipo: o.tipo, data: o.data, descricao: o.descricao, registrado_por: u.id,
+          natureza: o.natureza || null, suspensao_inicio: o.suspensaoInicio || null, suspensao_dias: o.suspensaoDias || null,
         }).select().single(),
       )
       return paraOcorrencia(r)
@@ -210,7 +212,39 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async folgas(inicio, fim) {
       const linhas = ok(await sb.from('folgas').select('*').gte('data', inicio).lte('data', fim)) ?? []
-      return linhas.map((r: any): Folga => ({ id: r.id, funcionarioId: r.funcionario_id, data: r.data }))
+      return linhas.map((r: any): Folga => ({ id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo ?? 'normal' }))
+    },
+    async definirFolga(fid, data, tipo) {
+      if (!tipo) ok(await sb.from('folgas').delete().eq('funcionario_id', fid).eq('data', data))
+      else ok(await sb.from('folgas').upsert({ funcionario_id: fid, data, tipo }, { onConflict: 'funcionario_id,data' }))
+    },
+    async ferias(fid) {
+      let q = sb.from('ferias').select('*').order('inicio', { ascending: false })
+      if (fid) q = q.eq('funcionario_id', fid)
+      return (ok(await q) ?? []).map((r: any): Ferias => ({
+        id: r.id, funcionarioId: r.funcionario_id, aquisitivoInicio: r.aquisitivo_inicio, inicio: r.inicio, dias: r.dias, abonoDias: r.abono_dias, observacao: r.observacao,
+      }))
+    },
+    async registrarFerias(f) {
+      ok(await sb.from('ferias').insert({
+        funcionario_id: f.funcionarioId, aquisitivo_inicio: f.aquisitivoInicio, inicio: f.inicio, dias: f.dias, abono_dias: f.abonoDias, observacao: f.observacao?.trim() || null,
+      }))
+    },
+    async excluirFerias(id) {
+      ok(await sb.from('ferias').delete().eq('id', id))
+    },
+    async decimoTerceiro(fid) {
+      return (ok(await sb.from('decimo_terceiro').select('*').eq('funcionario_id', fid).order('ano', { ascending: false })) ?? []).map((r: any): DecimoTerceiro => ({
+        id: r.id, funcionarioId: r.funcionario_id, ano: r.ano, parcela: r.parcela, valor: Number(r.valor), pagoEm: r.pago_em, observacao: r.observacao,
+      }))
+    },
+    async registrarDecimoTerceiro(d) {
+      ok(await sb.from('decimo_terceiro').insert({
+        funcionario_id: d.funcionarioId, ano: d.ano, parcela: d.parcela, valor: d.valor, pago_em: d.pagoEm, observacao: d.observacao?.trim() || null,
+      }))
+    },
+    async excluirDecimoTerceiro(id) {
+      ok(await sb.from('decimo_terceiro').delete().eq('id', id))
     },
     async alternarFolga(fid, data) {
       const existente = ok(await sb.from('folgas').select('id').eq('funcionario_id', fid).eq('data', data).maybeSingle())

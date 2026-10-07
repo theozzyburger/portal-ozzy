@@ -18,3 +18,11 @@ html, body, #root { height: 100%; }
 /* Rótulo no estilo do "BURGER" do logo: caixa alta, fino e espaçado. */
 .rotulo-marca { text-transform: uppercase; letter-spacing: 0.32em; font-weight: 400; }
 body { background: #f5f5f2; color: #1c1917; -webkit-tap-highlight-color: transparent; }
+
+/* Documento para imprimir (advertência, suspensão, folgas): na impressão, só ele aparece. */
+@media print {
+  body.imprimindo #root { display: none; }
+  body.imprimindo .folha-impressao { position: static !important; overflow: visible !important; background: white !important; }
+  body.imprimindo .nao-imprimir { display: none !important; }
+}
+.folha { font-family: 'Jost', system-ui, sans-serif; }

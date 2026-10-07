@@ -2,22 +2,24 @@ import { useCallback, useEffect, useState } from 'react'
 import { Avatar, Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import FormFuncionario from '../components/FormFuncionario'
 import { useApp } from '../lib/contexto'
-import { dataLonga, hoje } from '../lib/datas'
-import { possoAlterar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } from '../lib/permissoes'
+import { addDias, dataLonga, hoje } from '../lib/datas'
+import { possoAlterar, podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isentoDeRotinas } from '../lib/permissoes'
 import { ir } from '../lib/rota'
 import {
-  TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
+  NATUREZAS, TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
   type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
+import FeriasPessoa from './FeriasPessoa'
+import DocumentoOcorrencia, { temDocumento } from '../components/DocumentoOcorrencia'
 import { Contracheque } from './Salarios'
 import { dataPagamento } from '../lib/salarios'
 
-type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias' | 'salario'
+type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias' | 'ferias' | 'salario'
 
 const corOcorrencia: Record<TipoOcorrencia, 'vermelho' | 'ambar' | 'verde' | 'cinza'> = {
-  falta: 'vermelho', advertencia: 'vermelho', atraso: 'ambar', orientacao: 'cinza', elogio: 'verde', outro: 'cinza',
+  falta: 'vermelho', advertencia: 'vermelho', suspensao: 'vermelho', atraso: 'ambar', orientacao: 'cinza', elogio: 'verde', outro: 'cinza',
 }
 
 export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
@@ -27,6 +29,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [tipoInicial, setTipoInicial] = useState<TipoDocumento>('atestado')
   const [docs, setDocs] = useState<Documento[]>([])
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
+  const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
   // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
   const gestao = !!pessoa && possoAlterar(eu, pessoa)
@@ -155,6 +158,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             ['saude', 'Exames'],
             ['uniformes', 'Uniformes'],
             ['ocorrencias', 'Ocorrências'],
+            ...(podeGerenciar(eu.nivel) && pessoa.nivel !== 'proprietario' ? [['ferias', 'Férias e 13º']] : []),
             ...(souEu || gestao ? [['salario', 'Salário']] : []),
           ] as [AbaPerfil, string][]
         ).map(([a, nome]) => (
@@ -165,7 +169,9 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         ))}
       </div>
 
-      {aba === 'salario' ? (
+      {aba === 'ferias' ? (
+        <FeriasPessoa pessoa={pessoa} podeRegistrar={gestao} />
+      ) : aba === 'salario' ? (
         <MeusSalarios funcionarioId={funcionarioId} />
       ) : aba === 'saude' ? (
         <section className="space-y-3">
@@ -232,7 +238,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
                 setModal('documento')
               }}
             >
-              {souEu ? '+ Enviar atestado ou documento' : '+ Anexar documento'}
+              {souEu && !isentoDeRotinas(eu.nivel) ? '+ Enviar atestado ou documento' : '+ Anexar documento'}
             </Botao>
           )}
           {!verDocs ? (
@@ -271,8 +277,16 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
                   <Selo cor={corOcorrencia[o.tipo]}>{nomeTipoOcorrencia(o.tipo)}</Selo>
                   <span className="text-sm font-medium">{dataLonga(o.data)}</span>
                 </div>
-                <p className="mt-1.5 text-sm text-stone-700">{o.descricao}</p>
-                <div className="mt-1 text-xs text-stone-400">Registrado por {nomeDe(o.registradoPor)}</div>
+                {o.natureza && <div className="mt-1.5 text-sm font-medium">{o.natureza}{o.tipo === 'suspensao' && o.suspensaoDias ? ` · ${o.suspensaoDias} dia${o.suspensaoDias > 1 ? 's' : ''}` : ''}</div>}
+                <p className="mt-1 text-sm text-stone-700">{o.descricao}</p>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="text-xs text-stone-400">Registrado por {nomeDe(o.registradoPor)}</span>
+                  {gestao && temDocumento(o) && (
+                    <button onClick={() => setImprimir(o)} className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4">
+                      Imprimir documento
+                    </button>
+                  )}
+                </div>
               </Cartao>
             ))
           )}
@@ -296,13 +310,16 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         aberto={modal === 'ocorrencia'}
         funcionarioId={pessoa.id}
         aoFechar={() => setModal(null)}
-        aoSalvar={async () => {
+        aoSalvar={async (o) => {
           setModal(null)
           setAba('ocorrencias')
           await carregar()
           avisar('Ocorrência registrada')
+          // Advertência e suspensão já abrem o documento para imprimir e assinar.
+          if (temDocumento(o)) setImprimir(o)
         }}
       />
+      {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
       <Modal titulo="Desligar funcionário" aberto={modal === 'desligar'} aoFechar={() => setModal(null)}>
         <Desligar
           aoConfirmar={async (data) => {
@@ -470,19 +487,29 @@ function EnviarDocumento({
   )
 }
 
-function NovaOcorrencia({ aberto, funcionarioId, aoFechar, aoSalvar }: { aberto: boolean; funcionarioId: string; aoFechar: () => void; aoSalvar: () => void }) {
+function NovaOcorrencia({ aberto, funcionarioId, aoFechar, aoSalvar }: { aberto: boolean; funcionarioId: string; aoFechar: () => void; aoSalvar: (o: Ocorrencia) => void }) {
   const { store } = useApp()
   const [tipo, setTipo] = useState<TipoOcorrencia>('falta')
   const [data, setData] = useState(hoje())
   const [descricao, setDescricao] = useState('')
+  const [natureza, setNatureza] = useState('')
+  const [outra, setOutra] = useState('')
+  const [suspInicio, setSuspInicio] = useState(addDias(hoje(), 1))
+  const [suspDias, setSuspDias] = useState('1')
   const [erro, setErro] = useState('')
+  const disciplinar = tipo === 'advertencia' || tipo === 'suspensao'
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await store.registrarOcorrencia({ funcionarioId, tipo, data, descricao })
+      const o = await store.registrarOcorrencia({
+        funcionarioId, tipo, data, descricao,
+        natureza: disciplinar ? (natureza === 'outra' ? outra.trim() : natureza) : null,
+        suspensaoInicio: tipo === 'suspensao' ? suspInicio : null,
+        suspensaoDias: tipo === 'suspensao' ? Number(suspDias) : null,
+      })
       setDescricao('')
-      aoSalvar()
+      aoSalvar(o)
     } catch (err) {
       setErro((err as Error).message)
     }
@@ -505,11 +532,35 @@ function NovaOcorrencia({ aberto, funcionarioId, aoFechar, aoSalvar }: { aberto:
             <input className={estiloEntrada} type="date" value={data} onChange={(e) => setData(e.target.value)} />
           </Campo>
         </div>
+        {disciplinar && (
+          <Campo rotulo="Natureza" dica="Sai no documento impresso.">
+            <select className={estiloEntrada} value={natureza} onChange={(e) => setNatureza(e.target.value)} required>
+              <option value="">Escolha…</option>
+              {NATUREZAS.map((n) => <option key={n} value={n}>{n}</option>)}
+              <option value="outra">Outra…</option>
+            </select>
+          </Campo>
+        )}
+        {disciplinar && natureza === 'outra' && (
+          <Campo rotulo="Qual?">
+            <input className={estiloEntrada} value={outra} onChange={(e) => setOutra(e.target.value)} required />
+          </Campo>
+        )}
+        {tipo === 'suspensao' && (
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Suspensão a partir de">
+              <input className={estiloEntrada} type="date" value={suspInicio} onChange={(e) => setSuspInicio(e.target.value)} required />
+            </Campo>
+            <Campo rotulo="Dias">
+              <input className={estiloEntrada} type="number" min={1} max={30} value={suspDias} onChange={(e) => setSuspDias(e.target.value)} required />
+            </Campo>
+          </div>
+        )}
         <Campo rotulo="O que aconteceu">
           <textarea className={estiloEntrada} rows={4} value={descricao} onChange={(e) => setDescricao(e.target.value)} required />
         </Campo>
         {erro && <p className="text-sm text-red-600">{erro}</p>}
-        <Botao className="w-full">Salvar</Botao>
+        <Botao className="w-full">{disciplinar ? 'Salvar e gerar documento' : 'Salvar'}</Botao>
       </form>
     </Modal>
   )
