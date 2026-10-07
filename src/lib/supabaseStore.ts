@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -29,6 +29,7 @@ const paraSolicitacao = (r: any): SolicitacaoUniforme => ({
 })
 const paraPedidoUniforme = (r: any): PedidoUniforme => ({
   id: r.id, numero: r.numero, titulo: r.titulo, status: r.status, fornecedor: r.fornecedor, observacao: r.observacao, criadoEm: r.criado_em,
+  valorTotal: r.valor_total === null || r.valor_total === undefined ? null : Number(r.valor_total), fechadoEm: r.fechado_em ?? null, previsaoEntrega: r.previsao_entrega ?? null,
 })
 
 const paraDesligamento = (r: any): Desligamento => ({
@@ -224,15 +225,18 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async comunicados() {
       const linhas = ok(await sb.from('comunicados').select('*, comunicado_leituras(funcionario_id)').order('criado_em', { ascending: false })) ?? []
       return linhas.map((r: any): Comunicado => ({
-        id: r.id, titulo: r.titulo, corpo: r.corpo, unidadeId: r.unidade_id, autorId: r.autor_id, criadoEm: r.criado_em,
+        id: r.id, titulo: r.titulo, corpo: r.corpo, unidadeId: r.unidade_id, setores: r.setores ?? null, destinatarios: r.destinatarios ?? null, autorId: r.autor_id, criadoEm: r.criado_em,
         lidoPor: (r.comunicado_leituras ?? []).map((l: any) => l.funcionario_id),
       }))
     },
     async publicarComunicado(c) {
       const u = exigeEu()
-      const r = ok(await sb.from('comunicados').insert({ titulo: c.titulo, corpo: c.corpo, unidade_id: c.unidadeId, autor_id: u.id }).select().single())
+      const r = ok(await sb.from('comunicados').insert({
+        titulo: c.titulo, corpo: c.corpo, unidade_id: c.unidadeId, autor_id: u.id,
+        setores: c.setores?.length ? c.setores : null, destinatarios: c.destinatarios?.length ? c.destinatarios : null,
+      }).select().single())
       await sb.from('comunicado_leituras').insert({ comunicado_id: r.id, funcionario_id: u.id })
-      return { id: r.id, titulo: r.titulo, corpo: r.corpo, unidadeId: r.unidade_id, autorId: r.autor_id, criadoEm: r.criado_em, lidoPor: [u.id] }
+      return { id: r.id, titulo: r.titulo, corpo: r.corpo, unidadeId: r.unidade_id, setores: r.setores, destinatarios: r.destinatarios, autorId: r.autor_id, criadoEm: r.criado_em, lidoPor: [u.id] }
     },
     async marcarLido(id) {
       const u = exigeEu()
@@ -301,7 +305,10 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return (ok(await sb.from('uniforme_pedidos').select('*').order('criado_em', { ascending: false })) ?? []).map(paraPedidoUniforme)
     },
     async salvarPedidoUniforme(p) {
-      const linha = { titulo: p.titulo.trim(), status: p.status, fornecedor: texto(p.fornecedor), observacao: texto(p.observacao) }
+      const linha = {
+        titulo: p.titulo.trim(), status: p.status, fornecedor: texto(p.fornecedor), observacao: texto(p.observacao),
+        valor_total: p.valorTotal ?? null, fechado_em: p.fechadoEm || null, previsao_entrega: p.previsaoEntrega || null,
+      }
       return paraPedidoUniforme(p.id
         ? ok(await sb.from('uniforme_pedidos').update(linha).eq('id', p.id).select().single())
         : ok(await sb.from('uniforme_pedidos').insert(linha).select().single()))
@@ -398,6 +405,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         funcionario_id: d.funcionarioId, data: d.data, tipo: d.tipo, observacao: d.observacao?.trim() || null,
       }).select().single()))
     },
+    async excluirDesligamento(id) {
+      ok(await sb.from('desligamentos').delete().eq('id', id))
+    },
     async atualizarDesligamento(id, m) {
       const linha: Record<string, unknown> = {}
       if (m.itens) linha.itens = m.itens
@@ -430,6 +440,31 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async salariosDe(funcionarioId) {
       return (ok(await sb.from('salarios').select('*').eq('funcionario_id', funcionarioId).order('mes', { ascending: false })) ?? []).map(paraSalario)
+    },
+    async enviarHolerite(s, pdf) {
+      const caminho = `${s.funcionarioId}/${s.mes}-${s.tipo}.pdf`
+      ok(await sb.storage.from('holerites').upload(caminho, pdf, { contentType: 'application/pdf', upsert: true }))
+      ok(await sb.from('salarios').update({ holerite: caminho }).eq('funcionario_id', s.funcionarioId).eq('mes', s.mes).eq('tipo', s.tipo))
+    },
+    async abrirHolerite(s) {
+      if (!s.holerite) return null
+      const { data } = await sb.storage.from('holerites').createSignedUrl(s.holerite, 300)
+      return data?.signedUrl ?? null
+    },
+    async vinculosAnteriores(fid) {
+      return (ok(await sb.from('vinculos_anteriores').select('*').eq('funcionario_id', fid).order('admissao', { ascending: false })) ?? []).map((r: any): VinculoAnterior => ({
+        id: r.id, funcionarioId: r.funcionario_id, admissao: r.admissao, desligamento: r.desligamento, tipoDesligamento: r.tipo_desligamento, cargo: r.cargo, observacao: r.observacao,
+      }))
+    },
+    async readmitir(f, novaAdmissao, tipo) {
+      if (f.dataDesligamento) {
+        ok(await sb.from('vinculos_anteriores').insert({
+          funcionario_id: f.id, admissao: f.dataAdmissao, desligamento: f.dataDesligamento, tipo_desligamento: tipo, cargo: f.cargo,
+        }))
+      }
+      ok(await sb.from('funcionarios').update({
+        status: 'ativo', data_admissao: novaAdmissao, data_desligamento: null, experiencia_dias1: null, experiencia_dias2: null,
+      }).eq('id', f.id))
     },
     async salvarSalario(s) {
       ok(await sb.from('salarios').upsert({
@@ -598,5 +633,5 @@ const paraDiaria = (r: any): DiariaFreela => ({
 const paraSalario = (r: any): Salario => ({
   funcionarioId: r.funcionario_id, mes: r.mes, tipo: r.tipo ?? 'salario', descAdiantamento: Number(r.desc_adiantamento ?? 0), salario: Number(r.salario), caixinha: Number(r.caixinha), bonusCaixinha: Number(r.bonus_caixinha),
   bonusConclui: Number(r.bonus_conclui), descFaltas: Number(r.desc_faltas), descAtrasos: Number(r.desc_atrasos), inss: Number(r.inss),
-  descVt: Number(r.desc_vt), observacao: r.observacao, liberado: r.liberado,
+  descVt: Number(r.desc_vt), observacao: r.observacao, liberado: r.liberado, holerite: r.holerite ?? null,
 })

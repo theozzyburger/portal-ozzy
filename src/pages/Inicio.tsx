@@ -384,7 +384,7 @@ function AlertasDp({ docs }: { docs: Documento[] }) {
   const { store, equipe, nomeDe } = useApp()
   const [desligamentos, setDesligamentos] = useState<Desligamento[]>([])
   useEffect(() => {
-    store.desligamentos().then((ds) => setDesligamentos(ds.filter((d) => !d.concluido))).catch(() => setDesligamentos([]))
+    store.desligamentos().then((ds) => setDesligamentos(ds.filter((d) => !d.concluido && equipe.find((f) => f.id === d.funcionarioId)?.status === 'inativo'))).catch(() => setDesligamentos([]))
   }, [store, equipe])
   const exp = alertasExperiencia(equipe, hoje())
   const afast = alertasAfastamento(equipe, docs, hoje())

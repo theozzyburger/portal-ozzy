@@ -9,6 +9,8 @@ import {
 } from '../lib/salarios'
 import { apelidoUnidade, type Funcionario, type Salario } from '../lib/types'
 import { reais } from './Fichas'
+import ImportarHolerites from '../components/ImportarHolerites'
+import { lerHolerites, aplicarValores } from '../lib/holerite'
 
 const num = (n: number) => (n ? n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')
 const lerValor = (t: string) => Math.max(0, Number(t.replace(/[^\d,]/g, '').replace(',', '.')) || 0)
@@ -22,6 +24,7 @@ export default function Salarios() {
   const [loja, setLoja] = useState('')
   const [editando, setEditando] = useState<Funcionario | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [importando, setImportando] = useState<File[] | null>(null)
 
   const carregar = () => store.salarios(mes).then(setTodas)
   useEffect(() => {
@@ -147,6 +150,20 @@ export default function Salarios() {
           {unidades.map((u) => <option key={u.id} value={u.id}>{apelidoUnidade(u.nome)}</option>)}
         </select>
         {tipo === 'salario' && <Botao variante="secundario" onClick={puxarCaixinha} disabled={ocupado}>Puxar caixinha do mês</Botao>}
+        <label className="inline-flex cursor-pointer items-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold ring-1 ring-stone-300 hover:ring-carvao">
+          Importar holerites (PDF)
+          <input
+            type="file"
+            accept="application/pdf"
+            multiple
+            className="sr-only"
+            onChange={(e) => {
+              const fs = [...(e.target.files ?? [])]
+              e.target.value = ''
+              if (fs.length) setImportando(fs)
+            }}
+          />
+        </label>
         <Botao variante="secundario" onClick={arquivoBanco} disabled={!lancadas.length}>Arquivo do banco</Botao>
         <Botao variante="secundario" onClick={planilhaCompleta} disabled={!lancadas.length}>Planilha completa</Botao>
         <Botao variante={liberado ? 'perigo' : 'primario'} onClick={alternarLiberacao} disabled={!linhas.length}>
@@ -172,7 +189,7 @@ export default function Salarios() {
                   </div>
                   {l ? (
                     <div className="text-right">
-                      <div className="font-bold tabular-nums">{reais(liquido(l))}</div>
+                      <div className="font-bold tabular-nums">{l.holerite && <span className="mr-1 text-xs font-semibold text-sky-700" title="Holerite anexado">PDF</span>}{reais(liquido(l))}</div>
                       <div className="text-xs text-stone-500 tabular-nums">−{reais(totalDescontos(l))}</div>
                     </div>
                   ) : (
@@ -189,13 +206,27 @@ export default function Salarios() {
         O arquivo do banco traz nome, chave Pix e valor de cada pessoa (CSV, abre no Excel). Confira os valores antes de subir no banco.
       </p>
 
+      {importando && (
+        <ImportarHolerites
+          arquivos={importando}
+          pessoas={pessoas}
+          lancamento={(p) => doMes(p.id) ?? novo(p)}
+          aoFechar={() => setImportando(null)}
+          aoConcluir={async (n) => {
+            setImportando(null)
+            await carregar()
+            avisar(`${n} holerite${n === 1 ? '' : 's'} anexado${n === 1 ? '' : 's'}`)
+          }}
+        />
+      )}
       {editando && (
         <FormSalario
           pessoa={editando}
           atual={doMes(editando.id) ?? novo(editando)}
           aoFechar={() => setEditando(null)}
-          aoSalvar={async (s) => {
+          aoSalvar={async (s, pdf) => {
             await store.salvarSalario(s)
+            if (pdf) await store.enviarHolerite(s, pdf)
             await carregar()
             avisar('Salário salvo')
             setEditando(null)
@@ -206,7 +237,10 @@ export default function Salarios() {
   )
 }
 
-function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionario; atual: Salario; aoFechar: () => void; aoSalvar: (s: Salario) => Promise<void> }) {
+function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionario; atual: Salario; aoFechar: () => void; aoSalvar: (s: Salario, pdf?: Blob) => Promise<void> }) {
+  const { store, equipe, avisar } = useApp()
+  const [pdf, setPdf] = useState<File | null>(null)
+  const [lendo, setLendo] = useState(false)
   const creditos = creditosDe(atual.tipo)
   const descontos = descontosDe(atual.tipo)
   const [v, setV] = useState(() => Object.fromEntries([...creditos, ...descontos].map((c) => [c.campo, num(atual[c.campo])])) as Record<CampoValor, string>)
@@ -234,7 +268,7 @@ function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionari
         onSubmit={async (e) => {
           e.preventDefault()
           setSalvando(true)
-          try { await aoSalvar(s) } finally { setSalvando(false) }
+          try { await aoSalvar(s, pdf ?? undefined) } finally { setSalvando(false) }
         }}
       >
         <div>
@@ -251,6 +285,45 @@ function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionari
             </div>
           </div>
         )}
+        <div className="space-y-2 rounded-xl bg-stone-50 p-3 ring-1 ring-stone-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold">Holerite (PDF)</span>
+            {atual.holerite && (
+              <Botao type="button" variante="secundario" onClick={async () => {
+                const url = await store.abrirHolerite(atual)
+                if (url) window.open(url, '_blank')
+                else avisar('Não deu para abrir o holerite')
+              }}>Ver o anexado</Botao>
+            )}
+          </div>
+          <input
+            type="file"
+            accept="application/pdf"
+            aria-label="Anexar holerite"
+            className="block w-full text-sm"
+            onChange={async (e) => {
+              const f = e.target.files?.[0] ?? null
+              setPdf(f)
+              if (!f) return
+              setLendo(true)
+              try {
+                // Preenche os campos com o que achar no PDF; dá para corrigir antes de salvar.
+                const paginas = await lerHolerites(f, equipe)
+                const pagina = paginas.find((p) => p.funcionarioId === pessoa.id) ?? paginas[0]
+                if (pagina) {
+                  const novo = aplicarValores(s, pagina.valores)
+                  setV(Object.fromEntries([...creditos, ...descontos].map((c) => [c.campo, num(novo[c.campo])])) as Record<CampoValor, string>)
+                  avisar(Object.keys(pagina.valores).length ? 'Valores preenchidos pelo holerite: confira' : 'PDF anexado (não reconheci valores)')
+                }
+              } catch {
+                avisar('Não consegui ler esse PDF, mas ele será anexado')
+              } finally {
+                setLendo(false)
+              }
+            }}
+          />
+          {lendo && <p className="text-xs text-stone-500">Lendo o holerite…</p>}
+        </div>
         <Campo rotulo="Observação (a pessoa vê)">
           <input className={estiloEntrada} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex.: adiantamento descontado" />
         </Campo>
@@ -266,6 +339,7 @@ function FormSalario({ pessoa, atual, aoFechar, aoSalvar }: { pessoa: Funcionari
 
 // Detalhe de um mês, como a pessoa vê no perfil.
 export function Contracheque({ s }: { s: Salario }) {
+  const { store, avisar } = useApp()
   const linha = (nome: string, valor: number, sinal: '+' | '−') =>
     valor > 0 && (
       <div key={nome} className="flex justify-between py-1 text-sm">
@@ -295,6 +369,15 @@ export function Contracheque({ s }: { s: Salario }) {
         <span className="tabular-nums">{reais(liquido(s))}</span>
       </div>
       {s.observacao && <p className="mt-2 text-xs text-stone-500">{s.observacao}</p>}
+      {s.holerite && (
+        <Botao variante="secundario" className="mt-3 w-full" onClick={async () => {
+          const url = await store.abrirHolerite(s)
+          if (url) window.open(url, '_blank')
+          else avisar('Não deu para abrir o holerite agora')
+        }}>
+          Abrir holerite (PDF)
+        </Botao>
+      )}
     </div>
   )
 }

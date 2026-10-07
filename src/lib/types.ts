@@ -99,6 +99,9 @@ export interface Comunicado {
   corpo: string
   // null = todas as unidades
   unidadeId: string | null
+  // Público: setores (null = todos) ou pessoas escolhidas (quando houver, só elas).
+  setores?: Setor[] | null
+  destinatarios?: string[] | null
   autorId: string
   criadoEm: string
   lidoPor: string[]
@@ -424,6 +427,19 @@ export interface Salario {
   descVt: number
   observacao: string | null
   liberado: boolean
+  // PDF do holerite enviado pela contabilidade (caminho no armazenamento).
+  holerite?: string | null
+}
+
+// Período anterior de quem saiu e voltou (readmissão).
+export interface VinculoAnterior {
+  id: string
+  funcionarioId: string
+  admissao: string
+  desligamento: string
+  tipoDesligamento: string | null
+  cargo: string | null
+  observacao: string | null
 }
 
 // Férias gozadas, ligadas ao período aquisitivo (que começa no aniversário da admissão).
@@ -566,6 +582,10 @@ export interface PedidoUniforme {
   status: StatusPedidoUniforme
   fornecedor: string | null
   observacao: string | null
+  // Valor combinado com o fornecedor, quando o pedido foi fechado e quando deve chegar.
+  valorTotal?: number | null
+  fechadoEm?: string | null
+  previsaoEntrega?: string | null
   criadoEm: string
 }
 export interface ItemPedidoUniforme {

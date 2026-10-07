@@ -1,6 +1,6 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -247,7 +247,7 @@ const ocorrencias: Ocorrencia[] = ([
 }))
 
 const comunicados: Comunicado[] = [
-  { id: 'c1', titulo: 'Bem-vindos ao Portal The Ozzy', corpo: 'A partir de agora, comunicados, folgas e documentos ficam aqui. Atestados devem ser enviados pelo portal no mesmo dia, com foto legível.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -2) + 'T12:00:00Z', lidoPor: ['p-maria-costa'] },
+  { id: 'c1', titulo: 'Bem-vindos ao Portal do Time The Ozzy', corpo: 'A partir de agora, comunicados, folgas e documentos ficam aqui. Atestados devem ser enviados pelo portal no mesmo dia, com foto legível.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -2) + 'T12:00:00Z', lidoPor: ['p-maria-costa'] },
   { id: 'c2', titulo: 'Reunião de alinhamento de regras', corpo: 'Gerente e supervisoras: reunião na quinta às 15h para revisar regras e processos. Tragam as dúvidas da equipe.', unidadeId: null, autorId: 'f1', criadoEm: addDias(hoje(), -1) + 'T09:30:00Z', lidoPor: [] },
   { id: 'c3', titulo: 'Limpeza da chapa no fechamento', corpo: 'A partir de hoje a chapa é limpa no fechamento com o produto indicado no POP. A supervisora confere antes de sair.', unidadeId: 'burger-va', autorId: 'p-arlene-santos', criadoEm: addDias(hoje(), -4) + 'T16:00:00Z', lidoPor: ['p-dora-ramos'] },
 ]
@@ -307,6 +307,9 @@ const solicitacoesDemo: SolicitacaoUniforme[] = [
   { id: 'su3', funcionarioId: 'p-cibeli-costa', itens: ['Calça'], motivo: 'Calça ficou pequena.', foto: null, status: 'atendida', resposta: 'Entregue calça 40.', respondidoPor: 'p-maria-costa', respondidoEm: addDias(hoje(), -20) + 'T10:00:00Z', criadoEm: addDias(hoje(), -25) + 'T10:00:00Z' },
 ]
 const pedidosUniformeDemo: PedidoUniforme[] = []
+const vinculosDemo: VinculoAnterior[] = [
+  { id: 'va1', funcionarioId: 'p-dora-ramos', admissao: '2023-02-01', desligamento: '2023-11-20', tipoDesligamento: 'pedido', cargo: 'Atendente', observacao: null },
+]
 const itensPedidoDemo: ItemPedidoUniforme[] = []
 
 // Equipamentos e preventiva de EXEMPLO (a lista real o Heitor vai passar e a manutenção preenche no portal).
@@ -511,7 +514,11 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async comunicados() {
       const u = exigeEu()
-      const visiveis = comunicados.filter((c) => c.unidadeId === null || c.unidadeId === u.unidadeId || podeGerenciar(u.nivel))
+      const visiveis = comunicados.filter((c) =>
+        podeGerenciar(u.nivel) || c.autorId === u.id ||
+        (c.destinatarios?.length
+          ? c.destinatarios.includes(u.id)
+          : (c.unidadeId === null || c.unidadeId === u.unidadeId) && (!c.setores?.length || (!!u.setor && c.setores.includes(u.setor)))))
       return espera([...visiveis].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)))
     },
     async publicarComunicado(c) {
@@ -583,6 +590,10 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       desligamentosDemo.push(novo)
       return espera({ ...novo })
     },
+    async excluirDesligamento(id) {
+      exigeGestao()
+      tira(desligamentosDemo, id)
+    },
     async atualizarDesligamento(id, m) {
       const u = exigeGestao()
       const d = desligamentosDemo.find((x) => x.id === id)
@@ -610,6 +621,27 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const gestao = eu && podeGerenciar(eu.nivel)
       if (!gestao && eu?.id !== funcionarioId) return espera([])
       return espera(salariosDemo.filter((s) => s.funcionarioId === funcionarioId && (gestao || s.liberado)).sort((a, b) => b.mes.localeCompare(a.mes)).map((s) => ({ ...s })))
+    },
+    async enviarHolerite(s, pdf) {
+      exigeGestao()
+      const x = salariosDemo.find((y) => y.funcionarioId === s.funcionarioId && y.mes === s.mes && y.tipo === s.tipo)
+      const caminho = `${s.funcionarioId}/${s.mes}-${s.tipo}.pdf`
+      arquivosDemo.set('holerite:' + caminho, URL.createObjectURL(pdf))
+      if (x) x.holerite = caminho
+    },
+    async abrirHolerite(s) {
+      return s.holerite ? arquivosDemo.get('holerite:' + s.holerite) ?? null : null
+    },
+    async vinculosAnteriores(fid) {
+      exigeGestao()
+      return espera(vinculosDemo.filter((v) => v.funcionarioId === fid).sort((a, b) => b.admissao.localeCompare(a.admissao)).map((v) => ({ ...v })))
+    },
+    async readmitir(f, novaAdmissao, tipo) {
+      const u = exigeGestao()
+      const p = porId(f.id)
+      if (!possoAlterar(u, p)) throw new Error('Você não pode alterar quem está acima de você')
+      if (p.dataDesligamento) vinculosDemo.push({ id: novoId('va'), funcionarioId: p.id, admissao: p.dataAdmissao, desligamento: p.dataDesligamento, tipoDesligamento: tipo, cargo: p.cargo, observacao: null })
+      Object.assign(p, { status: 'ativo', dataAdmissao: novaAdmissao, dataDesligamento: null, experienciaDias1: null, experienciaDias2: null })
     },
     async salvarSalario(s) {
       exigeGestao()

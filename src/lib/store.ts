@@ -1,4 +1,4 @@
-import type { SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -46,6 +46,8 @@ export interface NovoComunicado {
   titulo: string
   corpo: string
   unidadeId: string | null
+  setores?: Setor[] | null
+  destinatarios?: string[] | null
 }
 
 // Tudo que as telas precisam. Há duas implementações: demonstração (dados de exemplo
@@ -82,7 +84,7 @@ export interface Store {
   fotoSolicitacao(s: SolicitacaoUniforme): Promise<string | null>
   // Pedidos de compra de uniformes por leva (só a gestão).
   pedidosUniforme(): Promise<PedidoUniforme[]>
-  salvarPedidoUniforme(p: Pick<PedidoUniforme, 'titulo' | 'status' | 'fornecedor' | 'observacao'> & { id?: string }): Promise<PedidoUniforme>
+  salvarPedidoUniforme(p: Pick<PedidoUniforme, 'titulo' | 'status' | 'fornecedor' | 'observacao' | 'valorTotal' | 'fechadoEm' | 'previsaoEntrega'> & { id?: string }): Promise<PedidoUniforme>
   excluirPedidoUniforme(id: string): Promise<void>
   itensPedidoUniforme(pedidoId: string): Promise<ItemPedidoUniforme[]>
   // Troca todas as peças de uma pessoa (ou avulsas, funcionarioId null) dentro do pedido.
@@ -114,6 +116,7 @@ export interface Store {
   // Checklist de desligamento (só a gestão). Sem funcionarioId: todos os que eu vejo.
   desligamentos(funcionarioId?: string): Promise<Desligamento[]>
   abrirDesligamento(d: Pick<Desligamento, 'funcionarioId' | 'data' | 'tipo' | 'observacao'>): Promise<Desligamento>
+  excluirDesligamento(id: string): Promise<void>
   atualizarDesligamento(id: string, mudanca: Partial<Pick<Desligamento, 'itens' | 'concluido' | 'observacao' | 'data' | 'tipo'>>): Promise<void>
 
   // Painel (Proprietário e Gerente): pedidos e faturamento por dia/loja/canal, e notas nas plataformas.
@@ -129,6 +132,13 @@ export interface Store {
   salariosDe(funcionarioId: string): Promise<Salario[]>
   salvarSalario(s: Salario): Promise<void>
   liberarSalarios(mes: string, tipo: TipoPagamento, liberado: boolean): Promise<void>
+  // Holerite em PDF de um pagamento (a gestão envia; a pessoa abre o seu quando liberado).
+  enviarHolerite(s: Salario, pdf: Blob): Promise<void>
+  abrirHolerite(s: Salario): Promise<string | null>
+
+  // Readmissão: guarda o período anterior e reativa com a nova data de admissão.
+  vinculosAnteriores(funcionarioId: string): Promise<VinculoAnterior[]>
+  readmitir(f: Funcionario, novaAdmissao: string, tipoDesligamento: string | null): Promise<void>
 
   // Turnos-padrão (horários). Todos veem; a gestão coloca cada pessoa no seu turno.
   turnos(): Promise<Turno[]>

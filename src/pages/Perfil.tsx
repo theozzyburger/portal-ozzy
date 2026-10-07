@@ -7,7 +7,7 @@ import { possoAlterar, podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isento
 import { ir } from '../lib/rota'
 import {
   NATUREZAS, TIPOS_DESLIGAMENTO, TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
-  type Desligamento, type TipoDesligamento, type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
+  type Desligamento, type TipoDesligamento, type VinculoAnterior, type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
@@ -37,6 +37,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [docs, setDocs] = useState<Documento[]>([])
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
   const [desligamentos, setDesligamentos] = useState<Desligamento[]>([])
+  const [vinculos, setVinculos] = useState<VinculoAnterior[]>([])
+  const [readmitir, setReadmitir] = useState(false)
   const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
   const [declaracao, setDeclaracao] = useState(false)
   const [termos, setTermos] = useState(false)
@@ -48,7 +50,10 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const carregar = useCallback(async () => {
     setDocs(await store.documentos(funcionarioId))
     setOcorrencias(await store.ocorrencias(funcionarioId))
-    if (podeGerenciar(eu.nivel)) setDesligamentos(await store.desligamentos(funcionarioId).catch(() => []))
+    if (podeGerenciar(eu.nivel)) {
+      setDesligamentos(await store.desligamentos(funcionarioId).catch(() => []))
+      setVinculos(await store.vinculosAnteriores(funcionarioId).catch(() => []))
+    }
   }, [store, funcionarioId, eu.nivel])
   useEffect(() => {
     carregar()
@@ -68,13 +73,9 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   }
 
   const exp = pessoa.status === 'ativo' ? experienciaDe(pessoa, hoje()) : null
-  const desligamento = desligamentos[0]
+  // Só o desligamento do período atual (quem foi readmitido não carrega o checklist antigo).
+  const desligamento = desligamentos.find((d) => d.data >= pessoa.dataAdmissao)
 
-  const reativar = async () => {
-    await store.salvarFuncionario({ ...pessoa, status: 'ativo', dataDesligamento: null })
-    await recarregarEquipe()
-    avisar('Funcionário reativado')
-  }
 
   return (
     <div className="space-y-5">
@@ -191,8 +192,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
                 Desligar
               </Botao>
             ) : pessoa.status === 'inativo' ? (
-              <Botao variante="secundario" onClick={reativar}>
-                Reativar
+              <Botao variante="secundario" onClick={() => setReadmitir(true)}>
+                Reativar / readmitir
               </Botao>
             ) : null}
           </div>
@@ -202,6 +203,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
       {podeGerenciar(eu.nivel) && desligamento && (
         <ChecklistDesligamento d={desligamento} pessoa={pessoa} podeMarcar={gestao} aoMudar={carregar} aoTermos={() => setTermos(true)} />
       )}
+      {podeGerenciar(eu.nivel) && vinculos.length > 0 && <HistoricoVinculos vinculos={vinculos} pessoa={pessoa} />}
       {gestao && !desligamento && pessoa.status === 'inativo' && pessoa.dataDesligamento && (
         <button
           onClick={async () => {
@@ -385,6 +387,29 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
       {termos && <TermosGravidez pessoa={pessoa} aoFechar={() => setTermos(false)} />}
       {declaracao && <DeclaracaoVinculo pessoa={pessoa} aoFechar={() => setDeclaracao(false)} />}
       {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
+      {readmitir && (
+        <Readmitir
+          pessoa={pessoa}
+          aoFechar={() => setReadmitir(false)}
+          aoConfirmar={async (modo, data) => {
+            try {
+              if (modo === 'engano') {
+                // Desligamento lançado por engano: volta como estava e o checklist some.
+                if (desligamento) await store.excluirDesligamento(desligamento.id)
+                await store.salvarFuncionario({ ...pessoa, status: 'ativo', dataDesligamento: null })
+              } else {
+                await store.readmitir(pessoa, data, desligamento?.tipo ?? null)
+              }
+              await recarregarEquipe()
+              await carregar()
+              setReadmitir(false)
+              avisar(modo === 'engano' ? 'Desligamento desfeito' : 'Readmitido! O período anterior ficou no histórico.')
+            } catch (e) {
+              avisar((e as Error).message)
+            }
+          }}
+        />
+      )}
       <Modal titulo="Desligar funcionário" aberto={modal === 'desligar'} aoFechar={() => setModal(null)}>
         <Desligar
           aoConfirmar={async (data, tipo) => {
@@ -699,4 +724,65 @@ function MeusSalarios({ funcionarioId }: { funcionarioId: string }) {
   if (!lista.length) return <Vazio>Nenhum salário liberado ainda.</Vazio>
   const ordenada = [...lista].sort((a, b) => dataPagamento(b).localeCompare(dataPagamento(a)))
   return <section className="space-y-3">{ordenada.map((s) => <Contracheque key={s.mes + s.tipo} s={s} />)}</section>
+}
+
+function Readmitir({ pessoa, aoFechar, aoConfirmar }: { pessoa: Funcionario; aoFechar: () => void; aoConfirmar: (modo: 'volta' | 'engano', data: string) => Promise<void> }) {
+  const [modo, setModo] = useState<'volta' | 'engano'>('volta')
+  const [data, setData] = useState(hoje())
+  const [salvando, setSalvando] = useState(false)
+  const opcoes = [
+    ['volta', 'Voltou a trabalhar (readmissão)', 'O período anterior fica guardado no histórico e começa um novo, com a nova data de admissão.'],
+    ['engano', 'O desligamento foi um engano', 'Desfaz o desligamento: mantém a admissão original e apaga o checklist.'],
+  ] as const
+  return (
+    <Modal titulo={`Reativar ${pessoa.nome.split(' ')[0]}`} aberto aoFechar={aoFechar}>
+      <div className="space-y-4">
+        {opcoes.map(([valor, titulo, dica]) => (
+          <label key={valor} className={`block cursor-pointer rounded-xl p-3 ring-1 ${modo === valor ? 'bg-carvao text-white ring-carvao' : 'ring-stone-300'}`}>
+            <input type="radio" name="modo-reativar" className="sr-only" checked={modo === valor} onChange={() => setModo(valor)} />
+            <span className="block font-semibold">{titulo}</span>
+            <span className={`block text-xs ${modo === valor ? 'text-stone-300' : 'text-stone-500'}`}>{dica}</span>
+          </label>
+        ))}
+        {modo === 'volta' && (
+          <Campo rotulo="Nova data de admissão">
+            <input className={estiloEntrada} type="date" value={data} onChange={(e) => setData(e.target.value)} />
+          </Campo>
+        )}
+        {modo === 'volta' && pessoa.dataDesligamento && (
+          <p className="text-sm text-stone-600">
+            Vai para o histórico: de {dataLonga(pessoa.dataAdmissao)} a {dataLonga(pessoa.dataDesligamento)}.
+          </p>
+        )}
+        <Botao className="w-full" disabled={salvando || (modo === 'volta' && !data)} onClick={async () => { setSalvando(true); await aoConfirmar(modo, data); setSalvando(false) }}>
+          {modo === 'volta' ? 'Readmitir' : 'Desfazer desligamento'}
+        </Botao>
+      </div>
+    </Modal>
+  )
+}
+
+function HistoricoVinculos({ vinculos, pessoa }: { vinculos: VinculoAnterior[]; pessoa: Funcionario }) {
+  const nomeTipo = (t: string | null) => TIPOS_DESLIGAMENTO.find((x) => x.valor === t)?.nome ?? 'Desligamento'
+  return (
+    <Cartao>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold">Histórico na empresa</h2>
+        <Selo cor="azul">{vinculos.length + 1}ª passagem</Selo>
+      </div>
+      <ol className="space-y-2 border-l-2 border-stone-200 pl-4 text-sm">
+        <li>
+          <b>Atual:</b> desde {dataLonga(pessoa.dataAdmissao)}
+          {pessoa.dataDesligamento && ` até ${dataLonga(pessoa.dataDesligamento)}`} · {pessoa.cargo}
+        </li>
+        {vinculos.map((v) => (
+          <li key={v.id}>
+            {dataLonga(v.admissao)} a {dataLonga(v.desligamento)}
+            {v.cargo && ` · ${v.cargo}`}
+            <span className="block text-xs text-stone-500">{nomeTipo(v.tipoDesligamento)}</span>
+          </li>
+        ))}
+      </ol>
+    </Cartao>
+  )
 }

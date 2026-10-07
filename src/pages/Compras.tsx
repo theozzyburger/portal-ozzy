@@ -169,6 +169,19 @@ function Responder({ s, aoFechar, aoSalvar }: { s: SolicitacaoUniforme; aoFechar
 
 // ---------- Pedidos de compra por leva ----------
 
+const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+// Uma linha com valor, fechamento e entrega (avisa quando a previsão já passou e não chegou).
+function resumoPedido(p: PedidoUniforme) {
+  const partes = [`Criado em ${dataLonga(p.criadoEm.slice(0, 10))}`]
+  if (p.fornecedor) partes.push(p.fornecedor)
+  if (p.valorTotal != null) partes.push(reais(p.valorTotal))
+  if (p.fechadoEm) partes.push(`fechado em ${dataLonga(p.fechadoEm)}`)
+  if (p.previsaoEntrega && p.status !== 'recebido')
+    partes.push(p.previsaoEntrega < hoje() ? `entrega atrasada (previsão ${dataLonga(p.previsaoEntrega)})` : `entrega prevista ${dataLonga(p.previsaoEntrega)}`)
+  return partes.join(' · ')
+}
+
 function Pedidos() {
   const { store, avisar } = useApp()
   const [pedidos, setPedidos] = useState<PedidoUniforme[] | null>(null)
@@ -195,8 +208,7 @@ function Pedidos() {
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold">#{p.numero} · {p.titulo}</span>
                   <span className="block text-xs text-stone-500">
-                    Criado em {dataLonga(p.criadoEm.slice(0, 10))}
-                    {p.fornecedor && ` · ${p.fornecedor}`}
+                    {resumoPedido(p)}
                   </span>
                 </span>
                 <Selo cor={SELO_PEDIDO[p.status]}>{nomeStatusPedido(p.status)}</Selo>
@@ -228,11 +240,21 @@ function DadosPedido({ pedido, aoFechar, aoSalvar }: { pedido?: PedidoUniforme; 
   const [status, setStatus] = useState<StatusPedidoUniforme>(pedido?.status ?? 'rascunho')
   const [fornecedor, setFornecedor] = useState(pedido?.fornecedor ?? '')
   const [observacao, setObservacao] = useState(pedido?.observacao ?? '')
+  const [valorTotal, setValorTotal] = useState(pedido?.valorTotal != null ? String(pedido.valorTotal).replace('.', ',') : '')
+  const [fechadoEm, setFechadoEm] = useState(pedido?.fechadoEm ?? '')
+  const [previsao, setPrevisao] = useState(pedido?.previsaoEntrega ?? '')
   const [erro, setErro] = useState('')
+  // Ao marcar "Pedido feito", a data de fechamento já vem com hoje.
+  const mudarStatus = (s: StatusPedidoUniforme) => {
+    setStatus(s)
+    if ((s === 'pedido' || s === 'recebido') && !fechadoEm) setFechadoEm(hoje())
+  }
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
+    const valor = valorTotal.trim() ? Number(valorTotal.replace(/\./g, '').replace(',', '.')) : null
+    if (valor !== null && !(valor >= 0)) return setErro('Valor total inválido.')
     try {
-      aoSalvar(await store.salvarPedidoUniforme({ id: pedido?.id, titulo, status, fornecedor, observacao }))
+      aoSalvar(await store.salvarPedidoUniforme({ id: pedido?.id, titulo, status, fornecedor, observacao, valorTotal: valor, fechadoEm: fechadoEm || null, previsaoEntrega: previsao || null }))
     } catch (err) {
       setErro((err as Error).message)
     }
@@ -245,12 +267,23 @@ function DadosPedido({ pedido, aoFechar, aoSalvar }: { pedido?: PedidoUniforme; 
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo="Situação">
-            <select className={estiloEntrada} value={status} onChange={(e) => setStatus(e.target.value as StatusPedidoUniforme)}>
+            <select className={estiloEntrada} value={status} onChange={(e) => mudarStatus(e.target.value as StatusPedidoUniforme)}>
               {STATUS_PEDIDO_UNIFORME.map((s) => <option key={s.valor} value={s.valor}>{s.nome}</option>)}
             </select>
           </Campo>
           <Campo rotulo="Fornecedor">
             <input className={estiloEntrada} value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
+          </Campo>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Campo rotulo="Valor total (R$)">
+            <input className={estiloEntrada} inputMode="decimal" value={valorTotal} onChange={(e) => setValorTotal(e.target.value)} placeholder="0,00" />
+          </Campo>
+          <Campo rotulo="Fechado em">
+            <input className={estiloEntrada} type="date" value={fechadoEm} onChange={(e) => setFechadoEm(e.target.value)} />
+          </Campo>
+          <Campo rotulo="Previsão de entrega">
+            <input className={estiloEntrada} type="date" value={previsao} onChange={(e) => setPrevisao(e.target.value)} />
           </Campo>
         </div>
         <Campo rotulo="Observação (sai no relatório)">
@@ -311,8 +344,8 @@ function DetalhePedido({ pedido, aoVoltar, aoMudar }: { pedido: PedidoUniforme; 
             <h2 className="text-lg font-bold">#{pedido.numero} · {pedido.titulo}</h2>
             <p className="text-sm text-stone-500">
               {pessoas.length} pessoa{pessoas.length === 1 ? '' : 's'} · {total} peça{total === 1 ? '' : 's'}
-              {pedido.fornecedor && ` · ${pedido.fornecedor}`}
             </p>
+            <p className="text-sm text-stone-500">{resumoPedido(pedido)}</p>
           </div>
           <Selo cor={SELO_PEDIDO[pedido.status]}>{nomeStatusPedido(pedido.status)}</Selo>
         </div>
@@ -495,10 +528,17 @@ function Relatorio({ pedido, itens, pessoas, loja, aoFechar }: {
         <div>
           <h1 className="text-lg font-bold">Pedido de uniformes · {pedido.titulo}</h1>
           <p className="text-xs">Pedido nº {pedido.numero} · emitido em {dataLonga(hoje())}{pedido.fornecedor && ` · ${pedido.fornecedor}`}</p>
+          {(pedido.fechadoEm || pedido.previsaoEntrega) && (
+            <p className="text-xs">
+              {pedido.fechadoEm && `Fechado em ${dataLonga(pedido.fechadoEm)}`}
+              {pedido.fechadoEm && pedido.previsaoEntrega && ' · '}
+              {pedido.previsaoEntrega && `Entrega prevista para ${dataLonga(pedido.previsaoEntrega)}`}
+            </p>
+          )}
         </div>
       </div>
       {pedido.observacao && <p className="mt-3 text-sm"><b>Observação:</b> {pedido.observacao}</p>}
-      <h2 className="mt-4 mb-1 font-bold">Totais ({total} peças)</h2>
+      <h2 className="mt-4 mb-1 font-bold">Totais ({total} peças{pedido.valorTotal != null ? ` · ${reais(pedido.valorTotal)}` : ''})</h2>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-black text-left">

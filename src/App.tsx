@@ -119,7 +119,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
         <img src={logo} alt="The Ozzy" className="h-14 w-14" />
         <div>
           <div className="text-[15px] font-light tracking-[0.25em] text-white">THE OZZY</div>
-          <div className="rotulo-marca text-[10px] text-ozzy-400">Portal interno</div>
+          <div className="rotulo-marca text-[10px] text-ozzy-400">Portal do Time</div>
         </div>
       </button>
       <div className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">

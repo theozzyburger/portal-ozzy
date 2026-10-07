@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Botao, Campo, estiloEntrada } from '../components/ui'
 import logo from '../assets/logo.png'
+import arte from '../assets/banner-ozzy.jpg'
 import { SENHA_DEMO, criarDemoStore } from '../lib/demoStore'
 import type { Store } from '../lib/store'
 import { nomeNivel, type Funcionario } from '../lib/types'
@@ -45,13 +46,25 @@ export default function Login({ store, aoEntrar }: { store: Store; aoEntrar: (f:
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-carvao px-4 py-10">
-      <div className="mb-8 text-center">
-        <img src={logo} alt="The Ozzy Burger" className="mx-auto h-36 w-36" />
-        <div className="rotulo-marca mt-4 text-xs text-ozzy-400">Portal do Funcionário</div>
+    <div className="min-h-full bg-carvao lg:grid lg:grid-cols-[1.15fr_1fr]">
+      {/* Arte da embalagem: no celular é o topo da tela; no computador, a metade esquerda. */}
+      <div className="relative h-[46vh] min-h-72 overflow-hidden lg:sticky lg:top-0 lg:h-screen">
+        <img src={arte} alt="" className="absolute inset-0 h-full w-full scale-105 object-cover object-[50%_30%]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-carvao/10 via-carvao/30 to-carvao lg:bg-gradient-to-r lg:from-transparent lg:via-carvao/20 lg:to-carvao" />
+        <div className="absolute inset-x-0 bottom-0 hidden h-3/4 bg-gradient-to-t from-carvao via-carvao/75 to-transparent lg:block" />
+        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-6 pb-4 text-center lg:items-start lg:pb-14 lg:pl-14 lg:text-left">
+          <img src={logo} alt="The Ozzy" className="h-24 w-24 drop-shadow-[0_6px_20px_rgba(0,0,0,0.6)] lg:h-32 lg:w-32" />
+          <h1 className="mt-3 leading-[0.9] font-extrabold tracking-tight uppercase drop-shadow-[0_3px_0_rgba(0,0,0,0.9)]">
+            <span className="block text-4xl text-white sm:text-5xl lg:text-7xl">Portal do Time</span>
+            <span className="block text-5xl text-ozzy-400 sm:text-6xl lg:text-8xl">The Ozzy</span>
+          </h1>
+          <p className="mt-3 max-w-xs text-sm font-medium text-stone-200 lg:max-w-sm lg:text-base">Folgas, avisos, salário e tudo do seu dia a dia num lugar só.</p>
+        </div>
       </div>
 
-      <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6">
+      <div className="flex flex-col items-center px-4 pt-4 pb-10 lg:justify-center lg:py-10">
+      <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-6 shadow-[0_0_0_4px_var(--color-ozzy-400)]">
+        <div className="-mt-1 mb-1 text-center text-lg font-extrabold">Bora entrar?</div>
         <Campo rotulo="Celular">
           <input className={estiloEntrada} inputMode="tel" placeholder="(11) 99999-0000" autoComplete="username" name="celular" value={celular} onChange={(e) => setCelular(e.target.value)} required />
         </Campo>
@@ -91,6 +104,7 @@ export default function Login({ store, aoEntrar }: { store: Store; aoEntrar: (f:
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
