@@ -1264,3 +1264,6 @@ alter table remessas_pagamento enable row level security;
 create policy "gestao ve remessas" on remessas_pagamento for select using (sou_gestao());
 create policy "gestao registra remessas" on remessas_pagamento for insert with check (sou_gestao());
 create policy "gestao apaga remessas" on remessas_pagamento for delete using (sou_gestao());
+
+-- Setor Pizzaria (pedido de 07/10).
+alter type setor_trabalho add value if not exists 'pizzaria';

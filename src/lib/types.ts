@@ -44,10 +44,11 @@ export interface Funcionario {
   fotoUrl?: string | null
 }
 
-export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao' | 'escritorio'
+export type Setor = 'cozinha' | 'atendimento' | 'producao' | 'unidade' | 'geral' | 'manutencao' | 'escritorio' | 'pizzaria'
 export const SETORES: { valor: Setor; nome: string }[] = [
   { valor: 'cozinha', nome: 'Cozinha' },
   { valor: 'atendimento', nome: 'Atendimento' },
+  { valor: 'pizzaria', nome: 'Pizzaria' },
   { valor: 'producao', nome: 'Produção' },
   { valor: 'unidade', nome: 'Unidade toda' },
   { valor: 'geral', nome: 'Geral (todas as lojas)' },
