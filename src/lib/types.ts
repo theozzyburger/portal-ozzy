@@ -420,6 +420,24 @@ export interface EnvioFreela {
   status: StatusEnvioFreela
   motivo: string | null
   enviadoEm: string
+  // Mandada de dentro da loja, no próprio dia: vale como presença (pedido de 08/10).
+  naLoja: boolean
+  distanciaLojaM: number | null // null = sem localização (negou ou a loja não tem local marcado)
+}
+
+// Localização do celular na hora do envio.
+export interface LocalEnvio {
+  lat: number
+  lng: number
+  precisao: number | null
+}
+
+// Onde fica cada loja, para conferir a presença do freela.
+export interface LocalLoja {
+  id: string
+  nome: string
+  latitude: number | null
+  longitude: number | null
 }
 
 export interface DiaEnviado {

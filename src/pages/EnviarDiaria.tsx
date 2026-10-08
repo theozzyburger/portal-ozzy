@@ -3,7 +3,7 @@ import { Botao, Campo, estiloEntrada } from '../components/ui'
 import CamposDiaria, { diasMarcados, type DiariaParaEnviar } from '../components/CamposDiaria'
 import logo from '../assets/logo.png'
 import { cpfValido, formatarCpf } from '../lib/cpf'
-import { soDigitos, type Store } from '../lib/store'
+import { pegarLocalizacao, soDigitos, type Store } from '../lib/store'
 import type { QuemSouFreela, Unidade } from '../lib/types'
 
 // Página aberta pelo link (ou QR Code) da loja: o freelancer manda as diárias que trabalhou, sem login.
@@ -20,6 +20,7 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
   const [erro, setErro] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [enviadas, setEnviadas] = useState<number | null>(null)
+  const [semLocal, setSemLocal] = useState(false)
 
   useEffect(() => {
     store.lojasParaDiaria().then((us) => {
@@ -55,9 +56,12 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
     setErro('')
     setEnviando(true)
     try {
+      // A localização vai junto: mandada de dentro da loja, no dia, vale como presença.
+      const local = await pegarLocalizacao()
+      setSemLocal(!local)
       const n = await store.enviarDiarias({
         cpf: soDigitos(cpf), celular: soDigitos(celular), nome: novo ? nome : '', pix: novo || trocarPix ? pix : '',
-        unidadeId: v.unidadeId, funcao: v.funcao, dias: diasMarcados(v),
+        unidadeId: v.unidadeId, funcao: v.funcao, dias: diasMarcados(v), local,
       })
       setEnviadas(n)
     } catch (err) {
@@ -94,6 +98,12 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
             <p className="text-sm text-stone-600">
               A gerente confere e aprova. O pagamento da semana cai por Pix até a terça-feira seguinte.
             </p>
+            {semLocal && (
+              <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                Não conseguimos sua localização, então a diária vai para a gerente conferir. Da próxima vez, permita a
+                localização quando o celular pedir.
+              </p>
+            )}
             <Botao variante="secundario" className="w-full" onClick={recomecar}>Mandar outro dia</Botao>
           </div>
         ) : !quem || quem.tipo === 'invalido' ? (
@@ -155,6 +165,7 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
               </>
             )}
             <CamposDiaria v={v} mudar={setV} unidades={unidades} />
+            <DicaLocal />
             {erro && <p className="text-sm text-red-600">{erro}</p>}
             <Botao className="w-full" disabled={enviando}>
               {enviando ? 'Enviando…' : v.marcados.length > 1 ? `Enviar ${v.marcados.length} diárias` : 'Enviar diária'}
@@ -173,5 +184,15 @@ export function AvisoPrazo() {
     <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-300">
       <b>Atenção:</b> mande suas diárias até <b>domingo, às 22h</b>. Quem não enviar no prazo não entra no pagamento da semana. O Pix cai até terça-feira.
     </div>
+  )
+}
+
+// Explica por que o celular vai pedir a localização.
+export function DicaLocal() {
+  return (
+    <p className="text-xs text-stone-500">
+      📍 Mande daqui da loja, no dia em que trabalhou: o celular vai pedir sua localização, e isso vale como sua presença.
+      Se mandar depois, de outro lugar, a diária vai para a gerente conferir.
+    </p>
   )
 }

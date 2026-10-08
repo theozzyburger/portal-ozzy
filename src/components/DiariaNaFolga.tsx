@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Botao, Campo, Modal, Selo, estiloEntrada } from './ui'
 import CamposDiaria, { NOME_TURNO, diasMarcados, type DiariaParaEnviar } from './CamposDiaria'
 import { useApp } from '../lib/contexto'
-import { AvisoPrazo } from '../pages/EnviarDiaria'
+import { AvisoPrazo, DicaLocal } from '../pages/EnviarDiaria'
+import { pegarLocalizacao } from '../lib/store'
 import { dataCurta, diaSemana } from '../lib/datas'
 import { apelidoUnidade, type EnvioFreela } from '../lib/types'
 
@@ -31,7 +32,8 @@ export default function DiariaNaFolga({ aoFechar }: { aoFechar: () => void }) {
     setErro('')
     setEnviando(true)
     try {
-      const n = await store.enviarMinhasDiarias({ pix, unidadeId: v.unidadeId, funcao: v.funcao, dias: diasMarcados(v) })
+      const local = await pegarLocalizacao()
+      const n = await store.enviarMinhasDiarias({ pix, unidadeId: v.unidadeId, funcao: v.funcao, dias: diasMarcados(v), local })
       avisar(n ? `${n === 1 ? 'Diária enviada' : `${n} diárias enviadas`} para a gestão aprovar` : 'Esses dias já tinham sido enviados')
       aoFechar()
     } catch (err) {
@@ -52,6 +54,7 @@ export default function DiariaNaFolga({ aoFechar }: { aoFechar: () => void }) {
         <Campo rotulo="Chave Pix para receber" dica="Vem do seu cadastro; dá para trocar aqui.">
           <input className={estiloEntrada} value={pix} onChange={(e) => setPix(e.target.value)} required />
         </Campo>
+        <DicaLocal />
         {erro && <p className="text-sm text-red-600">{erro}</p>}
         <Botao className="w-full" disabled={enviando}>
           {enviando ? 'Enviando…' : v.marcados.length > 1 ? `Enviar ${v.marcados.length} diárias` : 'Enviar diária'}

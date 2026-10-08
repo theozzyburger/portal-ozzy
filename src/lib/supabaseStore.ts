@@ -659,11 +659,17 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async enviarDiarias(e) {
       return ok(await sb.rpc('freela_enviar_diarias', {
-        p_cpf: e.cpf, p_celular: e.celular, p_nome: nomeProprio(e.nome), p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias,
+        p_cpf: e.cpf, p_celular: e.celular, p_nome: nomeProprio(e.nome), p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias, p_local: e.local,
       }))
     },
     async enviarMinhasDiarias(e) {
-      return ok(await sb.rpc('freela_enviar_minhas_diarias', { p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias }))
+      return ok(await sb.rpc('freela_enviar_minhas_diarias', { p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias, p_local: e.local }))
+    },
+    async locaisLojas() {
+      return (ok(await sb.from('unidades').select('id, nome, latitude, longitude').order('nome')) ?? []) as any
+    },
+    async definirLocalLoja(unidadeId, lat, lng) {
+      ok(await sb.rpc('definir_local_loja', { p_unidade: unidadeId, p_lat: lat, p_lng: lng }))
     },
     async enviosFreela(status) {
       let q = sb.from('freela_envios').select('*')
@@ -693,7 +699,7 @@ const paraDiaria = (r: any): DiariaFreela => ({
 const paraEnvio = (r: any): EnvioFreela => ({
   id: r.id, cpf: r.cpf, celular: r.celular, nome: r.nome, pix: r.pix, freelancerId: r.freelancer_id, funcionarioId: r.funcionario_id,
   data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao, observacao: r.observacao, status: r.status,
-  motivo: r.motivo, enviadoEm: r.enviado_em,
+  motivo: r.motivo, enviadoEm: r.enviado_em, naLoja: !!r.na_loja, distanciaLojaM: r.distancia_loja_m ?? null,
 })
 
 const paraConta = (r: any): ContaPagamento => ({

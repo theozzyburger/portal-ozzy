@@ -1,4 +1,4 @@
-import type { EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -201,8 +201,10 @@ export interface Store {
   // Diárias mandadas pelo próprio freelancer (link da loja, sem login) ou pelo funcionário (login).
   lojasParaDiaria(): Promise<Unidade[]>
   freelaQuemSou(cpf: string, celular: string): Promise<QuemSouFreela>
-  enviarDiarias(e: { cpf: string; celular: string; nome: string; pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[] }): Promise<number>
-  enviarMinhasDiarias(e: { pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[] }): Promise<number>
+  enviarDiarias(e: { cpf: string; celular: string; nome: string; pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[]; local: LocalEnvio | null }): Promise<number>
+  enviarMinhasDiarias(e: { pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[]; local: LocalEnvio | null }): Promise<number>
+  locaisLojas(): Promise<LocalLoja[]>
+  definirLocalLoja(unidadeId: string, lat: number, lng: number): Promise<void>
   enviosFreela(status: StatusEnvioFreela | 'meus'): Promise<EnvioFreela[]>
   aprovarEnvioFreela(id: string, valor: number, funcao: string, usarPixNovo: boolean): Promise<void>
   recusarEnvioFreela(id: string, motivo: string): Promise<void>
@@ -221,3 +223,21 @@ export const nomeProprio = (nome: string) =>
     .split(' ')
     .map((p, i) => (i > 0 && PARTICULAS.has(p) ? p : p.replace(/(^|[-'’])(\p{L})/gu, (_, a: string, l: string) => a + l.toLocaleUpperCase('pt-BR'))))
     .join(' ')
+
+// Localização do celular (com até 12 s de espera). null quando a pessoa nega ou o aparelho não consegue.
+export const pegarLocalizacao = () =>
+  new Promise<{ lat: number; lng: number; precisao: number | null } | null>((resolve) => {
+    if (!navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, precisao: Math.round(p.coords.accuracy) }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    )
+  })
+
+// Distância em metros entre dois pontos (a mesma conta que o banco faz).
+export function distanciaM(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const r = (g: number) => (g * Math.PI) / 180
+  const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lng2 - lng1) / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.sqrt(a))
+}

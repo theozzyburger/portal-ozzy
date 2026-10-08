@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
-import { nomeProprio, soDigitos, type Store } from './store'
+import { distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -17,6 +17,11 @@ const unidades: Unidade[] = [
   { id: 'burger-va', nome: 'The Ozzy Burger Vila Anastácio' },
   { id: 'pizza', nome: 'The Ozzy Pizza' },
 ]
+// Local das lojas na demonstração (aproximado); a Pizza fica sem, para mostrar o aviso.
+const locais: Record<string, { latitude: number; longitude: number } | undefined> = {
+  'burger-psd': { latitude: -23.4895, longitude: -46.7426 },
+  'burger-va': { latitude: -23.5179, longitude: -46.7275 },
+}
 
 const f = (
   id: string, nome: string, celular: string, cargo: string, unidadeId: string,
@@ -194,14 +199,15 @@ const pagamentos: PagamentoFreela[] = []
 const envios: EnvioFreela[] = (() => {
   const e = (id: string, dias: number, turno: 'manha' | 'noite', x: Partial<EnvioFreela>): EnvioFreela => ({
     id, cpf: null, celular: null, nome: '', pix: '', freelancerId: null, funcionarioId: null, data: addDias(hoje(), -dias), turno,
-    unidadeId: 'burger-psd', funcao: 'Chapeiro', observacao: null, status: 'pendente', motivo: null, enviadoEm: new Date().toISOString(), ...x,
+    unidadeId: 'burger-psd', funcao: 'Chapeiro', observacao: null, status: 'pendente', motivo: null, naLoja: false, distanciaLojaM: null,
+    enviadoEm: `${addDias(hoje(), -dias)}T${turno === 'noite' ? '18:0' : '10:1'}${dias}:00-03:00`, ...x,
   })
   return [
-    e('env1', 1, 'noite', { cpf: '52998224725', celular: '11988887777', nome: 'Rafael Mendes Teixeira', pix: '11988887777', freelancerId: 'fl1' }),
-    e('env2', 2, 'noite', { cpf: '86288366757', celular: '11966665555', nome: 'Lucas Almeida Rocha', pix: 'lucas.rocha@email.com', unidadeId: 'burger-va', funcao: 'Entregador' }),
-    e('env3', 1, 'noite', { cpf: '86288366757', celular: '11966665555', nome: 'Lucas Almeida Rocha', pix: 'lucas.rocha@email.com', unidadeId: 'burger-va', funcao: 'Entregador', observacao: 'Fiquei até 0h30' }),
+    e('env1', 1, 'noite', { cpf: '52998224725', celular: '11988887777', nome: 'Rafael Mendes Teixeira', pix: '11988887777', freelancerId: 'fl1', naLoja: true, distanciaLojaM: 40 }),
+    e('env2', 2, 'noite', { cpf: '86288366757', celular: '11966665555', nome: 'Lucas Almeida Rocha', pix: 'lucas.rocha@email.com', unidadeId: 'burger-va', funcao: 'Entregador', distanciaLojaM: 4200, enviadoEm: new Date().toISOString() }),
+    e('env3', 1, 'noite', { cpf: '86288366757', celular: '11966665555', nome: 'Lucas Almeida Rocha', pix: 'lucas.rocha@email.com', unidadeId: 'burger-va', funcao: 'Entregador', observacao: 'Fiquei até 0h30', naLoja: true, distanciaLojaM: 25 }),
     e('env4', 1, 'manha', { cpf: '39053344705', celular: '11955554444', nome: 'Diego Ferreira Santos', pix: '11955554444', freelancerId: 'fl3', unidadeId: 'pizza', funcao: 'Atendente' }),
-    e('env5', 2, 'noite', { nome: 'Cibeli Alves da Costa', pix: '11999990012', funcionarioId: 'p-cibeli-costa', unidadeId: 'burger-va', funcao: 'Auxiliar de cozinha' }),
+    e('env5', 2, 'noite', { nome: 'Cibeli Alves da Costa', pix: '11999990012', funcionarioId: 'p-cibeli-costa', unidadeId: 'burger-va', funcao: 'Auxiliar de cozinha', naLoja: true, distanciaLojaM: 60 }),
   ].filter((x) => x.data >= inicioDaSemana(addDias(hoje(), -7)))
 })()
 
@@ -448,7 +454,13 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     if (i >= 0) lista.splice(i, 1)
   }
 
-  const gravarEnvios = (dias: { data: string; turno: 'manha' | 'noite'; observacao?: string }[], base: Omit<EnvioFreela, 'id' | 'data' | 'turno' | 'observacao' | 'status' | 'motivo' | 'enviadoEm'>) => {
+  const gravarEnvios = (
+    dias: { data: string; turno: 'manha' | 'noite'; observacao?: string }[],
+    base: Omit<EnvioFreela, 'id' | 'data' | 'turno' | 'observacao' | 'status' | 'motivo' | 'enviadoEm' | 'naLoja' | 'distanciaLojaM'>,
+    local: LocalEnvio | null,
+  ) => {
+    const loja = locais[base.unidadeId]
+    const distancia = local && loja ? Math.round(distanciaM(local.lat, local.lng, loja.latitude, loja.longitude)) : null
     if (!dias.length) throw new Error('Escolha pelo menos um dia.')
     if (!base.funcao.trim()) throw new Error('Diga a função que você fez.')
     if (!base.pix.trim()) throw new Error('Coloque a chave Pix.')
@@ -457,7 +469,8 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     for (const d of dias) {
       const quem = base.funcionarioId ?? base.cpf
       if (envios.some((x) => x.status !== 'recusado' && (x.funcionarioId ?? x.cpf) === quem && x.data === d.data && x.turno === d.turno)) continue
-      envios.push({ ...base, id: novoId('env'), data: d.data, turno: d.turno, observacao: d.observacao?.trim() || null, status: 'pendente', motivo: null, enviadoEm: agora() })
+      envios.push({ ...base, id: novoId('env'), data: d.data, turno: d.turno, observacao: d.observacao?.trim() || null, status: 'pendente', motivo: null, enviadoEm: agora(),
+        distanciaLojaM: distancia, naLoja: d.data === hoje() && distancia !== null && distancia - Math.min(local?.precisao ?? 0, 100) <= 150 })
       n++
     }
     return espera(n)
@@ -1003,14 +1016,21 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const nome = nomeProprio(e.nome) || (quem.tipo === 'freelancer' ? f?.nome : '') || ''
       const pix = e.pix.trim() || (quem.tipo === 'freelancer' ? f?.pix : '') || ''
       if (nome.split(/\s+/).length < 2) throw new Error('Coloque o nome completo.')
-      return gravarEnvios(e.dias, { cpf, celular: soDigitos(e.celular).slice(-11), nome, pix, freelancerId: f?.id ?? null, funcionarioId: null, unidadeId: e.unidadeId, funcao: e.funcao })
+      return gravarEnvios(e.dias, { cpf, celular: soDigitos(e.celular).slice(-11), nome, pix, freelancerId: f?.id ?? null, funcionarioId: null, unidadeId: e.unidadeId, funcao: e.funcao }, e.local)
     },
     async enviarMinhasDiarias(e) {
       const u = exigeEu()
       return gravarEnvios(e.dias, {
         cpf: u.cpf ?? null, celular: u.celular, nome: u.nome, pix: e.pix.trim() || u.pix || '', unidadeId: e.unidadeId, funcao: e.funcao,
         freelancerId: freelas.find((x) => x.funcionarioId === u.id)?.id ?? null, funcionarioId: u.id,
-      })
+      }, e.local)
+    },
+    async locaisLojas(): Promise<LocalLoja[]> {
+      return espera(unidades.map((u) => ({ ...u, latitude: locais[u.id]?.latitude ?? null, longitude: locais[u.id]?.longitude ?? null })))
+    },
+    async definirLocalLoja(unidadeId, lat, lng) {
+      exigeGestao()
+      locais[unidadeId] = { latitude: lat, longitude: lng }
     },
     async enviosFreela(status) {
       if (status === 'meus') {

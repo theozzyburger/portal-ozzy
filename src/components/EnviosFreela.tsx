@@ -5,8 +5,8 @@ import Impressao from './Impressao'
 import { NOME_TURNO } from './CamposDiaria'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, inicioDaSemana } from '../lib/datas'
-import { soDigitos } from '../lib/store'
-import { apelidoUnidade, type EnvioFreela, type Freelancer } from '../lib/types'
+import { pegarLocalizacao, soDigitos } from '../lib/store'
+import { apelidoUnidade, type EnvioFreela, type Freelancer, type LocalLoja } from '../lib/types'
 import { formatarCpf } from '../lib/cpf'
 import logo from '../assets/logo.png'
 
@@ -18,6 +18,21 @@ export const linkDiaria = () => `${location.origin}${location.pathname}#/diaria`
 const foraDoPrazo = (e: EnvioFreela) => {
   const domingo = addDias(inicioDaSemana(e.data), 6)
   return new Date(e.enviadoEm) > new Date(`${domingo}T22:00:00-03:00`)
+}
+
+const horaDe = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+const diaDe = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+const km = (m: number) => (m < 1000 ? `${m} m` : `${(m / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`)
+
+// Presença: mandada de dentro da loja, no dia, vale como chegada. O resto a gerente confere antes de aprovar.
+function Presenca({ e }: { e: EnvioFreela }) {
+  if (e.naLoja) return <div className="text-xs font-semibold text-emerald-700">✓ Enviada da loja às {horaDe(e.enviadoEm)}</div>
+  const quando = diaDe(e.enviadoEm) !== e.data ? `em ${dataCurta(diaDe(e.enviadoEm))} às ${horaDe(e.enviadoEm)}` : `às ${horaDe(e.enviadoEm)}`
+  // Da loja, mas em outro dia: estava lá, só não prova o dia trabalhado.
+  if (e.distanciaLojaM !== null && e.distanciaLojaM <= 150)
+    return <div className="text-xs font-semibold text-amber-700">⚠ Enviada da loja, mas só {quando}. Confira com o supervisor.</div>
+  const onde = e.distanciaLojaM !== null ? `a ${km(e.distanciaLojaM)} da loja` : 'sem localização'
+  return <div className="text-xs font-semibold text-red-700">⚠ Enviada fora da loja ({onde}), {quando}. Confira com o supervisor.</div>
 }
 
 interface Grupo {
@@ -102,6 +117,7 @@ export default function EnviosFreela({ freelas, aoMudar }: { freelas: Freelancer
   return (
     <div className="space-y-3">
       <LinksDasLojas />
+      <LocaisDasLojas />
       {!envios ? (
         <p className="text-stone-400">Carregando…</p>
       ) : !grupos.length ? (
@@ -139,6 +155,7 @@ export default function EnviosFreela({ freelas, aoMudar }: { freelas: Freelancer
                   <div className="min-w-0 flex-1 text-sm">
                     <div className="font-medium">{diaSemana(e.data)} {dataCurta(e.data)} · {NOME_TURNO[e.turno]}</div>
                     <div className="text-xs text-stone-500">{nomeLoja(e.unidadeId)} · {e.funcao}{e.observacao && ` · ${e.observacao}`}</div>
+                    <Presenca e={e} />
                     {foraDoPrazo(e) && <div className="text-xs font-semibold text-red-700">Enviada depois do prazo (domingo 22h)</div>}
                   </div>
                   <input
@@ -217,6 +234,59 @@ function LinksDasLojas() {
           </div>
         </Impressao>
       )}
+    </details>
+  )
+}
+
+// Onde fica cada loja: a gestão marca uma vez, estando lá dentro, e o portal compara com o celular do freela.
+function LocaisDasLojas() {
+  const { store, avisar } = useApp()
+  const [lojas, setLojas] = useState<LocalLoja[] | null>(null)
+  const [marcando, setMarcando] = useState('')
+  const carregar = useCallback(() => store.locaisLojas().then(setLojas), [store])
+  useEffect(() => {
+    carregar()
+  }, [carregar])
+  if (!lojas) return null
+  const faltam = lojas.filter((l) => l.latitude === null)
+
+  const marcar = async (l: LocalLoja) => {
+    if (!confirm(`Você está dentro da ${apelidoUnidade(l.nome)} agora? O local do seu celular vai virar o local da loja.`)) return
+    setMarcando(l.id)
+    try {
+      const local = await pegarLocalizacao()
+      if (!local) return avisar('Não deu para pegar a localização. Permita a localização no navegador e tente de novo.')
+      if (local.precisao && local.precisao > 200) return avisar(`Localização imprecisa (${local.precisao} m). Chegue perto da janela ou ligue o GPS e tente de novo.`)
+      await store.definirLocalLoja(l.id, local.lat, local.lng)
+      avisar(`Local da ${apelidoUnidade(l.nome)} marcado`)
+      await carregar()
+    } catch (err) {
+      avisar((err as Error).message)
+    } finally {
+      setMarcando('')
+    }
+  }
+
+  return (
+    <details className="rounded-2xl bg-white p-3 ring-1 ring-stone-200" open={faltam.length > 0}>
+      <summary className="cursor-pointer text-sm font-semibold">
+        Local das lojas {faltam.length > 0 && <span className="text-red-700">· {faltam.length} sem local marcado</span>}
+      </summary>
+      <p className="mt-2 text-sm text-stone-600">
+        Para a diária valer como presença, o portal compara o celular do freela com o local da loja. Marque estando
+        dentro de cada loja; enquanto não marcar, as diárias dela chegam como "sem localização".
+      </p>
+      <div className="mt-2 space-y-2">
+        {lojas.map((l) => (
+          <div key={l.id} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 text-sm font-medium">{apelidoUnidade(l.nome)}</span>
+            {l.latitude === null ? <Selo cor="vermelho">Sem local</Selo> : <Selo cor="verde">Marcado</Selo>}
+            <Botao variante="secundario" className="py-1.5!" disabled={!!marcando} onClick={() => marcar(l)}>
+              {marcando === l.id ? 'Pegando…' : l.latitude === null ? 'Marcar local desta loja' : 'Marcar de novo'}
+            </Botao>
+          </div>
+        ))}
+      </div>
     </details>
   )
 }
