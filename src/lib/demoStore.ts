@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -69,6 +69,8 @@ const funcionarios: Funcionario[] = [
   f('p-julia-bernardo', 'Julia Motta Bernardo', '11999990031', 'Colaboradora de produção', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'ativo', null, 'producao'),
   // Manutencista, cadastrado em 07/10. Atende as três lojas; celular fictício.
   f('p-vanderlei', 'Vanderlei Aparecido', '11999990032', 'Manutencista', 'burger-psd', 'manutencao', ADMISSAO_A_CONFIRMAR, 'f1', 'ativo', null, 'manutencao'),
+  // EXEMPLO de admissão em andamento (fictício), para o passo a passo aparecer na demonstração.
+  { ...f('p-novo-exemplo', 'Pedro Henrique Alves', '11999990040', 'Auxiliar de cozinha', 'burger-psd', 'funcionario', hoje() > '2026-10-08' ? addDias(hoje(), -1) : hoje(), 'p-queli-souza', 'ativo', null, 'cozinha'), cpf: '52998224725', dataNascimento: '2004-03-12', sexo: 'masculino', tamCamiseta: 'M', tamCalca: '40', tamCalcado: 41, experienciaDias1: 10, experienciaDias2: 80 },
   f('p-caciano-souza', 'Caciano Ribeiro Silva Souza', '11999990024', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'inativo', '2026-07-28', 'atendimento'),
   f('p-gilson-silva', 'Gilson Bento Silva', '11999990025', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-23', 'cozinha'),
   f('p-joao-costa', 'João Victor Alves da Costa', '11999990026', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-09', 'atendimento'),
@@ -160,6 +162,7 @@ const ASSINATURA_DEMO =
 const valoresUniforme: Record<string, number> = { Camiseta: 35, 'Calça': 60, Sapato: 120, Avental: 30, 'Boné': 25 }
 const devolucoes: DevolucaoUniforme[] = []
 const guiasDemo = new Map<string, string>()
+const admissoes: Admissao[] = []
 const ajustesPonto: AjustePonto[] = [
   { id: 'aj1', funcionarioId: 'p-cibeli-costa', data: addDias(hoje(), -1), tipo: 'esqueci_saida', horario: '23:20', motivo: 'Saí junto com a Queli e esqueci de bater.', status: 'pendente', resposta: null, criadoEm: new Date(Date.now() - 5 * 3600_000).toISOString(), resolvidoPor: null, resolvidoEm: null },
   { id: 'aj2', funcionarioId: 'p-dora-ramos', data: addDias(hoje(), -2), tipo: 'equipamento', horario: '13:30', motivo: 'O relógio estava travado na entrada.', status: 'pendente', resposta: null, criadoEm: new Date(Date.now() - 26 * 3600_000).toISOString(), resolvidoPor: null, resolvidoEm: null },
@@ -1052,6 +1055,17 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async desfazerPagoFreela(freelancerId, semana) {
       exigeGestao()
       pagamentos.splice(pagamentos.findIndex((p) => p.freelancerId === freelancerId && p.semana === semana), 1)
+    },
+    async admissoes(fid) {
+      const u = exigeEu()
+      if (!podeGerenciar(u.nivel)) return espera([])
+      return espera(admissoes.filter((a) => !fid || a.funcionarioId === fid).map((a) => ({ ...a, itens: { ...a.itens } })))
+    },
+    async salvarAdmissao(a) {
+      exigeGestao()
+      const i = admissoes.findIndex((x) => x.funcionarioId === a.funcionarioId && x.dataAdmissao === a.dataAdmissao)
+      if (i >= 0) admissoes[i] = { ...a }
+      else admissoes.push({ ...a })
     },
     async publicarGuia(_fid, arquivo) {
       exigeGestao()

@@ -4,6 +4,7 @@ import { Botao, Campo, Modal, estiloEntrada } from './ui'
 import logoSouza from '../assets/logo-souza.png'
 import { useApp } from '../lib/contexto'
 import { folhaParaPdf } from '../lib/pdf'
+import { marcarEtapaAdmissao } from './ChecklistAdmissao'
 import { formatarCpf } from '../lib/cpf'
 import { addDias, dataCurta, hoje } from '../lib/datas'
 import { EMPRESAS } from '../lib/empresas'
@@ -30,6 +31,7 @@ const numero = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'))
 // ---------- Contrato de experiência ----------
 
 export function ContratoExperiencia({ pessoa, aoFechar }: { pessoa: Funcionario; aoFechar: () => void }) {
+  const { store, eu } = useApp()
   const [funcao, setFuncao] = useState(pessoa.cargo.toUpperCase())
   const [data, setData] = useState(pessoa.dataAdmissao)
   const [salario, setSalario] = useState('')
@@ -52,6 +54,7 @@ export function ContratoExperiencia({ pessoa, aoFechar }: { pessoa: Funcionario;
     if (!(numero(salario) > 0)) return setErro('Coloque o salário.')
     if (salarioDepois && !(numero(salarioDepois) > 0)) return setErro('Salário depois da experiência inválido.')
     setGerar(true)
+    marcarEtapaAdmissao(store, pessoa, 'contrato', eu.id).catch(() => {})
   }
 
   return (
@@ -237,7 +240,7 @@ type TipoExame = (typeof TIPOS_EXAME)[number]['valor']
 const COMPLEMENTARES_PADRAO = (p: Funcionario) => (p.setor === 'escritorio' ? [] : ['Coprocultura', 'Parasitológico'])
 
 export function GuiaExame({ pessoa, aoFechar }: { pessoa: Funcionario; aoFechar: () => void }) {
-  const { eu } = useApp()
+  const { eu, store } = useApp()
   const [tipo, setTipo] = useState<TipoExame>(pessoa.status === 'inativo' ? 'demissional' : 'admissional')
   const [extras, setExtras] = useState<string[]>(COMPLEMENTARES_PADRAO(pessoa))
   const [outro, setOutro] = useState('')
@@ -257,7 +260,14 @@ export function GuiaExame({ pessoa, aoFechar }: { pessoa: Funcionario; aoFechar:
 
   return (
     <Modal titulo="Encaminhamento para exame" aberto aoFechar={aoFechar}>
-      <form onSubmit={(e) => { e.preventDefault(); setGerar(true) }} className="space-y-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          setGerar(true)
+          marcarEtapaAdmissao(store, pessoa, 'guia', eu.id).catch(() => {})
+        }}
+        className="space-y-4"
+      >
         <Campo rotulo="Tipo de exame">
           <select className={estiloEntrada} value={tipo} onChange={(e) => setTipo(e.target.value as TipoExame)}>
             {TIPOS_EXAME.map((t) => <option key={t.valor} value={t.valor}>{t.nome}</option>)}

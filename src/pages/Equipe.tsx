@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Avatar, Botao, Cartao, Selo, Titulo, Vazio, estiloEntrada } from '../components/ui'
 import FormFuncionario from '../components/FormFuncionario'
+import AdmissoesAndamento from '../components/AdmissoesAndamento'
 import { useApp } from '../lib/contexto'
 import { podeGerenciar } from '../lib/permissoes'
 import { ir } from '../lib/rota'
@@ -56,6 +57,8 @@ export default function Equipe() {
           ))}
         </div>
       </div>
+
+      {gestao && status === 'ativo' && <AdmissoesAndamento />}
 
       <ContagemSetores pessoas={equipe.filter((f) => f.status === status && (!unidade || f.unidadeId === unidade))} setor={setor} escolher={setSetor} />
 

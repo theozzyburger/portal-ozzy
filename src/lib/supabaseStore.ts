@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
-import type { AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -479,6 +479,17 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async excluirExecucao(id) {
       ok(await sb.from('preventiva_execucoes').delete().eq('id', id))
+    },
+    async admissoes(fid) {
+      let q = sb.from('admissoes').select('*')
+      if (fid) q = q.eq('funcionario_id', fid)
+      return (ok(await q) ?? []).map((r: any): Admissao => ({ funcionarioId: r.funcionario_id, dataAdmissao: r.data_admissao, itens: r.itens ?? {}, concluido: r.concluido }))
+    },
+    async salvarAdmissao(a) {
+      ok(await sb.from('admissoes').upsert(
+        { funcionario_id: a.funcionarioId, data_admissao: a.dataAdmissao, itens: a.itens, concluido: a.concluido },
+        { onConflict: 'funcionario_id,data_admissao' },
+      ))
     },
     async desligamentos(fid) {
       let q = sb.from('desligamentos').select('*').order('data', { ascending: false })

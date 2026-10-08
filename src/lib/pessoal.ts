@@ -1,5 +1,5 @@
 import { addDias, inicioDaSemana } from './datas'
-import type { Desligamento, Documento, Funcionario } from './types'
+import type { Admissao, Desligamento, Documento, EntregaUniforme, Funcionario } from './types'
 
 const diasEntre = (a: string, b: string) => Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
 
@@ -141,4 +141,64 @@ export function progressoDesligamento(d: Desligamento, pessoa: Pick<Funcionario,
   const etapas = etapasDesligamento(d, pessoa)
   const feitas = etapas.filter((e) => d.itens[e.chave]).length
   return { feitas, total: etapas.length, pagamentoFeito: !!d.itens.pagamento }
+}
+
+// ---------- Admissão (passo a passo pedido em 08/10) ----------
+// Etapas na ordem em que acontecem (reunião de RH de 08/10). "auto" = o portal sabe sozinho se está feito;
+// as outras a gestão marca. acao: o botão que resolve a etapa ali mesmo.
+export interface EtapaAdmissao {
+  chave: string
+  nome: string
+  detalhe?: string
+  auto?: boolean
+  acao?: 'editar' | 'guia' | 'contrato' | 'uniforme' | 'turno' | 'documento'
+}
+
+export interface ContextoAdmissao {
+  docs: Pick<Documento, 'tipo'>[]
+  entregas: Pick<EntregaUniforme, 'assinatura'>[]
+  assinouRegulamento: boolean
+}
+
+// Admissão "aberta" para mostrar o passo a passo: quem entrou há até 120 dias e ainda não concluiu. Só conta
+// quem entrou a partir de 08/10/2026 (quando o passo a passo começou), para o time antigo não aparecer como pendente.
+export const DIAS_ADMISSAO = 120
+export const ADMISSAO_DESDE = '2026-10-08'
+export const emAdmissao = (p: Pick<Funcionario, 'status' | 'nivel' | 'dataAdmissao'>, hojeIso: string) =>
+  p.status === 'ativo' && p.nivel !== 'proprietario' && p.dataAdmissao >= ADMISSAO_DESDE && p.dataAdmissao >= addDias(hojeIso, -DIAS_ADMISSAO)
+
+export function faltaNoCadastro(p: Funcionario) {
+  return [
+    !p.cpf && 'CPF', !p.rg && 'RG', !p.ctps && 'carteira de trabalho', !p.endereco && 'endereço', !p.dataNascimento && 'nascimento',
+    !p.sexo && 'sexo', !p.setor && 'setor', !p.pix && 'Pix', !(p.tamCamiseta && p.tamCalca && p.tamCalcado) && 'tamanhos do uniforme',
+  ].filter((x): x is string => !!x)
+}
+
+export function etapasAdmissao(p: Funcionario, c: ContextoAdmissao): EtapaAdmissao[] {
+  const falta = faltaNoCadastro(p)
+  const tem = (t: Documento['tipo']) => c.docs.some((d) => d.tipo === t)
+  return [
+    { chave: 'dados', nome: 'Dados do cadastro completos', auto: falta.length === 0, detalhe: falta.length ? `Falta: ${falta.join(', ')}.` : undefined, acao: 'editar' },
+    { chave: 'documentos', nome: 'Documentos recolhidos e enviados à contabilidade', detalhe: 'A Josie recolhe e manda para a Ana Paula antes da pessoa começar.' },
+    { chave: 'guia', nome: 'Encaminhamento para o exame gerado e enviado', detalhe: 'Marca sozinho quando a guia é gerada aqui.', acao: 'guia' },
+    { chave: 'aso', nome: 'Exame admissional feito (ASO anexado)', auto: tem('aso_admissional'), detalhe: 'Anexe o ASO em Documentos, como "ASO admissional".', acao: 'documento' },
+    { chave: 'registro', nome: 'Registro feito pela contabilidade', detalhe: 'A pessoa só começa depois do registro e do exame.' },
+    { chave: 'contrato', nome: 'Contrato de experiência gerado', detalhe: 'Marca sozinho quando o contrato é gerado aqui.', acao: 'contrato' },
+    { chave: 'contrato_assinado', nome: 'Contrato assinado e anexado', auto: tem('contrato'), detalhe: 'Anexe em Documentos, como "Contrato".', acao: 'documento' },
+    { chave: 'uniforme', nome: 'Uniforme entregue e termo assinado', auto: c.entregas.some((e) => e.assinatura), acao: 'uniforme' },
+    { chave: 'turno', nome: 'Colocado(a) no turno', auto: !!p.turnoId, acao: 'turno' },
+    { chave: 'ponto', nome: 'Cadastrado(a) no ponto (Control iD)' },
+    { chave: 'acesso', nome: 'Recebeu o acesso ao portal', detalhe: 'Login = celular; passe a senha para a pessoa.' },
+    { chave: 'regulamento', nome: 'Regulamento interno assinado no portal', auto: c.assinouRegulamento, detalhe: 'A pessoa assina pelo próprio login, em Regras e processos.' },
+    { chave: 'apresentacao', nome: 'Regras da empresa apresentadas', detalhe: 'Feito pela Josie.' },
+    { chave: 'treinamento', nome: 'Treinamento no setor', detalhe: 'Com a Josie ou o supervisor do setor.' },
+  ]
+}
+
+export const etapaFeita = (e: EtapaAdmissao, a: Pick<Admissao, 'itens'> | null) => !!e.auto || !!a?.itens[e.chave]
+
+export function progressoAdmissao(p: Funcionario, c: ContextoAdmissao, a: Pick<Admissao, 'itens'> | null) {
+  const etapas = etapasAdmissao(p, c)
+  const feitas = etapas.filter((e) => etapaFeita(e, a)).length
+  return { feitas, total: etapas.length, proxima: etapas.find((e) => !etapaFeita(e, a)) ?? null }
 }

@@ -20,6 +20,8 @@ import { formatarCpf } from '../lib/cpf'
 import { Contracheque } from './Salarios'
 import { dataPagamento } from '../lib/salarios'
 import ChecklistDesligamento from '../components/ChecklistDesligamento'
+import ChecklistAdmissao from '../components/ChecklistAdmissao'
+import { emAdmissao } from '../lib/pessoal'
 import { tamanhosDe } from './Compras'
 import { textoExperiencia } from '../components/FormFuncionario'
 import { experienciaDe, idadeEm } from '../lib/pessoal'
@@ -43,6 +45,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
   const [declaracao, setDeclaracao] = useState(false)
   const [admissao, setAdmissao] = useState<'contrato' | 'guia' | null>(null)
+  const [versaoAdm, setVersaoAdm] = useState(0)
   const [termos, setTermos] = useState(false)
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
   // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
@@ -214,6 +217,24 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         )}
       </Cartao>
 
+      {podeGerenciar(eu.nivel) && emAdmissao(pessoa, hoje()) && (
+        <ChecklistAdmissao
+          key={`${versaoAdm}-${docs.length}-${aba}-${modal}`}
+          pessoa={pessoa}
+          docs={docs}
+          podeMarcar={gestao}
+          aoAcao={(acao, chave) => {
+            if (acao === 'editar') setModal('editar')
+            else if (acao === 'guia' || acao === 'contrato') setAdmissao(acao)
+            else if (acao === 'uniforme') setAba('uniformes')
+            else if (acao === 'turno') ir('rh/turnos')
+            else {
+              setTipoInicial(chave === 'aso' ? 'aso_admissional' : 'contrato')
+              setModal('documento')
+            }
+          }}
+        />
+      )}
       {podeGerenciar(eu.nivel) && desligamento && (
         <ChecklistDesligamento d={desligamento} pessoa={pessoa} podeMarcar={gestao} aoMudar={carregar} aoTermos={() => setTermos(true)} />
       )}
@@ -399,8 +420,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         }}
       />
       {termos && <TermosGravidez pessoa={pessoa} aoFechar={() => setTermos(false)} />}
-      {admissao === 'contrato' && <ContratoExperiencia pessoa={pessoa} aoFechar={() => setAdmissao(null)} />}
-      {admissao === 'guia' && <GuiaExame pessoa={pessoa} aoFechar={() => setAdmissao(null)} />}
+      {admissao === 'contrato' && <ContratoExperiencia pessoa={pessoa} aoFechar={() => { setAdmissao(null); setVersaoAdm((v) => v + 1) }} />}
+      {admissao === 'guia' && <GuiaExame pessoa={pessoa} aoFechar={() => { setAdmissao(null); setVersaoAdm((v) => v + 1) }} />}
       {declaracao && <DeclaracaoVinculo pessoa={pessoa} aoFechar={() => setDeclaracao(false)} />}
       {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
       {readmitir && (

@@ -645,6 +645,14 @@ export interface Desligamento {
   concluido: boolean
 }
 
+// Admissão (passo a passo pedido em 08/10): etapas marcadas à mão, com quem marcou e quando.
+export interface Admissao {
+  funcionarioId: string
+  dataAdmissao: string
+  itens: Record<string, { por: string; em: string }>
+  concluido: boolean
+}
+
 // Equipamentos mais caros de cada loja, com histórico de manutenções (inventário).
 export interface Equipamento {
   id: string
