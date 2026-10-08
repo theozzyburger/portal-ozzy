@@ -1,4 +1,4 @@
-import type { LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -77,6 +77,17 @@ export interface Store {
   registrarUniforme(e: NovaEntregaUniforme): Promise<EntregaUniforme>
   // Só a própria pessoa assina pelo portal.
   assinarUniforme(entregaId: string, assinatura: string): Promise<void>
+  // Tabela de desconto por peça e conferência da devolução no desligamento.
+  valoresUniforme(): Promise<Record<string, number>>
+  salvarValoresUniforme(valores: Record<string, number | null>): Promise<void>
+  devolucoesUniforme(funcionarioId: string): Promise<DevolucaoUniforme[]>
+  registrarDevolucao(d: { funcionarioId: string; data: string; itens: ItemDevolucao[]; observacao?: string }): Promise<DevolucaoUniforme>
+  excluirDevolucao(id: string): Promise<void>
+  // Ajuste do ponto: 'meus' = os da pessoa logada; 'pendente'/'todos' = a gestão vê de todos.
+  ajustesPonto(filtro: 'meus' | 'pendente' | 'todos'): Promise<AjustePonto[]>
+  pedirAjustePonto(a: { data: string; tipo: TipoAjustePonto; horario: string | null; motivo: string }): Promise<void>
+  resolverAjustePonto(id: string, status: 'feito' | 'recusado', resposta: string): Promise<void>
+  excluirAjustePonto(id: string): Promise<void>
   // Pedido de troca: a pessoa pede pelo próprio cadastro; a gestão vê todos e responde.
   solicitacoesUniforme(funcionarioId?: string): Promise<SolicitacaoUniforme[]>
   pedirTrocaUniforme(s: { funcionarioId: string; itens: string[]; motivo: string; foto?: Blob }): Promise<void>

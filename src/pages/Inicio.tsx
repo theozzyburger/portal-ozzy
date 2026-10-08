@@ -125,6 +125,15 @@ export default function Inicio() {
           <span className="text-lg text-stone-400">›</span>
         </button>
       )}
+      {!isentoDeRotinas(eu.nivel) && (
+        <button onClick={() => ir('rh/ponto')} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-left ring-1 ring-stone-200 hover:ring-carvao">
+          <span>
+            <span className="block font-semibold">Esqueci de bater o ponto</span>
+            <span className="text-sm text-stone-500">Peça o ajuste para o escritório por aqui</span>
+          </span>
+          <span className="text-lg text-stone-400">›</span>
+        </button>
+      )}
       {diariaFolga && <DiariaNaFolga aoFechar={() => setDiariaFolga(false)} />}
 
       <Aniversariantes />

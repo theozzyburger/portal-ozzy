@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -155,6 +155,15 @@ documentos.push(
 const ASSINATURA_DEMO =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="100"><path d="M10 70 C30 20 50 20 55 60 S80 90 95 50 S120 20 130 55 S160 80 175 45 S210 30 230 60 S270 70 290 40" fill="none" stroke="#0b0b0c" stroke-width="3" stroke-linecap="round"/></svg>')
+
+// Tabela de desconto de EXEMPLO (a real a gestão preenche em Compras › Uniformes).
+const valoresUniforme: Record<string, number> = { Camiseta: 35, 'Calça': 60, Sapato: 120, Avental: 30, 'Boné': 25 }
+const devolucoes: DevolucaoUniforme[] = []
+const ajustesPonto: AjustePonto[] = [
+  { id: 'aj1', funcionarioId: 'p-cibeli-costa', data: addDias(hoje(), -1), tipo: 'esqueci_saida', horario: '23:20', motivo: 'Saí junto com a Queli e esqueci de bater.', status: 'pendente', resposta: null, criadoEm: new Date(Date.now() - 5 * 3600_000).toISOString(), resolvidoPor: null, resolvidoEm: null },
+  { id: 'aj2', funcionarioId: 'p-dora-ramos', data: addDias(hoje(), -2), tipo: 'equipamento', horario: '13:30', motivo: 'O relógio estava travado na entrada.', status: 'pendente', resposta: null, criadoEm: new Date(Date.now() - 26 * 3600_000).toISOString(), resolvidoPor: null, resolvidoEm: null },
+  { id: 'aj3', funcionarioId: 'p-cibeli-costa', data: addDias(hoje(), -9), tipo: 'esqueci_entrada', horario: '13:30', motivo: null, status: 'feito', resposta: null, criadoEm: new Date(Date.now() - 9 * 86400_000).toISOString(), resolvidoPor: 'p-maria-costa', resolvidoEm: new Date(Date.now() - 8 * 86400_000).toISOString() },
+]
 
 const uniformes: EntregaUniforme[] = [
   {
@@ -557,6 +566,54 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!x || x.funcionarioId !== u.id) throw new Error('Só a própria pessoa pode assinar este termo.')
       if (x.assinatura) throw new Error('Este termo já foi assinado.')
       Object.assign(x, { assinatura, assinadoEm: agora(), assinadoVia: 'portal' })
+    },
+    async valoresUniforme() {
+      exigeEu()
+      return espera({ ...valoresUniforme })
+    },
+    async salvarValoresUniforme(valores) {
+      exigeGestao()
+      for (const [item, v] of Object.entries(valores)) if (v === null) delete valoresUniforme[item]; else valoresUniforme[item] = v
+    },
+    async devolucoesUniforme(fid) {
+      const u = exigeEu()
+      if (fid !== u.id && !podeGerenciar(u.nivel)) return espera([])
+      return espera(devolucoes.filter((d) => d.funcionarioId === fid).sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)))
+    },
+    async registrarDevolucao(d) {
+      const u = exigeGestao()
+      const total = d.itens.reduce((t, i) => t + Math.max(0, i.entregue - i.devolvido) * i.valor, 0)
+      const nova: DevolucaoUniforme = {
+        id: novoId('dv'), funcionarioId: d.funcionarioId, data: d.data, itens: d.itens, totalDesconto: Math.round(total * 100) / 100,
+        observacao: d.observacao?.trim() || null, conferidoPor: u.id, criadoEm: agora(),
+      }
+      devolucoes.push(nova)
+      return espera(nova)
+    },
+    async excluirDevolucao(id) {
+      exigeGestao()
+      const i = devolucoes.findIndex((d) => d.id === id)
+      if (i >= 0) devolucoes.splice(i, 1)
+    },
+    async ajustesPonto(filtro) {
+      const u = exigeEu()
+      const lista = filtro === 'meus' ? ajustesPonto.filter((a) => a.funcionarioId === u.id) : podeGerenciar(u.nivel) ? ajustesPonto.filter((a) => filtro === 'todos' || a.status === 'pendente') : []
+      return espera([...lista].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)))
+    },
+    async pedirAjustePonto(a) {
+      const u = exigeEu()
+      if (a.data > hoje()) throw new Error('A data não pode ser no futuro.')
+      ajustesPonto.push({ id: novoId('aj'), funcionarioId: u.id, data: a.data, tipo: a.tipo, horario: a.horario || null, motivo: a.motivo.trim() || null, status: 'pendente', resposta: null, criadoEm: agora(), resolvidoPor: null, resolvidoEm: null })
+    },
+    async resolverAjustePonto(id, status, resposta) {
+      const u = exigeGestao()
+      const a = ajustesPonto.find((x) => x.id === id)
+      if (a) Object.assign(a, { status, resposta: resposta.trim() || null, resolvidoPor: u.id, resolvidoEm: agora() })
+    },
+    async excluirAjustePonto(id) {
+      const u = exigeEu()
+      const i = ajustesPonto.findIndex((x) => x.id === id && x.funcionarioId === u.id && x.status === 'pendente')
+      if (i >= 0) ajustesPonto.splice(i, 1)
     },
     async ocorrencias(fid) {
       const u = exigeEu()

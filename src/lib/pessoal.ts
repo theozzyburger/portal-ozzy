@@ -124,7 +124,7 @@ export function etapasDesligamento(d: Pick<Desligamento, 'data' | 'tipo'>, pesso
     { chave: 'aviso', nome: d.tipo === 'pedido' ? 'Carta de pedido de demissão assinada' : 'Aviso de desligamento assinado', detalhe: 'Com a data e se o aviso prévio é trabalhado ou indenizado.' },
     pessoa.sexo === 'feminino' && { chave: 'gravidez', nome: 'Termos de exame de gravidez (oferta ou recusa)', detalhe: 'Gerados pelo portal; anexar assinado no cadastro.' },
     { chave: 'aso', nome: 'Exame demissional (ASO)', detalhe: 'Dispensado se o último exame for de menos de 90 dias.' },
-    { chave: 'uniforme', nome: 'Devolução de uniformes e EPIs' },
+    { chave: 'uniforme', nome: 'Devolução de uniformes e EPIs', detalhe: 'Confira em Uniformes, no perfil: o portal soma o que foi entregue e calcula o desconto do que faltar.' },
     { chave: 'chaves', nome: 'Devolução de chaves, armário e crachá' },
     { chave: 'acessos', nome: 'Tirar acessos', detalhe: 'Ponto (Control iD), grupos de WhatsApp, PDV e sistemas.' },
     { chave: 'pendencias', nome: 'Fechar caixinha, freelas, faltas e descontos do mês' },

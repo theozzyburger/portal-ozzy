@@ -3,7 +3,7 @@ import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/u
 import MapaTurnos from '../components/MapaTurnos'
 import { useApp } from '../lib/contexto'
 import { podeGerenciar } from '../lib/permissoes'
-import { DIAS_SEMANA, LIMITE_SEMANA_MIN, LOCAIS_EXTRAS, horas, minutosSemana, minutosTrabalhados, textoPausa, viraNoite } from '../lib/turnos'
+import { DIAS_POR_PESSOA, DIAS_SEMANA, LIMITE_SEMANA_MIN, LOCAIS_EXTRAS, diasAbertos, horas, minutosPessoa, minutosSemana, revezado, minutosTrabalhados, textoPausa, viraNoite } from '../lib/turnos'
 import { apelidoUnidade, nomeCurto, type DiaTurno, type Funcionario, type Turno } from '../lib/types'
 
 export default function Turnos() {
@@ -148,7 +148,7 @@ function CartaoTurno({
   aoAtribuir: (f: Funcionario, t: Turno | null) => void
   aoEditar: () => void
 }) {
-  const semana = minutosSemana(turno)
+  const semana = minutosPessoa(turno)
   const acima = semana > LIMITE_SEMANA_MIN
   const livres = candidatos.filter((f) => !nomeTurnoDe(f))
   const emOutro = candidatos.filter((f) => nomeTurnoDe(f))
@@ -169,7 +169,14 @@ function CartaoTurno({
         </div>
         <div className="text-right">
           <div className={`text-lg font-bold tabular-nums ${acima ? 'text-red-700' : ''}`}>{horas(semana)}</div>
-          <div className="text-xs text-stone-500">{acima ? 'acima de 44h por semana' : 'por semana'}</div>
+          <div className="text-xs text-stone-500">
+            {acima ? 'por pessoa, acima de 44h' : revezado(turno) ? `por pessoa (${DIAS_POR_PESSOA}x2, média)` : 'por semana'}
+          </div>
+          {revezado(turno) && (
+            <div className="text-[11px] text-stone-400">
+              Posto aberto {diasAbertos(turno)} dias: {horas(minutosSemana(turno))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -277,7 +284,7 @@ function EditorTurno({
   const [apagar, setApagar] = useState(false)
   const [erro, setErro] = useState('')
   const rascunho: Turno = { id: turno?.id ?? '', local, nome, dias }
-  const semana = minutosSemana(rascunho)
+  const semana = minutosPessoa(rascunho)
   const locais = [...unidades.map((u) => ({ id: u.id, nome: u.nome })), ...Object.entries(LOCAIS_EXTRAS).map(([id, nome]) => ({ id, nome }))]
 
   const mudarDia = (i: number, d: DiaTurno | null) => {
@@ -362,7 +369,16 @@ function EditorTurno({
         </div>
 
         <p className={`rounded-xl p-3 text-sm ${semana > LIMITE_SEMANA_MIN ? 'bg-red-50 text-red-700' : 'bg-stone-50 text-stone-700'}`}>
-          Total: <b>{horas(semana)}</b> por semana{semana > LIMITE_SEMANA_MIN ? ', acima do limite de 44h da CLT.' : '.'} Saída antes da entrada = termina no dia seguinte.
+          {revezado(rascunho) ? (
+            <>
+              Posto aberto {diasAbertos(rascunho)} dias ({horas(minutosSemana(rascunho))}). Cada pessoa faz {DIAS_POR_PESSOA}x2: em média <b>{horas(semana)}</b> por semana
+            </>
+          ) : (
+            <>
+              Total: <b>{horas(semana)}</b> por semana
+            </>
+          )}
+          {semana > LIMITE_SEMANA_MIN ? ', acima do limite de 44h da CLT.' : '.'} Saída antes da entrada = termina no dia seguinte.
         </p>
 
         {erro && <p className="text-sm text-red-600">{erro}</p>}

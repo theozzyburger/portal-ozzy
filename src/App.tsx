@@ -18,6 +18,7 @@ import Compras from './pages/Compras'
 import Vencimentos from './pages/Vencimentos'
 import Caixinha from './pages/Caixinha'
 import Turnos from './pages/Turnos'
+import Ponto from './pages/Ponto'
 import Regras from './pages/Regras'
 import Manutencao from './pages/Manutencao'
 import Fichas from './pages/Fichas'
@@ -101,7 +102,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
     { id: 'folgas', nome: 'Folgas' },
     ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe' }] : []),
     ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }, { id: 'caixinha', nome: 'Caixinha' }, { id: 'salarios', nome: 'Salários' }] : []),
-    { id: 'ponto', nome: 'Ponto', emBreve: true },
+    { id: 'ponto', nome: 'Ponto' },
     { id: 'perfil', nome: 'Meu perfil' },
   ]
   const abaRh = abasRh.find((a) => a.id === sub)?.id ?? 'avisos'
@@ -122,7 +123,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (abaRh === 'exames') conteudo = <Vencimentos />
   else if (abaRh === 'caixinha') conteudo = <Caixinha />
   else if (abaRh === 'salarios') conteudo = <Salarios />
-  else if (abaRh === 'ponto') conteudo = <EmBreve modulo={PONTO} />
+  else if (abaRh === 'ponto') conteudo = <Ponto />
   else if (abaRh === 'perfil') conteudo = <Perfil funcionarioId={eu.id} />
   else conteudo = <Comunicados />
 
@@ -223,10 +224,3 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   )
 }
 
-const PONTO = {
-  id: 'rh' as const,
-  nome: 'Ponto',
-  resumo: 'Batidas do relógio Control iD dentro do portal.',
-  itens: ['Espelho de ponto de cada funcionário', 'Atrasos e faltas cruzados com atestados', 'Cada pessoa vê o próprio ponto pelo celular'],
-  origem: 'Primeiro por importação do relatório do Control iD; depois, se o seu modelo permitir, direto pela API.',
-}

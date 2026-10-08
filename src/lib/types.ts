@@ -181,13 +181,62 @@ export interface EntregaUniforme {
   criadoEm: string
 }
 
-export const ITENS_UNIFORME = ['Camiseta', 'Dólmã', 'Avental', 'Boné', 'Touca', 'Calça', 'Jaqueta', 'Bota de segurança (EPI)', 'Luva térmica (EPI)']
-export const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'Único']
+export const ITENS_UNIFORME = ['Camiseta', 'Calça', 'Sapato', 'Avental', 'Boné', 'Dólmã', 'Touca', 'Jaqueta', 'Bota de segurança (EPI)', 'Luva térmica (EPI)']
+export const TAMANHOS = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'Único']
 
-export const termoUniforme = (nome: string, data: string, itens: ItemUniforme[]) =>
+// Termos registrados a partir daqui levam a cláusula do desconto (reunião de RH de 08/10). Os já assinados
+// continuam mostrando o texto que a pessoa assinou.
+export const TERMO_UNIFORME_V2 = '2026-10-08T15:30:00Z'
+export const termoUniforme = (nome: string, data: string, itens: ItemUniforme[], criadoEm?: string) =>
   `Eu, ${nome}, declaro que recebi da empresa, gratuitamente, em ${data.split('-').reverse().join('/')}, os itens de uniforme e equipamentos listados abaixo, ` +
   `em bom estado: ${itens.map((i) => `${i.quantidade}x ${i.item}${i.tamanho ? ` (${i.tamanho})` : ''}`).join('; ')}. ` +
-  `Comprometo-me a usá-los somente durante o trabalho, a conservá-los e a devolvê-los quando for desligado(a) ou quando forem substituídos.`
+  `Comprometo-me a usá-los somente durante o trabalho, a conservá-los e a devolvê-los quando for desligado(a) ou quando forem substituídos.` +
+  (!criadoEm || criadoEm >= TERMO_UNIFORME_V2
+    ? ` Se não devolver alguma peça, ou devolver danificada por mau uso, autorizo o desconto do valor dela, conforme a tabela da empresa, no salário ou na rescisão.`
+    : '')
+
+// Conferência da devolução de uniforme (no desligamento): o que foi entregue, o que voltou e quanto desconta.
+export interface ItemDevolucao {
+  item: string
+  tamanho?: string
+  entregue: number
+  devolvido: number
+  valor: number
+}
+export interface DevolucaoUniforme {
+  id: string
+  funcionarioId: string
+  data: string
+  itens: ItemDevolucao[]
+  totalDesconto: number
+  observacao: string | null
+  conferidoPor: string
+  criadoEm: string
+}
+
+// Pedido de ajuste do ponto (Control iD), feito pela própria pessoa.
+export type TipoAjustePonto = 'esqueci_entrada' | 'esqueci_saida' | 'horario_errado' | 'equipamento' | 'outro'
+export const TIPOS_AJUSTE_PONTO: { valor: TipoAjustePonto; nome: string }[] = [
+  { valor: 'esqueci_entrada', nome: 'Esqueci de bater a entrada' },
+  { valor: 'esqueci_saida', nome: 'Esqueci de bater a saída' },
+  { valor: 'horario_errado', nome: 'Horário saiu errado' },
+  { valor: 'equipamento', nome: 'O relógio não registrou (falha)' },
+  { valor: 'outro', nome: 'Outro' },
+]
+export interface AjustePonto {
+  id: string
+  funcionarioId: string
+  data: string
+  tipo: TipoAjustePonto
+  // Horário certo (HH:MM), quando a pessoa sabe.
+  horario: string | null
+  motivo: string | null
+  status: 'pendente' | 'feito' | 'recusado'
+  resposta: string | null
+  criadoEm: string
+  resolvidoPor: string | null
+  resolvidoEm: string | null
+}
 
 export const TIPOS_OCORRENCIA: { valor: TipoOcorrencia; nome: string }[] = [
   { valor: 'falta', nome: 'Falta' },

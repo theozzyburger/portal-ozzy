@@ -22,7 +22,15 @@ export const minutosTrabalhados = (d: DiaTurno | null) => {
   return total - d.pausaMin
 }
 
-export const minutosSemana = (t: Turno) => t.dias.reduce((s, d) => s + minutosTrabalhados(d), 0)
+export const minutosSemana = (t: Pick<Turno, 'dias'>) => t.dias.reduce((s, d) => s + minutosTrabalhados(d), 0)
+
+// Escala 5x2 (08/10): o posto abre até 6 dias, mas cada pessoa trabalha 5 e folga em revezamento (toda segunda
+// e um domingo sim, outro não). As horas da pessoa são a média dos dias abertos × 5, não a soma do posto.
+export const DIAS_POR_PESSOA = 5
+export const diasAbertos = (t: Pick<Turno, 'dias'>) => t.dias.filter(Boolean).length
+export const revezado = (t: Pick<Turno, 'dias'>) => diasAbertos(t) > DIAS_POR_PESSOA
+export const minutosPessoa = (t: Pick<Turno, 'dias'>) =>
+  revezado(t) ? Math.round((minutosSemana(t) * DIAS_POR_PESSOA) / diasAbertos(t)) : minutosSemana(t)
 
 export const horas = (minutos: number) => {
   const h = Math.floor(minutos / 60)

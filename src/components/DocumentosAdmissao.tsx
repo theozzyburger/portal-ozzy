@@ -291,6 +291,24 @@ export function GuiaExame({ pessoa, aoFechar }: { pessoa: Funcionario; aoFechar:
   )
 }
 
+// Mensagem pronta para a pessoa (pedido de 08/10): abre o WhatsApp dela e é só apertar Enviar.
+function linkWhatsApp(p: Funcionario, tipo: TipoExame, extras: string[], responsavel: string) {
+  const d = p.celular.replace(/\D/g, '')
+  if (d.length < 10) return null
+  const nomeExame = TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()
+  const msg = [
+    `Oi, ${p.nome.split(' ')[0]}! Aqui é ${responsavel.split(' ')[0]}, da The Ozzy. Segue a guia do seu exame ${nomeExame}.`,
+    '',
+    'Não precisa agendar. É só ir à clínica Souza Segurança do Trabalho com a guia e um documento com foto:',
+    '📍 Rua John Harrison, 299, 1º andar, sala 109 (perto da estação Lapa)',
+    '🕗 Segunda a sexta, das 8h às 16h40',
+    ...(extras.length ? ['', `Os exames de laboratório (${extras.join(', ').toLowerCase()}) são feitos só de manhã, das 8h às 12h.`] : []),
+    '',
+    'Qualquer dúvida, é só chamar!',
+  ].join('\n')
+  return `https://wa.me/${d.startsWith('55') && d.length > 11 ? d : '55' + d}?text=${encodeURIComponent(msg)}`
+}
+
 const celularBonito = (c: string) => {
   const d = c.replace(/\D/g, '')
   return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : d.length === 10 ? `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}` : c
@@ -311,8 +329,31 @@ function FolhaGuia({
   )
   const linhas = [...extras]
   while (linhas.length < 4) linhas.push('')
+  const [ajuda, setAjuda] = useState(false)
+  const whats = linkWhatsApp(pessoa, tipo, extras, responsavel)
   return (
-    <Impressao titulo={`Encaminhamento para exame · ${pessoa.nome}`} aoFechar={aoFechar}>
+    <Impressao
+      titulo={`Encaminhamento para exame · ${pessoa.nome}`}
+      aoFechar={aoFechar}
+      acoes={
+        whats ? (
+          <a
+            href={whats}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setAjuda(true)}
+            className="inline-flex items-center rounded-xl bg-[#25D366] px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
+          >
+            WhatsApp
+          </a>
+        ) : null
+      }
+    >
+      {ajuda && (
+        <p className="nao-imprimir mb-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-300">
+          A mensagem abre pronta no WhatsApp. Para mandar a guia junto: Imprimir › Salvar como PDF e anexe o arquivo na conversa.
+        </p>
+      )}
       <div className="text-[11px] leading-tight">
         <div className="grid grid-cols-[5fr_7fr] border border-black">
           <div className="flex items-center border-r border-black p-2">

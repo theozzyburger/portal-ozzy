@@ -23,18 +23,18 @@ export const tamanhosDe = (p: Funcionario) =>
 
 // Compras: por enquanto, uniformes (pedidos de troca da equipe e pedidos de compra por leva).
 export default function Compras() {
-  const [aba, setAba] = useState<'trocas' | 'pedidos'>('trocas')
+  const [aba, setAba] = useState<'trocas' | 'pedidos' | 'valores'>('trocas')
   return (
     <div className="space-y-4">
       <Titulo>Compras · Uniformes</Titulo>
       <div className="flex gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
-        {([['trocas', 'Pedidos de troca'], ['pedidos', 'Pedidos de compra']] as const).map(([a, nome]) => (
+        {([['trocas', 'Pedidos de troca'], ['pedidos', 'Pedidos de compra'], ['valores', 'Valores']] as const).map(([a, nome]) => (
           <button key={a} onClick={() => setAba(a)} className={`flex-1 rounded-lg px-3 py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
             {nome}
           </button>
         ))}
       </div>
-      {aba === 'trocas' ? <Trocas /> : <Pedidos />}
+      {aba === 'trocas' ? <Trocas /> : aba === 'pedidos' ? <Pedidos /> : <ValoresUniforme />}
     </div>
   )
 }
@@ -570,5 +570,60 @@ function Relatorio({ pedido, itens, pessoas, loja, aoFechar }: {
         </tbody>
       </table>
     </Impressao>
+  )
+}
+
+// Tabela de valores (reunião de RH de 08/10): quanto se desconta de cada peça não devolvida no desligamento.
+function ValoresUniforme() {
+  const { store, avisar } = useApp()
+  const [linhas, setLinhas] = useState<{ item: string; valor: string; original?: string }[]>([])
+  const [salvando, setSalvando] = useState(false)
+  const carregar = useCallback(
+    () =>
+      store.valoresUniforme().then((t) => {
+        const itens = [...new Set([...PECAS.map((p) => p.item), ...Object.keys(t)])]
+        setLinhas(itens.map((item) => ({ item, original: item in t ? item : undefined, valor: item in t ? String(t[item]).replace('.', ',') : '' })))
+      }),
+    [store],
+  )
+  useEffect(() => {
+    carregar()
+  }, [carregar])
+  const numero = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'))
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      const mudancas: Record<string, number | null> = {}
+      for (const l of linhas) {
+        const nome = l.item.trim()
+        if (l.original && l.original !== nome) mudancas[l.original] = null
+        if (!nome) continue
+        mudancas[nome] = l.valor.trim() && numero(l.valor) >= 0 ? numero(l.valor) : null
+      }
+      await store.salvarValoresUniforme(mudancas)
+      await carregar()
+      avisar('Tabela de valores salva')
+    } catch (e) {
+      avisar((e as Error).message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+  return (
+    <section className="space-y-3 rounded-2xl bg-white p-4 ring-1 ring-stone-200">
+      <p className="text-sm text-stone-600">
+        Valor de cada peça, descontado na rescisão se a pessoa não devolver. Entra sozinho na conferência da devolução (perfil › Uniformes).
+      </p>
+      {linhas.map((l, i) => (
+        <div key={i} className="grid grid-cols-[1fr_8rem] gap-2">
+          <input className={estiloEntrada} value={l.item} onChange={(e) => setLinhas(linhas.map((x, k) => (k === i ? { ...x, item: e.target.value } : x)))} aria-label="Peça" />
+          <input className={estiloEntrada} inputMode="decimal" placeholder="R$ 0,00" value={l.valor} onChange={(e) => setLinhas(linhas.map((x, k) => (k === i ? { ...x, valor: e.target.value } : x)))} aria-label={`Valor de ${l.item}`} />
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <Botao variante="secundario" onClick={() => setLinhas([...linhas, { item: '', valor: '' }])}>+ Peça</Botao>
+        <Botao disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar tabela'}</Botao>
+      </div>
+    </section>
   )
 }

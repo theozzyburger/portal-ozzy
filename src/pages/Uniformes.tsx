@@ -6,6 +6,8 @@ import { dataLonga, hoje } from '../lib/datas'
 import { podeGerenciar, possoAlterar } from '../lib/permissoes'
 import { FotoTroca } from './Compras'
 import { ir } from '../lib/rota'
+import DevolucaoUniformes from '../components/DevolucaoUniformes'
+import { PECAS, corCamiseta } from '../lib/uniformes'
 import { ITENS_TROCA, type SolicitacaoUniforme, ITENS_UNIFORME, TAMANHOS, termoUniforme, type EntregaUniforme, type Funcionario, type ItemUniforme } from '../lib/types'
 
 const resumoItens = (itens: ItemUniforme[]) => itens.map((i) => `${i.quantidade}x ${i.item}${i.tamanho ? ` ${i.tamanho}` : ''}`).join(' · ')
@@ -53,6 +55,10 @@ export default function Uniformes({ pessoa }: { pessoa: Funcionario }) {
         ))
       )}
 
+      {(entregas.length > 0 || pessoa.status === 'inativo') && (podeGerenciar(eu.nivel) || souEu) && (
+        <DevolucaoUniformes pessoa={pessoa} entregas={entregas} gestao={gestao} />
+      )}
+
       {modal?.tipo === 'nova' && (
         <NovaEntrega
           pessoa={pessoa}
@@ -84,7 +90,14 @@ export default function Uniformes({ pessoa }: { pessoa: Funcionario }) {
 function NovaEntrega({ pessoa, aoFechar, aoSalvar }: { pessoa: Funcionario; aoFechar: () => void; aoSalvar: (assinado: boolean) => void }) {
   const { store } = useApp()
   const [data, setData] = useState(hoje())
-  const [itens, setItens] = useState<ItemUniforme[]>([{ item: ITENS_UNIFORME[0], tamanho: 'M', quantidade: 1 }])
+  // Kit padrão da casa (5 peças), com os tamanhos do cadastro.
+  const kit = (): ItemUniforme[] =>
+    PECAS.map((p) => ({
+      item: p.cor ? `Camiseta ${corCamiseta(pessoa).toLowerCase()}` : p.item,
+      tamanho: p.tamanho(pessoa) ?? undefined,
+      quantidade: 1,
+    }))
+  const [itens, setItens] = useState<ItemUniforme[]>(kit)
   const [observacao, setObservacao] = useState('')
   const [etapa, setEtapa] = useState<'itens' | 'assinar'>('itens')
   const [assinatura, setAssinatura] = useState<string | null>(null)
@@ -92,6 +105,7 @@ function NovaEntrega({ pessoa, aoFechar, aoSalvar }: { pessoa: Funcionario; aoFe
 
   const mudar = (i: number, p: Partial<ItemUniforme>) => setItens(itens.map((x, k) => (k === i ? { ...x, ...p } : x)))
   const salvar = async (comAssinatura: boolean) => {
+    if (itens.some((x) => !x.item.trim())) return setErro('Preencha o nome de cada item (ou tire a linha vazia).')
     try {
       await store.registrarUniforme({ funcionarioId: pessoa.id, data, itens, observacao, assinatura: comAssinatura ? assinatura! : undefined })
       aoSalvar(comAssinatura)
@@ -110,33 +124,35 @@ function NovaEntrega({ pessoa, aoFechar, aoSalvar }: { pessoa: Funcionario; aoFe
           <div className="space-y-2">
             <div className="text-sm font-semibold text-stone-700">Itens entregues</div>
             {itens.map((x, i) => (
-              <div key={i} className="grid grid-cols-[1fr_5rem_4rem_auto] items-center gap-2">
-                <select className={estiloEntrada} value={x.item} onChange={(e) => mudar(i, { item: e.target.value })} aria-label="Item">
-                  {ITENS_UNIFORME.map((n) => (
-                    <option key={n}>{n}</option>
-                  ))}
-                </select>
-                <select className={estiloEntrada} value={x.tamanho ?? ''} onChange={(e) => mudar(i, { tamanho: e.target.value || undefined })} aria-label="Tamanho">
-                  <option value="">—</option>
-                  {TAMANHOS.map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
+              <div key={i} className="grid grid-cols-[1fr_5.5rem_3.5rem_auto] items-center gap-2">
+                <input className={estiloEntrada} list="itens-uniforme" value={x.item} onChange={(e) => mudar(i, { item: e.target.value })} aria-label="Item" />
+                <input className={estiloEntrada} list="tamanhos-uniforme" value={x.tamanho ?? ''} onChange={(e) => mudar(i, { tamanho: e.target.value || undefined })} aria-label="Tamanho" placeholder="—" />
                 <input className={estiloEntrada} type="number" min={1} value={x.quantidade} onChange={(e) => mudar(i, { quantidade: Math.max(1, Number(e.target.value)) })} aria-label="Quantidade" />
                 <button type="button" onClick={() => setItens(itens.filter((_, k) => k !== i))} disabled={itens.length === 1} className="px-1 text-lg text-stone-400 disabled:opacity-30" aria-label="Remover item">
                   ×
                 </button>
               </div>
             ))}
-            <button type="button" onClick={() => setItens([...itens, { item: ITENS_UNIFORME[2], quantidade: 1 }])} className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4">
-              + Adicionar item
-            </button>
+            <datalist id="itens-uniforme">
+              {['Camiseta preta', 'Camiseta branca', ...ITENS_UNIFORME].map((n) => <option key={n} value={n} />)}
+            </datalist>
+            <datalist id="tamanhos-uniforme">
+              {TAMANHOS.map((t) => <option key={t} value={t} />)}
+            </datalist>
+            <div className="flex flex-wrap gap-4">
+              <button type="button" onClick={() => setItens([...itens, { item: '', quantidade: 1 }])} className="text-sm font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4">
+                + Adicionar item
+              </button>
+              <button type="button" onClick={() => setItens(kit())} className="text-sm font-semibold text-stone-500">
+                Voltar ao kit padrão
+              </button>
+            </div>
           </div>
           <Campo rotulo="Observação (opcional)">
-            <input className={estiloEntrada} value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex.: troca do dólmã gasto" />
+            <input className={estiloEntrada} value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex.: troca da camiseta gasta" />
           </Campo>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Botao onClick={() => setEtapa('assinar')}>Assinar agora</Botao>
+            <Botao onClick={() => (itens.some((x) => !x.item.trim()) ? setErro('Preencha o nome de cada item (ou tire a linha vazia).') : setEtapa('assinar'))}>Assinar agora</Botao>
             <Botao variante="secundario" onClick={() => salvar(false)}>
               Assinar depois pelo portal
             </Botao>
@@ -178,7 +194,7 @@ function Termo({ entrega, pessoa, assinar, aoFechar, aoAssinar }: { entrega: Ent
   return (
     <Modal titulo="Termo de recebimento de uniforme" aberto aoFechar={aoFechar}>
       <div className="space-y-4">
-        <p className="rounded-xl bg-stone-50 p-3 text-sm leading-relaxed text-stone-700">{termoUniforme(pessoa.nome, entrega.data, entrega.itens)}</p>
+        <p className="rounded-xl bg-stone-50 p-3 text-sm leading-relaxed text-stone-700">{termoUniforme(pessoa.nome, entrega.data, entrega.itens, entrega.criadoEm)}</p>
         {entrega.assinatura ? (
           <div>
             <img src={entrega.assinatura} alt={`Assinatura de ${pessoa.nome}`} className="h-24 w-full rounded-xl border border-stone-200 bg-white object-contain" />

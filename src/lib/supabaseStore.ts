@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { nomeProprio, soDigitos, type Store } from './store'
-import type { EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -41,6 +41,16 @@ const paraDesligamento = (r: any): Desligamento => ({
 const paraDocumento = (r: any): Documento & { caminho: string } => ({
   id: r.id, funcionarioId: r.funcionario_id, tipo: r.tipo, nomeArquivo: r.nome_arquivo, observacao: r.observacao,
   inicio: r.inicio, fim: r.fim, realizadoEm: r.realizado_em, vence: r.vence, enviadoPor: r.enviado_por, criadoEm: r.criado_em, caminho: r.caminho,
+})
+
+const paraDevolucao = (r: any): DevolucaoUniforme => ({
+  id: r.id, funcionarioId: r.funcionario_id, data: r.data, itens: r.itens ?? [], totalDesconto: Number(r.total_desconto),
+  observacao: r.observacao, conferidoPor: r.conferido_por, criadoEm: r.criado_em,
+})
+
+const paraAjuste = (r: any): AjustePonto => ({
+  id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo, horario: r.horario, motivo: r.motivo, status: r.status,
+  resposta: r.resposta, criadoEm: r.criado_em, resolvidoPor: r.resolvido_por, resolvidoEm: r.resolvido_em,
 })
 
 const paraUniforme = (r: any): EntregaUniforme => ({
@@ -209,6 +219,50 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async assinarUniforme(id, assinatura) {
       ok(await sb.rpc('assinar_uniforme', { entrega: id, imagem: assinatura }))
+    },
+    async valoresUniforme() {
+      const rs = ok(await sb.from('uniforme_valores').select('item, valor')) ?? []
+      return Object.fromEntries(rs.map((r: any) => [r.item, Number(r.valor)]))
+    },
+    async salvarValoresUniforme(valores) {
+      const salvar = Object.entries(valores).filter(([, v]) => v !== null).map(([item, valor]) => ({ item, valor, atualizado_em: new Date().toISOString() }))
+      const apagar = Object.entries(valores).filter(([, v]) => v === null).map(([item]) => item)
+      if (salvar.length) ok(await sb.from('uniforme_valores').upsert(salvar))
+      if (apagar.length) ok(await sb.from('uniforme_valores').delete().in('item', apagar))
+    },
+    async devolucoesUniforme(fid) {
+      return (ok(await sb.from('uniforme_devolucoes').select('*').eq('funcionario_id', fid).order('criado_em', { ascending: false })) ?? []).map(paraDevolucao)
+    },
+    async registrarDevolucao(d) {
+      const u = exigeEu()
+      const total = d.itens.reduce((t, i) => t + Math.max(0, i.entregue - i.devolvido) * i.valor, 0)
+      const r = ok(
+        await sb.from('uniforme_devolucoes').insert({
+          funcionario_id: d.funcionarioId, data: d.data, itens: d.itens, total_desconto: Math.round(total * 100) / 100,
+          observacao: d.observacao?.trim() || null, conferido_por: u.id,
+        }).select().single(),
+      )
+      return paraDevolucao(r)
+    },
+    async excluirDevolucao(id) {
+      ok(await sb.from('uniforme_devolucoes').delete().eq('id', id))
+    },
+    async ajustesPonto(filtro) {
+      let q = sb.from('ponto_ajustes').select('*').order('criado_em', { ascending: false }).limit(300)
+      if (filtro === 'meus') q = q.eq('funcionario_id', exigeEu().id)
+      if (filtro === 'pendente') q = q.eq('status', 'pendente')
+      return (ok(await q) ?? []).map(paraAjuste)
+    },
+    async pedirAjustePonto(a) {
+      const u = exigeEu()
+      ok(await sb.from('ponto_ajustes').insert({ funcionario_id: u.id, data: a.data, tipo: a.tipo, horario: a.horario || null, motivo: a.motivo.trim() || null }))
+    },
+    async resolverAjustePonto(id, status, resposta) {
+      const u = exigeEu()
+      ok(await sb.from('ponto_ajustes').update({ status, resposta: resposta.trim() || null, resolvido_por: u.id, resolvido_em: new Date().toISOString() }).eq('id', id))
+    },
+    async excluirAjustePonto(id) {
+      ok(await sb.from('ponto_ajustes').delete().eq('id', id))
     },
     async ocorrencias(fid) {
       return (ok(await sb.from('ocorrencias').select('*').eq('funcionario_id', fid).order('data', { ascending: false })) ?? []).map(paraOcorrencia)

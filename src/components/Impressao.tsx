@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { Botao } from './ui'
 
 // Tela cheia com uma folha A4 e o botão Imprimir. Na impressão (ou "Salvar como PDF"), só a folha sai.
-export default function Impressao({ titulo, aoFechar, children }: { titulo: string; aoFechar: () => void; children: ReactNode }) {
+// acoes: botões extras na barra (ex.: mandar no WhatsApp). Não saem na impressão.
+export default function Impressao({ titulo, aoFechar, children, acoes }: { titulo: string; aoFechar: () => void; children: ReactNode; acoes?: ReactNode }) {
   useEffect(() => {
     document.body.classList.add('imprimindo')
     return () => document.body.classList.remove('imprimindo')
@@ -13,6 +14,7 @@ export default function Impressao({ titulo, aoFechar, children }: { titulo: stri
       <div className="nao-imprimir sticky top-0 z-10 flex items-center justify-between gap-2 bg-carvao px-4 py-3 text-white">
         <span className="truncate font-semibold">{titulo}</span>
         <div className="flex shrink-0 gap-2">
+          {acoes}
           <Botao className="bg-ozzy-400! text-carvao!" onClick={() => window.print()}>Imprimir</Botao>
           <Botao variante="fantasma" className="text-white! hover:bg-white/10!" onClick={aoFechar} aria-label="Fechar">✕</Botao>
         </div>
