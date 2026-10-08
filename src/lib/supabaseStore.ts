@@ -195,10 +195,10 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       )
       return paraDocumento(r)
     },
-    async abrirDocumento(d) {
+    async abrirDocumento(d, segundos = 60) {
       const caminho = (d as Documento & { caminho?: string }).caminho
       if (!caminho) return null
-      const { data } = await sb.storage.from('documentos').createSignedUrl(caminho, 60)
+      const { data } = await sb.storage.from('documentos').createSignedUrl(caminho, segundos)
       return data?.signedUrl ?? null
     },
     async documentosTodos() {

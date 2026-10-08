@@ -69,7 +69,8 @@ export interface Store {
 
   documentos(funcionarioId: string): Promise<Documento[]>
   enviarDocumento(d: NovoDocumento): Promise<Documento>
-  abrirDocumento(d: Documento): Promise<string | null>
+  // segundos: por quanto tempo o link vale (padrão 1 minuto; a guia mandada no WhatsApp vale 7 dias).
+  abrirDocumento(d: Documento, segundos?: number): Promise<string | null>
   // Todos os documentos que eu posso ver (para o controle de vencimentos).
   documentosTodos(): Promise<Documento[]>
 

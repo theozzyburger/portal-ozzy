@@ -3,6 +3,7 @@ import Impressao from './Impressao'
 import { Botao, Campo, Modal, estiloEntrada } from './ui'
 import logoSouza from '../assets/logo-souza.png'
 import { useApp } from '../lib/contexto'
+import { folhaParaPdf } from '../lib/pdf'
 import { formatarCpf } from '../lib/cpf'
 import { addDias, dataCurta, hoje } from '../lib/datas'
 import { EMPRESAS } from '../lib/empresas'
@@ -301,7 +302,7 @@ export function diaDoExame(de: string) {
   return { data: d, texto: d === addDias(de, 1) ? `amanhã, ${nome}, ${dataCurta(d)}` : `na ${nome}, ${dataCurta(d)}` }
 }
 
-function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string) {
+function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string, linkGuia?: string | null) {
   const d = p.celular.replace(/\D/g, '')
   if (d.length < 10) return null
   const nomeExame = TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()
@@ -319,6 +320,7 @@ function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string) {
     'R. John Harrison, 299 – 1º andar – Lapa, São Paulo – SP, 05074-080.',
     '',
     'Qualquer dúvida, fico à disposição!',
+    ...(linkGuia ? ['', `📄 Carta de encaminhamento (abra e mostre na clínica): ${linkGuia}`] : []),
   ].join('\n')
   return `https://wa.me/${d.startsWith('55') && d.length > 11 ? d : '55' + d}?text=${encodeURIComponent(msg)}`
 }
@@ -343,29 +345,75 @@ function FolhaGuia({
   )
   const linhas = [...extras]
   while (linhas.length < 4) linhas.push('')
-  const [ajuda, setAjuda] = useState(false)
-  const whats = linkWhatsApp(pessoa, tipo, responsavel)
+  const { store, avisar } = useApp()
+  const [enviando, setEnviando] = useState(false)
+  const [linkPronto, setLinkPronto] = useState<string | null>(null)
+  const temCelular = pessoa.celular.replace(/\D/g, '').length >= 10
+  const nomePdf = `Encaminhamento exame - ${pessoa.nome}.pdf`
+  const gerarPdf = () => folhaParaPdf(document.querySelector<HTMLElement>('.folha-impressao .folha')!, nomePdf)
+  // Celular (e alguns computadores) deixam anexar o arquivo de verdade pelo menu de compartilhar.
+  const podeCompartilhar = typeof navigator !== 'undefined' && !!navigator.canShare?.({ files: [new File([''], 'a.pdf', { type: 'application/pdf' })] })
+
+  // Gera o PDF, guarda no cadastro da pessoa e manda o link dele junto da mensagem.
+  const mandarLink = async () => {
+    const janela = window.open('', '_blank')
+    setEnviando(true)
+    try {
+      const arquivo = await gerarPdf()
+      const doc = await store.enviarDocumento({
+        funcionarioId: pessoa.id, tipo: 'outro', arquivo,
+        observacao: `Guia de encaminhamento para exame ${TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()}`,
+      })
+      const url = await store.abrirDocumento(doc, 7 * 24 * 3600)
+      const link = linkWhatsApp(pessoa, tipo, responsavel, url)!
+      if (janela) janela.location.href = link
+      else setLinkPronto(link)
+      avisar('Guia salva no cadastro e mensagem aberta no WhatsApp')
+    } catch (e) {
+      janela?.close()
+      avisar((e as Error).message)
+    } finally {
+      setEnviando(false)
+    }
+  }
+  const compartilharPdf = async () => {
+    setEnviando(true)
+    try {
+      const arquivo = await gerarPdf()
+      const texto = decodeURIComponent(linkWhatsApp(pessoa, tipo, responsavel)!.split('text=')[1])
+      await navigator.share({ files: [arquivo], text: texto })
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') avisar((e as Error).message)
+    } finally {
+      setEnviando(false)
+    }
+  }
   return (
     <Impressao
       titulo={`Encaminhamento para exame · ${pessoa.nome}`}
       aoFechar={aoFechar}
       acoes={
-        whats ? (
-          <a
-            href={whats}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => setAjuda(true)}
-            className="inline-flex items-center rounded-xl bg-[#25D366] px-3 py-2 text-sm font-semibold text-white hover:brightness-95"
-          >
-            WhatsApp
-          </a>
-        ) : null
+        <>
+          {podeCompartilhar && (
+            <Botao variante="secundario" disabled={enviando} onClick={compartilharPdf} className="bg-white/10! text-white! ring-white/30!">
+              Compartilhar PDF
+            </Botao>
+          )}
+          {temCelular && (
+            <button
+              disabled={enviando}
+              onClick={mandarLink}
+              className="inline-flex items-center rounded-xl bg-[#25D366] px-3 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-60"
+            >
+              {enviando ? 'Gerando…' : 'WhatsApp'}
+            </button>
+          )}
+        </>
       }
     >
-      {ajuda && (
-        <p className="nao-imprimir mb-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-300">
-          A mensagem abre pronta no WhatsApp. Para mandar a guia junto: Imprimir › Salvar como PDF e anexe o arquivo na conversa.
+      {linkPronto && (
+        <p className="nao-imprimir mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-300">
+          O navegador bloqueou a nova aba. <a href={linkPronto} target="_blank" rel="noreferrer" className="font-semibold underline">Abrir o WhatsApp</a>
         </p>
       )}
       <div className="text-[11px] leading-tight">
