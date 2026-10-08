@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -135,6 +135,7 @@ const eventoDemo = (n: number, dias: number[], extra: Partial<Evento>): Evento =
   local: null, endereco: null, publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null,
   taxaOrganizadorPct: null, valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null,
   infraestrutura: null, observacao: null, operacoes: [], responsaveis: [],
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10,
   dias: dias.map((d) => ({ data: addDias(hoje(), d), abre: '12:00', fecha: '22:00' })),
   criadoPor: 'f1', criadoEm: haHoras(24 * 30), atualizadoPor: 'f1', atualizadoEm: haHoras(24 * 2), ...extra,
 })
@@ -155,9 +156,23 @@ const eventosDemo: Evento[] = [
   }),
   eventoDemo(1, [-20, -19], {
     nome: 'Festa Junina do Clube (exemplo)', status: 'finalizado', tipo: 'Festa', organizador: 'Clube Exemplo', local: 'Clube Exemplo',
-    publicoEstimado: 1500, taxaOrganizadorPct: 15, quemRecebe: 'the_ozzy', operacoes: ['burger'],
+    publicoEstimado: 1500, taxaOrganizadorPct: 15, quemRecebe: 'the_ozzy', operacoes: ['burger'], gastronomia: 'Junina', cidade: 'São Paulo', barracas: 1,
+  }),
+  eventoDemo(4, [-90, -89], {
+    nome: 'Festival Italiano Centro (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Praça Exemplo',
+    cidade: 'São Paulo', gastronomia: 'Italiano', barracas: 2, taxaOrganizadorPct: 21, quemRecebe: 'organizador',
+  }),
+  eventoDemo(5, [-60, -59, -58], {
+    nome: 'Festival Italiano Interior (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Shopping Exemplo',
+    cidade: 'Sorocaba', gastronomia: 'Italiano', barracas: 2, taxaOrganizadorPct: 21, quemRecebe: 'organizador',
+  }),
+  eventoDemo(6, [-1, 0, 1], {
+    nome: 'Festival Italiano do Bairro (exemplo)', status: 'execucao', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Rua Exemplo',
+    cidade: 'São Paulo', gastronomia: 'Italiano', barracas: 2, taxaOrganizadorPct: 21, quemRecebe: 'organizador', operacoes: ['pizza'],
+    responsaveis: [{ funcionarioId: 'p-maria-costa', papel: 'Responsável geral' }, { funcionarioId: 'p-cibeli-costa', papel: 'Estoque' }],
   }),
 ]
+eventosDemo.find((e) => e.id === 'ev2')!.gastronomia = 'Italiano'
 // Insumos e fichas de EXEMPLO (nomes e preços inventados), só para a demonstração.
 const fornecedoresDemo: Fornecedor[] = [
   { id: 'fo1', nome: 'Distribuidora Exemplo', contato: 'Vendedor Exemplo', telefone: '(11) 90000-0001', observacao: null, ativo: true },
@@ -185,13 +200,71 @@ const receitasDemo: Receita[] = [
   rec('re1', 'Creme de queijo (exemplo)', 'preparo', { conservacao: 'Refrigerado até 5 °C', validadeDias: 3 }),
   rec('re2', 'Focaccia de presunto (exemplo)', 'produto', { precoVenda: 55, tempoFinalizacaoMin: 3, capacidadeHora: 60, equipamentos: 'Forno elétrico', versaoAtual: 2 }),
   rec('re3', 'Refrigerante (exemplo)', 'produto', { linha: 'Bebidas', origem: 'revenda', precoVenda: 9 }),
+  rec('re4', 'Pizza margherita (exemplo)', 'produto', { linha: 'Pizza', precoVenda: 50 }),
 ]
 const it = (insumoId: string | null, subReceitaId: string | null, quantidade: number, aproveitamento = 1) => ({ insumoId, subReceitaId, quantidade, aproveitamento })
 const versoesReceitaDemo: VersaoReceita[] = [
   { id: 've1', receitaId: 're1', numero: 1, rendimento: 1, custoTotal: 34.08, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in4', null, 0.33), it('in3', null, 0.67)] },
   { id: 've2', receitaId: 're2', numero: 1, rendimento: 1, custoTotal: 7.78, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025)] },
   { id: 've3', receitaId: 're2', numero: 2, rendimento: 1, custoTotal: 8.28, nota: 'Mais rúcula, a pedido da cozinha', criadaEm: haHoras(24 * 3), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025), it('in5', null, 0.02, 0.8)] },
-  { id: 've4', receitaId: 're3', numero: 1, rendimento: 1, custoTotal: 3.2, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in7', null, 1)] },
+  { id: 've4', receitaId: 're3', numero: 1, rendimento: 1, custoTotal: 3.2, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in7', null, 1)] },  { id: 've5', receitaId: 're4', numero: 1, rendimento: 1, custoTotal: 6.3, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in6', null, 0.15, 0.9), it('in3', null, 0.08), it('in1', null, 0.1)] },
+]
+// Vendas de EXEMPLO dos eventos finalizados e do evento em andamento (dia de ontem).
+const vendaDemo = (eventoId: string, dia: number, receitaId: string, quantidade: number, preco: number): VendaEvento => ({
+  eventoId, data: addDias(hoje(), dia), receitaId, produto: receitasDemo.find((r) => r.id === receitaId)!.nome, quantidade, total: quantidade * preco, origem: 'exemplo',
+})
+const vendasEventosDemo: VendaEvento[] = [
+  ...[[-20, 120, 210], [-19, 150, 260]].flatMap(([d, a, b]) => [vendaDemo('ev1', d, 're2', a, 50), vendaDemo('ev1', d, 're3', b, 8)]),
+  ...[[-90, 380, 420, 300], [-89, 450, 500, 340]].flatMap(([d, a, b, c]) => [vendaDemo('ev4', d, 're2', a, 55), vendaDemo('ev4', d, 're3', b, 9), vendaDemo('ev4', d, 're4', c, 50)]),
+  ...[[-60, 180, 200, 150], [-59, 420, 470, 330], [-58, 360, 390, 280]].flatMap(([d, a, b, c]) => [vendaDemo('ev5', d, 're2', a, 55), vendaDemo('ev5', d, 're3', b, 9), vendaDemo('ev5', d, 're4', c, 50)]),
+  vendaDemo('ev6', -1, 're2', 260, 55), vendaDemo('ev6', -1, 're3', 300, 9), vendaDemo('ev6', -1, 're4', 210, 50),
+]
+const cardapiosDemo: Record<string, ProdutoEvento[]> = {
+  ev1: [{ receitaId: 're2', preco: 50, ordem: 1 }, { receitaId: 're3', preco: 8, ordem: 2 }],
+  ev2: [{ receitaId: 're2', preco: 55, ordem: 1 }, { receitaId: 're4', preco: 50, ordem: 2 }, { receitaId: 're3', preco: 9, ordem: 3 }],
+  ev4: [{ receitaId: 're2', preco: 55, ordem: 1 }, { receitaId: 're3', preco: 9, ordem: 2 }, { receitaId: 're4', preco: 50, ordem: 3 }],
+  ev5: [{ receitaId: 're2', preco: 55, ordem: 1 }, { receitaId: 're3', preco: 9, ordem: 2 }, { receitaId: 're4', preco: 50, ordem: 3 }],
+  ev6: [{ receitaId: 're2', preco: 55, ordem: 1 }, { receitaId: 're4', preco: 50, ordem: 2 }, { receitaId: 're3', preco: 9, ordem: 3 }],
+}
+const previsoesDemo: Record<string, QtdDiaProduto[]> = {
+  ev6: [-1, 0, 1].flatMap((d, i) => [
+    { data: addDias(hoje(), d), receitaId: 're2', quantidade: [250, 400, 350][i] },
+    { data: addDias(hoje(), d), receitaId: 're4', quantidade: [200, 320, 280][i] },
+    { data: addDias(hoje(), d), receitaId: 're3', quantidade: [280, 450, 400][i] },
+  ]),
+}
+const modeloChecklistDemo: ItemModeloChecklist[] = [
+  ['Equipamentos', 'Chapa de pão', 'Foca', '2'], ['Equipamentos', 'Extintor', null, '2'], ['Equipamentos', 'Fornos', 'Pizza', 'Grande e médio'],
+  ['Utensílios', 'Cortador de pizza', 'Pizza', '4'], ['Utensílios', 'GNs', 'Foca', 'Todas'], ['Embalagens', 'Pratos pizza', 'Pizza', '1000'],
+  ['Prod. Limpeza', 'Álcool gel', null, '3'], ['Decoração', 'Cardápios', null, 'Todos'],
+].map(([categoria, item, operacao, quantidade], i) => ({ id: 'mc' + i, categoria: categoria!, item: item!, operacao, quantidade, ordem: i, ativo: true }))
+const itemEnvioDemo = (id: string, categoria: string, chave: string | null, item: string | null, previsto: number | null, unidade: string | null, extra: Partial<ItemEnvio> = {}): ItemEnvio => ({
+  id, ordem: 0, categoria, operacao: null, insumoId: chave?.startsWith('i:') ? chave.slice(2) : null, receitaId: chave?.startsWith('r:') ? chave.slice(2) : null, item,
+  previsto, quantidade: previsto, quantidadeTexto: null, unidade, conferido: true, conferidoPor: 'p-maria-costa', conferidoEm: haHoras(30),
+  retornou: false, retornoPor: null, retornoEm: null, ...extra,
+})
+const enviosDemo: EnvioEvento[] = [
+  {
+    id: 'en1', eventoId: 'ev6', data: addDias(hoje(), -1), tipo: 'separacao', observacao: null, criadoPor: 'f1', criadoEm: haHoras(48),
+    itens: [
+      itemEnvioDemo('ei1', 'Insumos', 'i:in1', null, 50, 'un'), itemEnvioDemo('ei2', 'Insumos', 'i:in2', null, 5, 'kg'), itemEnvioDemo('ei3', 'Pré-preparos', 'r:re1', null, 8, 'kg'),
+      itemEnvioDemo('ei4', 'Insumos', 'i:in3', null, 25, 'kg'), itemEnvioDemo('ei5', 'Insumos', 'i:in6', null, 40, 'kg'), itemEnvioDemo('ei6', 'Insumos', 'i:in7', null, 360, 'un'),
+      itemEnvioDemo('ei7', 'Equipamentos', null, 'Chapa de pão', null, null, { operacao: 'Foca', quantidadeTexto: '2' }),
+      itemEnvioDemo('ei8', 'Equipamentos', null, 'Extintor', null, null, { quantidadeTexto: '2' }),
+      itemEnvioDemo('ei9', 'Utensílios', null, 'GNs', null, null, { operacao: 'Foca', quantidadeTexto: 'Todas' }),
+    ].map((x, i) => ({ ...x, ordem: i + 1 })),
+  },
+]
+const inventariosDemo: Inventario[] = [
+  {
+    id: 'iv1', local: 'evento', eventoId: 'ev6', data: addDias(hoje(), -1), contadoPor: 'p-maria-costa', contadoEm: haHoras(14), observacao: null,
+    fala: 'focaccia 9, presunto cru 0,9 quilo, creme de queijo 1 quilo e meio, queijo branco 4 quilos, creme de leite 1 quilo, tomate 6 quilos, refrigerante 70',
+    itens: [{ chave: 'i:in1', quantidade: 9 }, { chave: 'i:in2', quantidade: 0.9 }, { chave: 'r:re1', quantidade: 1.5 }, { chave: 'i:in3', quantidade: 4 }, { chave: 'i:in4', quantidade: 1 }, { chave: 'i:in6', quantidade: 6 }, { chave: 'i:in7', quantidade: 70 }],
+  },
+  {
+    id: 'iv0', local: 'base', eventoId: null, data: addDias(hoje(), -3), contadoPor: 'f1', contadoEm: haHoras(72), observacao: 'Contagem da Central (exemplo)', fala: null,
+    itens: [{ chave: 'i:in1', quantidade: 200 }, { chave: 'i:in2', quantidade: 12 }, { chave: 'r:re1', quantidade: 20 }, { chave: 'i:in3', quantidade: 60 }, { chave: 'i:in4', quantidade: 10 }, { chave: 'i:in6', quantidade: 80 }, { chave: 'i:in7', quantidade: 1200 }],
+  },
 ]
 const historicoEventosDemo: HistoricoEvento[] = [
   { id: 'he1', eventoId: 'ev2', em: haHoras(24 * 30), por: 'f1', tipo: 'criado', de: null, para: 'negociacao', campos: null, motivo: null },
@@ -1336,6 +1409,117 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       r.versaoAtual += 1
       versoesReceitaDemo.push({ id: novoId('ve'), receitaId, numero: r.versaoAtual, rendimento, custoTotal, nota: nota.trim() || null, criadaEm: agora(), criadaPor: u.id, itens: structuredClone(itens) })
       return r.versaoAtual
+    },
+
+    async cardapioEvento(eventoId) {
+      exigeGestao()
+      return structuredClone(cardapiosDemo[eventoId] ?? [])
+    },
+    async salvarCardapioEvento(eventoId, itens) {
+      exigeGestao()
+      cardapiosDemo[eventoId] = itens.map((i, o) => ({ ...i, ordem: o + 1 }))
+    },
+    async previsaoEvento(eventoId) {
+      exigeGestao()
+      return structuredClone(previsoesDemo[eventoId] ?? [])
+    },
+    async salvarPrevisaoEvento(eventoId, linhas) {
+      exigeGestao()
+      previsoesDemo[eventoId] = linhas.filter((l) => l.quantidade > 0)
+    },
+    async vendasEventos() {
+      exigeGestao()
+      return structuredClone(vendasEventosDemo)
+    },
+    async salvarVendasEvento(eventoId, linhas) {
+      exigeGestao()
+      for (let i = vendasEventosDemo.length - 1; i >= 0; i--) if (vendasEventosDemo[i].eventoId === eventoId) vendasEventosDemo.splice(i, 1)
+      for (const l of linhas.filter((x) => x.quantidade > 0))
+        vendasEventosDemo.push({ ...l, eventoId, produto: receitasDemo.find((r) => r.id === l.receitaId)?.nome ?? '?', origem: 'manual' })
+    },
+    async modeloChecklist() {
+      exigeGestao()
+      return structuredClone(modeloChecklistDemo).sort((a, b) => a.ordem - b.ordem)
+    },
+    async salvarItemModelo(i) {
+      exigeGestao()
+      if (!i.item.trim()) throw new Error('Escreva o item.')
+      const atual = modeloChecklistDemo.find((x) => x.id === i.id)
+      if (atual) Object.assign(atual, i)
+      else modeloChecklistDemo.push({ ...i, id: novoId('mc') })
+    },
+    async envios(eventoId) {
+      const u = exigeEu()
+      const vejo = (ev: string) => podeGerenciar(u.nivel) || eventosDemo.find((e) => e.id === ev)?.responsaveis.some((r) => r.funcionarioId === u.id)
+      return structuredClone(enviosDemo.filter((e) => (!eventoId || e.eventoId === eventoId) && vejo(e.eventoId))).sort((a, b) => a.data.localeCompare(b.data) || a.criadoEm.localeCompare(b.criadoEm))
+    },
+    async criarEnvio(eventoId, data, tipo, observacao, itens) {
+      const u = exigeGestao()
+      const id = novoId('en')
+      enviosDemo.push({
+        id, eventoId, data, tipo, observacao: observacao.trim() || null, criadoPor: u.id, criadoEm: agora(),
+        itens: itens.map((i, o) => ({ ...i, id: novoId('ei'), ordem: o + 1, conferido: false, conferidoPor: null, conferidoEm: null, retornou: false, retornoPor: null, retornoEm: null })),
+      })
+      return id
+    },
+    async excluirEnvio(id) {
+      exigeGestao()
+      const i = enviosDemo.findIndex((e) => e.id === id)
+      if (i >= 0) enviosDemo.splice(i, 1)
+    },
+    async adicionarItemEnvio(envioId, item) {
+      exigeGestao()
+      const e = enviosDemo.find((x) => x.id === envioId)
+      if (!e) throw new Error('Separação não encontrada.')
+      e.itens.push({ ...item, id: novoId('ei'), ordem: e.itens.length + 1, conferido: false, conferidoPor: null, conferidoEm: null, retornou: false, retornoPor: null, retornoEm: null })
+    },
+    async excluirItemEnvio(itemId) {
+      exigeGestao()
+      for (const e of enviosDemo) e.itens = e.itens.filter((i) => i.id !== itemId)
+    },
+    async conferirItemEnvio(itemId, etapa, quantidade, feito) {
+      const u = exigeEu()
+      const e = enviosDemo.find((x) => x.itens.some((i) => i.id === itemId))
+      const ev = eventosDemo.find((x) => x.id === e?.eventoId)
+      if (!e || !ev) throw new Error('Item não encontrado.')
+      if (!podeGerenciar(u.nivel) && !ev.responsaveis.some((r) => r.funcionarioId === u.id)) throw new Error('Seu nível de acesso não permite esta ação.')
+      const item = e.itens.find((i) => i.id === itemId)!
+      if (etapa === 'saida') Object.assign(item, { quantidade, conferido: feito, conferidoPor: feito ? u.id : null, conferidoEm: feito ? agora() : null })
+      else Object.assign(item, { retornou: feito, retornoPor: feito ? u.id : null, retornoEm: feito ? agora() : null })
+    },
+    async inventarios(filtro) {
+      const u = exigeEu()
+      if ('eventoId' in filtro) {
+        const ev = eventosDemo.find((x) => x.id === filtro.eventoId)
+        if (!podeGerenciar(u.nivel) && !ev?.responsaveis.some((r) => r.funcionarioId === u.id)) return []
+        return structuredClone(inventariosDemo.filter((i) => i.local === 'evento' && i.eventoId === filtro.eventoId)).sort((a, b) => b.contadoEm.localeCompare(a.contadoEm))
+      }
+      exigeGestao()
+      return structuredClone(inventariosDemo.filter((i) => i.local === 'base')).sort((a, b) => b.contadoEm.localeCompare(a.contadoEm))
+    },
+    async salvarInventario(local, eventoId, data, itens, fala, observacao) {
+      const u = exigeEu()
+      if (local === 'base') exigeGestao()
+      else if (!podeGerenciar(u.nivel) && !eventosDemo.find((x) => x.id === eventoId)?.responsaveis.some((r) => r.funcionarioId === u.id))
+        throw new Error('Seu nível de acesso não permite esta ação.')
+      const novo: Inventario = { id: novoId('iv'), local, eventoId, data, contadoPor: u.id, contadoEm: agora(), observacao: observacao.trim() || null, fala: fala.trim() || null, itens: structuredClone(itens) }
+      const i = local === 'evento' ? inventariosDemo.findIndex((x) => x.local === 'evento' && x.eventoId === eventoId && x.data === data) : -1
+      if (i >= 0) inventariosDemo[i] = { ...novo, id: inventariosDemo[i].id }
+      else inventariosDemo.push(novo)
+    },
+    async itensContagem() {
+      const u = exigeEu()
+      if (!podeGerenciar(u.nivel) && !eventosDemo.some((e) => e.responsaveis.some((r) => r.funcionarioId === u.id))) throw new Error('Seu nível de acesso não permite esta ação.')
+      return [
+        ...insumosDemo.filter((i) => i.ativo).map((i) => ({ chave: 'i:' + i.id, nome: i.nome, categoria: i.categoria, unidade: i.unidade, embalagem: i.embalagem, embalagemQtd: i.embalagemQtd })),
+        ...receitasDemo.filter((r) => r.ativo && r.tipo === 'preparo').map((r) => ({ chave: 'r:' + r.id, nome: r.nome, categoria: 'Pré-preparos', unidade: r.unidade, embalagem: null, embalagemQtd: null })),
+      ].sort((a, b) => a.nome.localeCompare(b.nome))
+    },
+    async meusEventosEscalados() {
+      const u = exigeEu()
+      return eventosDemo
+        .filter((e) => ['aprovado', 'preparacao', 'execucao'].includes(e.status) && e.responsaveis.some((r) => r.funcionarioId === u.id))
+        .map((e) => ({ id: e.id, nome: e.nome, status: e.status, papel: e.responsaveis.find((r) => r.funcionarioId === u.id)?.papel ?? null, dias: structuredClone(e.dias) }))
     },
   }
 }

@@ -806,6 +806,12 @@ export interface Evento {
   repasseObs: string | null
   infraestrutura: string | null
   observacao: string | null
+  cidade: string | null
+  // Italiano, Árabe, Coreano, Junina, Geral… (para comparar com eventos parecidos)
+  gastronomia: string | null
+  barracas: number | null
+  // Folga que a sugestão de "quanto levar" põe em cima da previsão (%).
+  margemSegurancaPct: number
   dias: DiaEvento[]
   operacoes: string[]
   responsaveis: ResponsavelEvento[]
@@ -898,4 +904,96 @@ export interface VersaoReceita {
   criadaEm: string
   criadaPor: string | null
   itens: ItemReceita[]
+}
+
+// Eventos, Entrega 4 e logística (08/10): cardápio, previsão, vendas, separação, inventário e estoque da base.
+export interface ProdutoEvento {
+  receitaId: string
+  preco: number | null
+  ordem: number
+}
+// Quantidade por dia e produto (previsão ou venda real).
+export interface QtdDiaProduto {
+  data: string
+  receitaId: string
+  quantidade: number
+}
+export interface VendaEvento extends QtdDiaProduto {
+  eventoId: string
+  produto: string
+  total: number | null
+  origem: string
+}
+export interface ItemModeloChecklist {
+  id: string
+  categoria: string
+  item: string
+  // Praça que usa o item (Foca, Pizza, Romana…); null = todas.
+  operacao: string | null
+  quantidade: string | null // livre: "2", "3 caixas", "Todas"
+  ordem: number
+  ativo: boolean
+}
+// Item da logística: insumo ("i:<id>") ou pré-preparo feito na base ("r:<id>").
+export type ChaveItem = string
+export const chaveDe = (x: { insumoId?: string | null; receitaId?: string | null }): ChaveItem | null =>
+  x.insumoId ? 'i:' + x.insumoId : x.receitaId ? 'r:' + x.receitaId : null
+export const daChave = (c: ChaveItem) => (c.startsWith('i:') ? { insumoId: c.slice(2), receitaId: null } : { insumoId: null, receitaId: c.slice(2) })
+export interface ItemEnvio {
+  id: string
+  ordem: number
+  categoria: string | null
+  operacao: string | null
+  insumoId: string | null
+  receitaId: string | null
+  item: string | null
+  previsto: number | null
+  quantidade: number | null
+  quantidadeTexto: string | null
+  unidade: string | null
+  // Conferência de saída e de retorno.
+  conferido: boolean
+  conferidoPor: string | null
+  conferidoEm: string | null
+  retornou: boolean
+  retornoPor: string | null
+  retornoEm: string | null
+}
+export interface EnvioEvento {
+  id: string
+  eventoId: string
+  data: string
+  tipo: 'separacao' | 'reposicao'
+  observacao: string | null
+  criadoPor: string | null
+  criadoEm: string
+  itens: ItemEnvio[]
+}
+export type NovoItemEnvio = Pick<ItemEnvio, 'categoria' | 'operacao' | 'insumoId' | 'receitaId' | 'item' | 'previsto' | 'quantidade' | 'quantidadeTexto' | 'unidade'>
+export interface Inventario {
+  id: string
+  local: 'base' | 'evento'
+  eventoId: string | null
+  data: string
+  contadoPor: string | null
+  contadoEm: string
+  observacao: string | null
+  fala: string | null
+  itens: { chave: ChaveItem; quantidade: number }[]
+}
+// O que se conta (insumo ou pré-preparo), sem preço.
+export interface ItemContagem {
+  chave: ChaveItem
+  nome: string
+  categoria: string | null
+  unidade: UnidadeMedida
+  embalagem: string | null
+  embalagemQtd: number | null
+}
+export interface EventoEscalado {
+  id: string
+  nome: string
+  status: StatusEvento
+  papel: string | null
+  dias: DiaEvento[]
 }

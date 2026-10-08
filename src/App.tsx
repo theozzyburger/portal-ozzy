@@ -27,6 +27,7 @@ import Freelancers from './pages/Freelancers'
 import Salarios from './pages/Salarios'
 import Financeiro from './pages/Financeiro'
 import Eventos from './pages/Eventos'
+import { MeuEvento } from './pages/EventoLogistica'
 import Icone from './components/Icone'
 import logo from './assets/logo.png'
 import { modulosVisiveis } from './lib/modulos'
@@ -125,7 +126,9 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   const abaRh = abasRh.find((a) => a.id === sub)?.id ?? 'avisos'
 
   let conteudo
-  if (modulo.id === 'inicio') conteudo = <Inicio />
+  // Quem está escalado num evento confere a separação e conta as sobras, mesmo sem ver o módulo Eventos.
+  if (area === 'meu-evento') conteudo = <MeuEvento id={sub} aba={param} />
+  else if (modulo.id === 'inicio') conteudo = <Inicio />
   else if (modulo.id === 'regras') conteudo = <Regras />
   else if (modulo.id === 'manutencao') conteudo = <Manutencao />
   else if (modulo.id === 'fichas') conteudo = <Fichas />

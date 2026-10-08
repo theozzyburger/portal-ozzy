@@ -19,6 +19,7 @@ import { exigenciasDe, pendencias, textoSituacao, type Pendencia } from '../lib/
 import { nomeTipoOcorrencia } from '../lib/types'
 import type { Desligamento } from '../lib/types'
 import DiariaNaFolga from '../components/DiariaNaFolga'
+import { CartaoEventosEscalado } from './EventoLogistica'
 import { LIMITE_AFASTAMENTO, JANELA_AFASTAMENTO, alertasAfastamento, alertasExperiencia, aniversariantesDaSemana, prazoRescisao, progressoDesligamento, situacaoAniversario } from '../lib/pessoal'
 
 export default function Inicio() {
@@ -82,6 +83,8 @@ export default function Inicio() {
 
       {gestao && <AlertasDp docs={docsEquipe} />}
       {gestao && <AlertaTrocas />}
+
+      <CartaoEventosEscalado />
 
       {painel && <Painel />}
 

@@ -1,4 +1,4 @@
-import type { Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -251,6 +251,34 @@ export interface Store {
   salvarReceita(r: Omit<Receita, 'id' | 'versaoAtual'> & { id?: string }): Promise<Receita>
   // Cria a versão seguinte e passa a usá-la; as anteriores não mudam. Devolve o número da versão.
   salvarVersaoReceita(receitaId: string, rendimento: number, custoTotal: number | null, nota: string, itens: ItemReceita[]): Promise<number>
+
+  // Cardápio, previsão e vendas por dia de cada evento (só a gestão). Salvar substitui a lista inteira do evento.
+  cardapioEvento(eventoId: string): Promise<ProdutoEvento[]>
+  salvarCardapioEvento(eventoId: string, itens: ProdutoEvento[]): Promise<void>
+  previsaoEvento(eventoId: string): Promise<QtdDiaProduto[]>
+  salvarPrevisaoEvento(eventoId: string, linhas: QtdDiaProduto[]): Promise<void>
+  // Vendas reais de todos os eventos (base da sugestão e do comparativo).
+  vendasEventos(): Promise<VendaEvento[]>
+  salvarVendasEvento(eventoId: string, linhas: (QtdDiaProduto & { total: number | null })[]): Promise<void>
+
+  // Logística. Itens fixos (equipamentos, utensílios…) e separações: a gestão monta; quem está escalado no evento confere.
+  modeloChecklist(): Promise<ItemModeloChecklist[]>
+  salvarItemModelo(i: Omit<ItemModeloChecklist, 'id'> & { id?: string }): Promise<void>
+  // Sem eventoId: as separações de todos os eventos (para o estoque da base).
+  envios(eventoId?: string): Promise<EnvioEvento[]>
+  criarEnvio(eventoId: string, data: string, tipo: EnvioEvento['tipo'], observacao: string, itens: NovoItemEnvio[]): Promise<string>
+  excluirEnvio(id: string): Promise<void>
+  adicionarItemEnvio(envioId: string, item: NovoItemEnvio): Promise<void>
+  excluirItemEnvio(itemId: string): Promise<void>
+  // Saída: confere a quantidade separada. Retorno: o item voltou do evento.
+  conferirItemEnvio(itemId: string, etapa: 'saida' | 'retorno', quantidade: number | null, ok: boolean): Promise<void>
+  // Contagens: sobra no fim do dia do evento (uma por dia, contar de novo substitui) ou estoque da base.
+  inventarios(filtro: { eventoId: string } | { local: 'base' }): Promise<Inventario[]>
+  salvarInventario(local: 'base' | 'evento', eventoId: string | null, data: string, itens: { chave: string; quantidade: number }[], fala: string, observacao: string): Promise<void>
+  // Insumos e pré-preparos ativos, sem preço (para quem conta).
+  itensContagem(): Promise<ItemContagem[]>
+  // Eventos aprovados, em preparação ou em execução em que estou escalado.
+  meusEventosEscalados(): Promise<EventoEscalado[]>
 }
 
 export const EVENTO_ALTERADO = 'Outra pessoa salvou este evento enquanto você editava. Feche, abra de novo e refaça a alteração.'

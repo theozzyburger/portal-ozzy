@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
-import type { Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import { chaveDe, daChave } from './types'
+import type { NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -788,6 +789,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         montagem_inicio: e.montagemInicio || null, montagem_fim: e.montagemFim || null, desmontagem_inicio: e.desmontagemInicio || null, desmontagem_fim: e.desmontagemFim || null,
         taxa_organizador_pct: e.taxaOrganizadorPct, valor_fixo: e.valorFixo, condicoes: texto(e.condicoes), quem_recebe: e.quemRecebe,
         repasse_prazo_dias: e.repassePrazoDias, repasse_obs: texto(e.repasseObs), infraestrutura: texto(e.infraestrutura), observacao: texto(e.observacao),
+        cidade: texto(e.cidade), gastronomia: texto(e.gastronomia), barracas: e.barracas, margem_seguranca_pct: e.margemSegurancaPct,
       }
       let id = e.id
       if (id) {
@@ -870,6 +872,119 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         p_itens: itens.map((i) => ({ insumo_id: i.insumoId, sub_receita_id: i.subReceitaId, quantidade: i.quantidade, aproveitamento: i.aproveitamento })),
       })) as number
     },
+
+    async cardapioEvento(eventoId) {
+      return (ok(await sb.from('evento_produtos').select('*').eq('evento_id', eventoId).order('ordem')) ?? []).map((r: any) => ({
+        receitaId: r.receita_id, preco: numeroOuNulo(r.preco), ordem: r.ordem,
+      }))
+    },
+    async salvarCardapioEvento(eventoId, itens) {
+      ok(await sb.from('evento_produtos').delete().eq('evento_id', eventoId))
+      if (itens.length) ok(await sb.from('evento_produtos').insert(itens.map((i, o) => ({ evento_id: eventoId, receita_id: i.receitaId, preco: i.preco, ordem: o + 1 }))))
+    },
+    async previsaoEvento(eventoId) {
+      return (ok(await sb.from('evento_previsao').select('*').eq('evento_id', eventoId)) ?? []).map((r: any) => ({
+        data: r.data, receitaId: r.receita_id, quantidade: Number(r.quantidade),
+      }))
+    },
+    async salvarPrevisaoEvento(eventoId, linhas) {
+      ok(await sb.from('evento_previsao').delete().eq('evento_id', eventoId))
+      const l = linhas.filter((x) => x.quantidade > 0)
+      if (l.length) ok(await sb.from('evento_previsao').insert(l.map((x) => ({ evento_id: eventoId, data: x.data, receita_id: x.receitaId, quantidade: x.quantidade }))))
+    },
+    async vendasEventos() {
+      // Sem limite de 1.000 linhas do Supabase: busca em páginas.
+      const todas: any[] = []
+      for (let de = 0; ; de += 1000) {
+        const pg = ok(await sb.from('evento_vendas').select('*').order('id').range(de, de + 999)) ?? []
+        todas.push(...pg)
+        if (pg.length < 1000) break
+      }
+      return todas.map((r): VendaEvento => ({
+        eventoId: r.evento_id, data: r.data, receitaId: r.receita_id, produto: r.produto, quantidade: Number(r.quantidade), total: numeroOuNulo(r.total), origem: r.origem,
+      }))
+    },
+    async salvarVendasEvento(eventoId, linhas) {
+      const receitas = (ok(await sb.from('receitas').select('id, nome').in('id', [...new Set(linhas.map((l) => l.receitaId))])) ?? []) as { id: string; nome: string }[]
+      ok(await sb.from('evento_vendas').delete().eq('evento_id', eventoId))
+      const l = linhas.filter((x) => x.quantidade > 0)
+      if (l.length)
+        ok(await sb.from('evento_vendas').insert(l.map((x) => ({
+          evento_id: eventoId, data: x.data, receita_id: x.receitaId, produto: receitas.find((r) => r.id === x.receitaId)?.nome ?? '?', quantidade: x.quantidade, total: x.total, origem: 'manual',
+        }))))
+    },
+
+    async modeloChecklist() {
+      return (ok(await sb.from('checklist_evento_modelo').select('*').order('ordem')) ?? []).map((r: any): ItemModeloChecklist => ({
+        id: r.id, categoria: r.categoria, item: r.item, operacao: r.operacao, quantidade: r.quantidade, ordem: r.ordem, ativo: r.ativo,
+      }))
+    },
+    async salvarItemModelo(i) {
+      const linha = { categoria: i.categoria.trim(), item: i.item.trim(), operacao: texto(i.operacao), quantidade: texto(i.quantidade), ordem: i.ordem, ativo: i.ativo }
+      ok(i.id ? await sb.from('checklist_evento_modelo').update(linha).eq('id', i.id) : await sb.from('checklist_evento_modelo').insert(linha))
+    },
+    async envios(eventoId) {
+      let c = sb.from('evento_envios').select('*, evento_envio_itens(*)').order('data').order('criado_em')
+      if (eventoId) c = c.eq('evento_id', eventoId)
+      return (ok(await c) ?? []).map((r: any): EnvioEvento => ({
+        id: r.id, eventoId: r.evento_id, data: r.data, tipo: r.tipo, observacao: r.observacao, criadoPor: r.criado_por, criadoEm: r.criado_em,
+        itens: (r.evento_envio_itens ?? []).sort((a: any, b: any) => a.ordem - b.ordem).map((i: any) => ({
+          id: i.id, ordem: i.ordem, categoria: i.categoria, operacao: i.operacao, insumoId: i.insumo_id, receitaId: i.receita_id, item: i.item, previsto: numeroOuNulo(i.previsto),
+          quantidade: numeroOuNulo(i.quantidade), quantidadeTexto: i.quantidade_texto, unidade: i.unidade, conferido: i.conferido, conferidoPor: i.conferido_por,
+          conferidoEm: i.conferido_em, retornou: i.retornou, retornoPor: i.retorno_por, retornoEm: i.retorno_em,
+        })),
+      }))
+    },
+    async criarEnvio(eventoId, data, tipo, observacao, itens) {
+      const { id } = ok(await sb.from('evento_envios').insert({ evento_id: eventoId, data, tipo, observacao: texto(observacao) }).select('id').single()) as { id: string }
+      if (itens.length)
+        ok(await sb.from('evento_envio_itens').insert(itens.map((i, o) => ({
+          envio_id: id, ordem: o + 1, ...linhaItemEnvio(i),
+        }))))
+      return id
+    },
+    async excluirEnvio(id) {
+      ok(await sb.from('evento_envios').delete().eq('id', id))
+    },
+    async adicionarItemEnvio(envioId, i) {
+      const ult = (ok(await sb.from('evento_envio_itens').select('ordem').eq('envio_id', envioId).order('ordem', { ascending: false }).limit(1)) ?? []) as { ordem: number }[]
+      ok(await sb.from('evento_envio_itens').insert({
+        envio_id: envioId, ordem: (ult[0]?.ordem ?? 0) + 1, ...linhaItemEnvio(i),
+      }))
+    },
+    async excluirItemEnvio(itemId) {
+      ok(await sb.from('evento_envio_itens').delete().eq('id', itemId))
+    },
+    async conferirItemEnvio(itemId, etapa, quantidade, feito) {
+      ok(await sb.rpc('conferir_item_envio', { p_item: itemId, p_etapa: etapa, p_quantidade: quantidade, p_ok: feito }))
+    },
+    async inventarios(filtro) {
+      let c = sb.from('inventarios').select('*, inventario_itens(insumo_id, receita_id, quantidade)').order('contado_em', { ascending: false })
+      c = 'eventoId' in filtro ? c.eq('local', 'evento').eq('evento_id', filtro.eventoId) : c.eq('local', 'base')
+      return (ok(await c) ?? []).map((r: any): Inventario => ({
+        id: r.id, local: r.local, eventoId: r.evento_id, data: r.data, contadoPor: r.contado_por, contadoEm: r.contado_em, observacao: r.observacao, fala: r.fala,
+        itens: (r.inventario_itens ?? []).map((i: any) => ({ chave: chaveDe({ insumoId: i.insumo_id, receitaId: i.receita_id })!, quantidade: Number(i.quantidade) })),
+      }))
+    },
+    async salvarInventario(local, eventoId, data, itens, fala, observacao) {
+      ok(await sb.rpc('salvar_inventario', {
+        p_local: local, p_evento: eventoId, p_data: data, p_itens: itens.map((i) => {
+          const k = daChave(i.chave)
+          return { insumo_id: k.insumoId, receita_id: k.receitaId, quantidade: i.quantidade }
+        }), p_fala: fala, p_obs: observacao,
+      }))
+    },
+    async itensContagem() {
+      return (ok(await sb.rpc('itens_contagem')) ?? []).map((r: any) => ({
+        chave: (r.tipo === 'insumo' ? 'i:' : 'r:') + r.id, nome: r.nome, categoria: r.categoria, unidade: r.unidade, embalagem: r.embalagem, embalagemQtd: numeroOuNulo(r.embalagem_qtd),
+      }))
+    },
+    async meusEventosEscalados() {
+      return (ok(await sb.rpc('meus_eventos_escalados')) ?? []).map((r: any) => ({
+        id: r.id, nome: r.nome, status: r.status, papel: r.papel,
+        dias: (r.dias ?? []).map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null })),
+      }))
+    },
   }
 }
 
@@ -884,6 +999,10 @@ const paraReceita = (r: any): Receita => ({
   conservacao: r.conservacao, validadeDias: r.validade_dias, ativo: r.ativo, versaoAtual: r.versao_atual,
 })
 
+const linhaItemEnvio = (i: NovoItemEnvio) => ({
+  categoria: texto(i.categoria), operacao: texto(i.operacao), insumo_id: i.insumoId, receita_id: i.receitaId, item: texto(i.item), previsto: i.previsto,
+  quantidade: i.quantidade, quantidade_texto: texto(i.quantidadeTexto), unidade: texto(i.unidade),
+})
 const SELECT_EVENTO = '*, evento_dias(data, abre, fecha), evento_operacoes(operacao_id), evento_responsaveis(funcionario_id, papel)'
 const numeroOuNulo = (v: unknown) => (v === null || v === undefined ? null : Number(v))
 const paraEvento = (r: any): Evento => ({
@@ -893,6 +1012,7 @@ const paraEvento = (r: any): Evento => ({
   desmontagemInicio: r.desmontagem_inicio?.slice(0, 16) ?? null, desmontagemFim: r.desmontagem_fim?.slice(0, 16) ?? null,
   taxaOrganizadorPct: numeroOuNulo(r.taxa_organizador_pct), valorFixo: numeroOuNulo(r.valor_fixo), condicoes: r.condicoes, quemRecebe: r.quem_recebe,
   repassePrazoDias: r.repasse_prazo_dias, repasseObs: r.repasse_obs, infraestrutura: r.infraestrutura, observacao: r.observacao,
+  cidade: r.cidade ?? null, gastronomia: r.gastronomia ?? null, barracas: numeroOuNulo(r.barracas), margemSegurancaPct: Number(r.margem_seguranca_pct ?? 10),
   dias: (r.evento_dias ?? [])
     .map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null }))
     .sort((a: DiaEvento, b: DiaEvento) => a.data.localeCompare(b.data)),

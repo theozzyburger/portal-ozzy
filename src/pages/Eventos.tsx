@@ -5,6 +5,9 @@ import { addDias, dataCurta, dataLonga, diaSemana, hoje, tempoDesde } from '../l
 import { ir } from '../lib/rota'
 import FichasEvento from './FichasEvento'
 import Insumos from './Insumos'
+import EstoqueBase from './EstoqueBase'
+import ComparativoEventos from './ComparativoEventos'
+import { AbasEvento, CardapioPrevisao, Separacao, Sobras, VendasEvento, useDadosLogistica } from './EventoLogistica'
 import { STATUS_EVENTO, nomeStatusEvento, type DiaEvento, type Evento, type HistoricoEvento, type NovoEvento, type Operacao, type StatusEvento } from '../lib/types'
 
 const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -32,6 +35,7 @@ const CAMPOS: Record<string, string> = {
   desmontagem_inicio: 'início da desmontagem', desmontagem_fim: 'fim da desmontagem', taxa_organizador_pct: 'taxa do organizador',
   valor_fixo: 'valor fixo', condicoes: 'condições', quem_recebe: 'quem recebe as vendas', repasse_prazo_dias: 'prazo do repasse',
   repasse_obs: 'observação do repasse', infraestrutura: 'infraestrutura', observacao: 'observações',
+  cidade: 'cidade', gastronomia: 'gastronomia', barracas: 'barracas', margem_seguranca_pct: 'folga da separação',
 }
 
 // O que ainda falta definir no evento, para a gestão não esquecer (não impede salvar).
@@ -57,6 +61,8 @@ function pendencias(e: Evento): string[] {
 
 const ABAS = [
   { id: '', nome: 'Eventos' },
+  { id: 'historico', nome: 'Comparativo' },
+  { id: 'estoque', nome: 'Estoque e checklist' },
   { id: 'fichas', nome: 'Fichas' },
   { id: 'insumos', nome: 'Insumos' },
   { id: 'fornecedores', nome: 'Fornecedores' },
@@ -78,13 +84,17 @@ export default function ModuloEventos({ sub, param }: { sub?: string; param?: st
           </button>
         ))}
       </div>
-      {aba === 'fichas' ? <FichasEvento id={param} /> : aba === 'insumos' || aba === 'fornecedores' ? <Insumos aba={aba} /> : <Eventos id={sub} />}
+      {aba === 'fichas' ? <FichasEvento id={param} />
+        : aba === 'insumos' || aba === 'fornecedores' ? <Insumos aba={aba} />
+        : aba === 'estoque' ? <EstoqueBase />
+        : aba === 'historico' ? <ComparativoEventos />
+        : <Eventos id={sub} aba={param ?? ''} />}
     </div>
   )
 }
 
 // Eventos (Entrega 1, 08/10): lista e cadastro. Cada evento tem sua página (#/eventos/<id>).
-function Eventos({ id }: { id?: string }) {
+function Eventos({ id, aba }: { id?: string; aba: string }) {
   const { store } = useApp()
   const [lista, setLista] = useState<Evento[] | null>(null)
   const [operacoes, setOperacoes] = useState<Operacao[]>([])
@@ -108,7 +118,7 @@ function Eventos({ id }: { id?: string }) {
   if (id) {
     const e = lista.find((x) => x.id === id)
     if (!e) return <Vazio>Evento não encontrado. <button className="font-semibold underline" onClick={() => ir('eventos')}>Voltar para a lista</button></Vazio>
-    return <PaginaEvento e={e} operacoes={operacoes} aoMudar={carregar} />
+    return <PaginaEvento e={e} eventos={lista} operacoes={operacoes} aoMudar={carregar} aba={aba} />
   }
   return <ListaEventos lista={lista} operacoes={operacoes} aoMudar={carregar} />
 }
@@ -201,7 +211,38 @@ function ListaEventos({ lista, operacoes, aoMudar }: { lista: Evento[]; operacoe
   )
 }
 
-function PaginaEvento({ e, operacoes, aoMudar }: { e: Evento; operacoes: Operacao[]; aoMudar: () => Promise<void> }) {
+function PaginaEvento({ e, eventos, operacoes, aoMudar, aba }: { e: Evento; eventos: Evento[]; operacoes: Operacao[]; aoMudar: () => Promise<void>; aba: string }) {
+  return (
+    <div className="space-y-4">
+      <button onClick={() => ir('eventos')} className="text-sm font-semibold text-stone-500 hover:text-carvao">← Eventos</button>
+      <div>
+        <div className="text-xs font-semibold text-stone-400">Evento nº {e.numero}{e.tipo && ` · ${e.tipo}`}</div>
+        <h1 className="text-2xl font-bold tracking-tight">{e.nome}</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-600">
+          <Selo cor={corStatus(e.status)}>{nomeStatusEvento(e.status)}</Selo>
+          <span>{periodo(e)}</span>
+          {e.local && <span>· {e.local}</span>}
+          {e.cidade && <span>· {e.cidade}</span>}
+        </div>
+      </div>
+      <AbasEvento id={e.id} aba={aba} />
+      {aba === '' ? <ResumoEvento e={e} operacoes={operacoes} aoMudar={aoMudar} /> : <AbaLogistica e={e} eventos={eventos} aba={aba} />}
+    </div>
+  )
+}
+
+function AbaLogistica({ e, eventos, aba }: { e: Evento; eventos: Evento[]; aba: string }) {
+  const { d, erro, carregar } = useDadosLogistica(e.id, true)
+  if (erro) return <p className="text-red-600">{erro}</p>
+  if (!d) return <p className="text-stone-400">Carregando…</p>
+  if (aba === 'previsao') return <CardapioPrevisao e={e} eventos={eventos} d={d} aoMudar={carregar} />
+  if (aba === 'vendas') return <VendasEvento e={e} d={d} aoMudar={carregar} />
+  if (aba === 'separacao') return <Separacao e={e} d={d} aoMudar={carregar} />
+  if (aba === 'sobras') return <Sobras e={e} d={d} aoMudar={carregar} />
+  return <Vazio>Aba não encontrada.</Vazio>
+}
+
+function ResumoEvento({ e, operacoes, aoMudar }: { e: Evento; operacoes: Operacao[]; aoMudar: () => Promise<void> }) {
   const { store, nomeDe, avisar } = useApp()
   const [historico, setHistorico] = useState<HistoricoEvento[]>([])
   const [editando, setEditando] = useState(false)
@@ -214,21 +255,9 @@ function PaginaEvento({ e, operacoes, aoMudar }: { e: Evento; operacoes: Operaca
 
   return (
     <div className="space-y-4">
-      <button onClick={() => ir('eventos')} className="text-sm font-semibold text-stone-500 hover:text-carvao">← Eventos</button>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold text-stone-400">Evento nº {e.numero}{e.tipo && ` · ${e.tipo}`}</div>
-          <h1 className="text-2xl font-bold tracking-tight">{e.nome}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-600">
-            <Selo cor={corStatus(e.status)}>{nomeStatusEvento(e.status)}</Selo>
-            <span>{periodo(e)}</span>
-            {e.local && <span>· {e.local}</span>}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Botao variante="secundario" onClick={() => setMudandoStatus(true)}>Mudar status</Botao>
-          <Botao onClick={() => setEditando(true)}>Editar</Botao>
-        </div>
+      <div className="flex justify-end gap-2">
+        <Botao variante="secundario" onClick={() => setMudandoStatus(true)}>Mudar status</Botao>
+        <Botao onClick={() => setEditando(true)}>Editar</Botao>
       </div>
 
       {falta.length > 0 && (
@@ -256,7 +285,9 @@ function PaginaEvento({ e, operacoes, aoMudar }: { e: Evento; operacoes: Operaca
           )}
           <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-stone-500">Local</dt>
-            <dd>{e.local ?? '—'}</dd>
+            <dd>{e.local ?? '—'}{e.cidade && <span className="text-stone-500"> · {e.cidade}</span>}</dd>
+            <dt className="text-stone-500">Gastronomia</dt>
+            <dd>{e.gastronomia ?? '—'}{e.barracas !== null && <span className="text-stone-500"> · {doNumero(e.barracas)} barraca(s)</span>}</dd>
             {e.endereco && (<><dt className="text-stone-500">Endereço</dt><dd>{e.endereco}</dd></>)}
             <dt className="text-stone-500">Público</dt>
             <dd>{e.publicoEstimado !== null ? `${e.publicoEstimado.toLocaleString('pt-BR')} pessoas (estimado)` : '—'}</dd>
@@ -310,10 +341,7 @@ function PaginaEvento({ e, operacoes, aoMudar }: { e: Evento; operacoes: Operaca
 
       <div className="rounded-2xl border border-dashed border-stone-300 p-4">
         <h2 className="font-bold">Próximas etapas deste evento</h2>
-        <p className="mt-1 text-sm text-stone-600">Cada evento vai ter aqui o cardápio com fichas técnicas, a previsão de vendas, a lista de insumos e o simulador financeiro. Estão em construção, nesta ordem.</p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {['Cardápio e fichas', 'Previsão de vendas', 'Insumos e compras', 'Simulador financeiro'].map((t) => <Selo key={t} cor="ambar">{t}</Selo>)}
-        </div>
+        <p className="mt-1 text-sm text-stone-600">Cardápio, previsão, vendas, separação e sobras já estão nas abas acima. Falta o simulador financeiro.</p>
       </div>
 
       <Cartao>
@@ -412,6 +440,7 @@ const emBranco: NovoEvento = {
   nome: '', status: 'negociacao', statusMotivo: null, tipo: null, organizador: null, organizadorContato: null, local: null, endereco: null,
   publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null, taxaOrganizadorPct: null,
   valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null, infraestrutura: null, observacao: null,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10,
   dias: [], operacoes: [], responsaveis: [],
 }
 
@@ -431,6 +460,7 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
     taxaOrganizadorPct: doNumero(base.taxaOrganizadorPct), valorFixo: doNumero(base.valorFixo), condicoes: base.condicoes ?? '',
     quemRecebe: base.quemRecebe ?? '', repassePrazoDias: base.repassePrazoDias === null ? '' : String(base.repassePrazoDias), repasseObs: base.repasseObs ?? '',
     infraestrutura: base.infraestrutura ?? '', observacao: base.observacao ?? '',
+    cidade: base.cidade ?? '', gastronomia: base.gastronomia ?? '', barracas: doNumero(base.barracas), margemSegurancaPct: doNumero(base.margemSegurancaPct),
   })
   const [dias, setDias] = useState<DiaEvento[]>(base.dias)
   const [ops, setOps] = useState<string[]>(base.operacoes)
@@ -476,6 +506,10 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
     if (prazo !== null && (!Number.isInteger(prazo) || prazo < 0 || prazo > 365)) return setErro('O prazo do repasse é em dias (0 a 365).')
     if (f.montagemInicio && f.montagemFim && f.montagemFim < f.montagemInicio) return setErro('O fim da montagem está antes do início.')
     if (f.desmontagemInicio && f.desmontagemFim && f.desmontagemFim < f.desmontagemInicio) return setErro('O fim da desmontagem está antes do início.')
+    const barracas = numero(f.barracas)
+    if (barracas !== null && (Number.isNaN(barracas) || barracas < 0)) return setErro('Confira o número de barracas.')
+    const margem = numero(f.margemSegurancaPct) ?? 10
+    if (Number.isNaN(margem) || margem < 0 || margem > 200) return setErro('A folga da separação é um percentual entre 0 e 200.')
     setSalvando(true)
     try {
       aoSalvar(
@@ -487,6 +521,7 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
           montagemInicio: f.montagemInicio || null, montagemFim: f.montagemFim || null, desmontagemInicio: f.desmontagemInicio || null, desmontagemFim: f.desmontagemFim || null,
           taxaOrganizadorPct: taxa, valorFixo: fixo, condicoes: f.condicoes || null, quemRecebe: (f.quemRecebe || null) as Evento['quemRecebe'],
           repassePrazoDias: prazo, repasseObs: f.repasseObs || null, infraestrutura: f.infraestrutura || null, observacao: f.observacao || null,
+          cidade: f.cidade || null, gastronomia: f.gastronomia || null, barracas, margemSegurancaPct: margem,
           dias: dias.filter((d) => d.data), operacoes: ops, responsaveis: resp,
         }),
       )
@@ -517,6 +552,21 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
         </Campo>
         <Campo rotulo="Endereço">
           <input className={estiloEntrada} value={f.endereco} onChange={mudar('endereco')} />
+        </Campo>
+        <div className="grid grid-cols-3 gap-3">
+          <Campo rotulo="Cidade">
+            <input className={estiloEntrada} value={f.cidade} onChange={mudar('cidade')} />
+          </Campo>
+          <Campo rotulo="Gastronomia" dica="Para comparar">
+            <input className={estiloEntrada} list="gastronomias" value={f.gastronomia} onChange={mudar('gastronomia')} placeholder="Italiano…" />
+            <datalist id="gastronomias">{['Italiano', 'Árabe', 'Coreano', 'Junina', 'Geral'].map((t) => <option key={t} value={t} />)}</datalist>
+          </Campo>
+          <Campo rotulo="Barracas">
+            <input className={estiloEntrada} inputMode="decimal" value={f.barracas} onChange={mudar('barracas')} />
+          </Campo>
+        </div>
+        <Campo rotulo="Folga na separação (%)" dica="Quanto a sugestão de separação põe a mais em cima da previsão. Padrão 10%.">
+          <input className={estiloEntrada} inputMode="decimal" value={f.margemSegurancaPct} onChange={mudar('margemSegurancaPct')} />
         </Campo>
 
         <h3 className={secao}>Dias e horários de funcionamento</h3>
