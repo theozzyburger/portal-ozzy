@@ -1,4 +1,4 @@
-import type { Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -230,7 +230,16 @@ export interface Store {
   enviosFreela(status: StatusEnvioFreela | 'meus'): Promise<EnvioFreela[]>
   aprovarEnvioFreela(id: string, valor: number, funcao: string, usarPixNovo: boolean): Promise<void>
   recusarEnvioFreela(id: string, motivo: string): Promise<void>
+
+  // Eventos (só a gestão). salvarEvento recusa quando outra pessoa salvou o mesmo evento depois que eu abri.
+  operacoes(): Promise<Operacao[]>
+  salvarOperacao(o: Operacao): Promise<void>
+  eventos(): Promise<Evento[]>
+  salvarEvento(e: NovoEvento): Promise<Evento>
+  historicoEvento(eventoId: string): Promise<HistoricoEvento[]>
 }
+
+export const EVENTO_ALTERADO = 'Outra pessoa salvou este evento enquanto você editava. Feche, abra de novo e refaça a alteração.'
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')
 

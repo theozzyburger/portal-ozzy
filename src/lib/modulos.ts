@@ -71,9 +71,10 @@ export const MODULOS: Modulo[] = [
     itens: ['Cadastro de equipamentos críticos', 'Abertura e acompanhamento de chamados', 'Agenda de manutenção preventiva'],
   },
   {
-    id: 'eventos', soGestao: true, nome: 'Eventos', pronto: false,
+    // Entrega 1 (08/10): cadastro de eventos. Fichas, previsão, insumos e simulador vêm em seguida.
+    id: 'eventos', soGestao: true, nome: 'Eventos', pronto: true,
     resumo: 'Do orçamento ao resultado de cada evento.',
-    itens: ['Orçamento e cálculo de custo', 'Checklist de pré-evento', 'Resultado e aprendizados'],
+    itens: ['Cadastro e status de cada evento', 'Cardápio, fichas e previsão de vendas', 'Insumos, simulador e resultado'],
   },
 ]
 

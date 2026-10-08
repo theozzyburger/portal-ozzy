@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
-import { codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
+import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -124,6 +124,44 @@ const chamados: Chamado[] = [
 ]
 let seq = 100
 const novoId = (p: string) => `${p}${++seq}`
+
+// Eventos de EXEMPLO, só para a demonstração (nomes, locais e valores inventados).
+const operacoesDemo: Operacao[] = [
+  { id: 'burger', nome: 'The Ozzy Burger', ativa: true },
+  { id: 'pizza', nome: 'The Ozzy Pizza', ativa: true },
+]
+const eventoDemo = (n: number, dias: number[], extra: Partial<Evento>): Evento => ({
+  id: `ev${n}`, numero: n, nome: '', status: 'negociacao', statusMotivo: null, tipo: null, organizador: null, organizadorContato: null,
+  local: null, endereco: null, publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null,
+  taxaOrganizadorPct: null, valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null,
+  infraestrutura: null, observacao: null, operacoes: [], responsaveis: [],
+  dias: dias.map((d) => ({ data: addDias(hoje(), d), abre: '12:00', fecha: '22:00' })),
+  criadoPor: 'f1', criadoEm: haHoras(24 * 30), atualizadoPor: 'f1', atualizadoEm: haHoras(24 * 2), ...extra,
+})
+const eventosDemo: Evento[] = [
+  eventoDemo(3, [40, 41], {
+    nome: 'Festival de Inverno (exemplo)', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Praça central (exemplo)',
+    publicoEstimado: 3000, taxaOrganizadorPct: 20, quemRecebe: 'organizador', repassePrazoDias: 30, operacoes: ['pizza'],
+  }),
+  eventoDemo(2, [10, 11, 12], {
+    nome: 'Feira Gastronômica do Parque (exemplo)', status: 'aprovado', tipo: 'Feira gastronômica', organizador: 'Associação Exemplo',
+    organizadorContato: '(11) 90000-0000', local: 'Parque Exemplo', endereco: 'Av. Exemplo, 100 - São Paulo', publicoEstimado: 8000,
+    montagemInicio: `${addDias(hoje(), 9)}T08:00`, montagemFim: `${addDias(hoje(), 9)}T18:00`,
+    desmontagemInicio: `${addDias(hoje(), 12)}T22:30`, desmontagemFim: `${addDias(hoje(), 13)}T02:00`,
+    taxaOrganizadorPct: 21, valorFixo: 1500, condicoes: 'Taxa sobre o faturamento bruto das maquininhas do organizador. Cota fixa paga na assinatura.',
+    quemRecebe: 'organizador', repassePrazoDias: 15, repasseObs: 'Repasse por Pix após o fechamento do último dia.',
+    infraestrutura: 'Ponto de energia 220 V 32 A, água próxima, tenda 6x3 fornecida pelo organizador.',
+    operacoes: ['burger', 'pizza'], responsaveis: [{ funcionarioId: 'p-maria-costa', papel: 'Responsável geral' }, { funcionarioId: 'p-queli-souza', papel: 'Cozinha' }],
+  }),
+  eventoDemo(1, [-20, -19], {
+    nome: 'Festa Junina do Clube (exemplo)', status: 'finalizado', tipo: 'Festa', organizador: 'Clube Exemplo', local: 'Clube Exemplo',
+    publicoEstimado: 1500, taxaOrganizadorPct: 15, quemRecebe: 'the_ozzy', operacoes: ['burger'],
+  }),
+]
+const historicoEventosDemo: HistoricoEvento[] = [
+  { id: 'he1', eventoId: 'ev2', em: haHoras(24 * 30), por: 'f1', tipo: 'criado', de: null, para: 'negociacao', campos: null, motivo: null },
+  { id: 'he2', eventoId: 'ev2', em: haHoras(24 * 2), por: 'f1', tipo: 'status', de: 'negociacao', para: 'aprovado', campos: null, motivo: 'Contrato assinado' },
+]
 
 // Documentos e exames são EXEMPLO (não vieram da planilha).
 const documentos: Documento[] = [
@@ -1159,6 +1197,48 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeGestao()
       const e = envios.find((x) => x.id === id && x.status === 'pendente')
       if (e) Object.assign(e, { status: 'recusado', motivo: motivo.trim() || null })
+    },
+
+    async operacoes() {
+      exigeGestao()
+      return operacoesDemo.map((o) => ({ ...o })).sort((a, b) => a.nome.localeCompare(b.nome))
+    },
+    async salvarOperacao(o) {
+      exigeGestao()
+      const atual = operacoesDemo.find((x) => x.id === o.id)
+      if (atual) Object.assign(atual, { nome: o.nome.trim(), ativa: o.ativa })
+      else operacoesDemo.push({ id: o.id, nome: o.nome.trim(), ativa: o.ativa })
+    },
+    async eventos() {
+      exigeGestao()
+      return structuredClone(eventosDemo).sort((a, b) => b.numero - a.numero)
+    },
+    async salvarEvento(e) {
+      const u = exigeGestao()
+      if (!e.nome.trim()) throw new Error('Dê um nome ao evento.')
+      const quando = agora()
+      const limpo = { ...e, nome: e.nome.trim(), dias: e.dias.filter((d) => d.data).sort((a, b) => a.data.localeCompare(b.data)) }
+      const atual = eventosDemo.find((x) => x.id === e.id)
+      if (atual) {
+        if (atual.atualizadoEm !== e.atualizadoEm) throw new Error(EVENTO_ALTERADO)
+        if (atual.status !== limpo.status)
+          historicoEventosDemo.push({ id: novoId('he'), eventoId: atual.id, em: quando, por: u.id, tipo: 'status', de: atual.status, para: limpo.status, campos: null, motivo: limpo.statusMotivo?.trim() || null })
+        const ignorar = new Set(['status', 'statusMotivo', 'dias', 'operacoes', 'responsaveis', 'atualizadoEm', 'atualizadoPor', 'criadoEm', 'criadoPor', 'numero', 'id'])
+        const campos = Object.keys(limpo).filter((k) => !ignorar.has(k) && JSON.stringify((limpo as any)[k] ?? null) !== JSON.stringify((atual as any)[k] ?? null))
+          // Mesmo nome de coluna que o banco grava no histórico.
+          .map((k) => k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase()))
+        if (campos.length) historicoEventosDemo.push({ id: novoId('he'), eventoId: atual.id, em: quando, por: u.id, tipo: 'dados', de: null, para: null, campos, motivo: null })
+        Object.assign(atual, limpo, { atualizadoPor: u.id, atualizadoEm: quando })
+        return structuredClone(atual)
+      }
+      const novo: Evento = { ...limpo, id: novoId('ev'), numero: Math.max(0, ...eventosDemo.map((x) => x.numero)) + 1, criadoPor: u.id, criadoEm: quando, atualizadoPor: u.id, atualizadoEm: quando }
+      eventosDemo.push(novo)
+      historicoEventosDemo.push({ id: novoId('he'), eventoId: novo.id, em: quando, por: u.id, tipo: 'criado', de: null, para: novo.status, campos: null, motivo: null })
+      return structuredClone(novo)
+    },
+    async historicoEvento(eventoId) {
+      exigeGestao()
+      return historicoEventosDemo.filter((h) => h.eventoId === eventoId).sort((a, b) => b.em.localeCompare(a.em))
     },
   }
 }

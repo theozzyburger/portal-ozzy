@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
-import type { Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
+import type { DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -771,8 +771,67 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         status: 'recusado', motivo: motivo.trim() || null, resolvido_por: exigeEu().id, resolvido_em: new Date().toISOString(),
       }).eq('id', id).eq('status', 'pendente'))
     },
+
+    async operacoes() {
+      return (ok(await sb.from('operacoes').select('id, nome, ativa').order('nome')) ?? []) as Operacao[]
+    },
+    async salvarOperacao(o) {
+      ok(await sb.from('operacoes').upsert({ id: o.id, nome: o.nome.trim(), ativa: o.ativa }))
+    },
+    async eventos() {
+      return (ok(await sb.from('eventos').select(SELECT_EVENTO).order('numero', { ascending: false })) ?? []).map(paraEvento)
+    },
+    async salvarEvento(e) {
+      const linha = {
+        nome: e.nome.trim(), status: e.status, status_motivo: texto(e.statusMotivo), tipo: texto(e.tipo), organizador: texto(e.organizador),
+        organizador_contato: texto(e.organizadorContato), local: texto(e.local), endereco: texto(e.endereco), publico_estimado: e.publicoEstimado,
+        montagem_inicio: e.montagemInicio || null, montagem_fim: e.montagemFim || null, desmontagem_inicio: e.desmontagemInicio || null, desmontagem_fim: e.desmontagemFim || null,
+        taxa_organizador_pct: e.taxaOrganizadorPct, valor_fixo: e.valorFixo, condicoes: texto(e.condicoes), quem_recebe: e.quemRecebe,
+        repasse_prazo_dias: e.repassePrazoDias, repasse_obs: texto(e.repasseObs), infraestrutura: texto(e.infraestrutura), observacao: texto(e.observacao),
+      }
+      let id = e.id
+      if (id) {
+        // Só grava se ninguém salvou depois que eu abri (atualizado_em igual ao que eu li).
+        const r = ok(await sb.from('eventos').update(linha).eq('id', id).eq('atualizado_em', e.atualizadoEm!).select('id')) ?? []
+        if (!r.length) throw new Error(EVENTO_ALTERADO)
+      } else id = (ok(await sb.from('eventos').insert(linha).select('id').single()) as { id: string }).id
+      const dias = e.dias.filter((d) => d.data)
+      if (dias.length)
+        ok(await sb.from('evento_dias').upsert(dias.map((d) => ({ evento_id: id, data: d.data, abre: d.abre || null, fecha: d.fecha || null })), { onConflict: 'evento_id,data' }))
+      let tirarDias = sb.from('evento_dias').delete().eq('evento_id', id)
+      if (dias.length) tirarDias = tirarDias.not('data', 'in', `(${dias.map((d) => d.data).join(',')})`)
+      ok(await tirarDias)
+      ok(await sb.from('evento_operacoes').delete().eq('evento_id', id))
+      if (e.operacoes.length) ok(await sb.from('evento_operacoes').insert(e.operacoes.map((o) => ({ evento_id: id, operacao_id: o }))))
+      ok(await sb.from('evento_responsaveis').delete().eq('evento_id', id))
+      if (e.responsaveis.length)
+        ok(await sb.from('evento_responsaveis').insert(e.responsaveis.map((r) => ({ evento_id: id, funcionario_id: r.funcionarioId, papel: texto(r.papel) }))))
+      return paraEvento(ok(await sb.from('eventos').select(SELECT_EVENTO).eq('id', id).single()))
+    },
+    async historicoEvento(eventoId) {
+      return (ok(await sb.from('evento_historico').select('*').eq('evento_id', eventoId).order('em', { ascending: false })) ?? []).map((r: any): HistoricoEvento => ({
+        id: r.id, eventoId: r.evento_id, em: r.em, por: r.por, tipo: r.tipo, de: r.de, para: r.para, campos: r.campos, motivo: r.motivo,
+      }))
+    },
   }
 }
+
+const SELECT_EVENTO = '*, evento_dias(data, abre, fecha), evento_operacoes(operacao_id), evento_responsaveis(funcionario_id, papel)'
+const numeroOuNulo = (v: unknown) => (v === null || v === undefined ? null : Number(v))
+const paraEvento = (r: any): Evento => ({
+  id: r.id, numero: r.numero, nome: r.nome, status: r.status, statusMotivo: r.status_motivo, tipo: r.tipo, organizador: r.organizador,
+  organizadorContato: r.organizador_contato, local: r.local, endereco: r.endereco, publicoEstimado: r.publico_estimado,
+  montagemInicio: r.montagem_inicio?.slice(0, 16) ?? null, montagemFim: r.montagem_fim?.slice(0, 16) ?? null,
+  desmontagemInicio: r.desmontagem_inicio?.slice(0, 16) ?? null, desmontagemFim: r.desmontagem_fim?.slice(0, 16) ?? null,
+  taxaOrganizadorPct: numeroOuNulo(r.taxa_organizador_pct), valorFixo: numeroOuNulo(r.valor_fixo), condicoes: r.condicoes, quemRecebe: r.quem_recebe,
+  repassePrazoDias: r.repasse_prazo_dias, repasseObs: r.repasse_obs, infraestrutura: r.infraestrutura, observacao: r.observacao,
+  dias: (r.evento_dias ?? [])
+    .map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null }))
+    .sort((a: DiaEvento, b: DiaEvento) => a.data.localeCompare(b.data)),
+  operacoes: (r.evento_operacoes ?? []).map((o: any) => o.operacao_id),
+  responsaveis: (r.evento_responsaveis ?? []).map((x: any) => ({ funcionarioId: x.funcionario_id, papel: x.papel })),
+  criadoPor: r.criado_por, criadoEm: r.criado_em, atualizadoPor: r.atualizado_por, atualizadoEm: r.atualizado_em,
+})
 
 const paraFreelancer = (r: any): Freelancer => ({
   id: r.id, nome: r.nome, cpf: r.cpf, pix: r.pix, celular: r.celular, ativo: r.ativo, funcionarioId: r.funcionario_id,

@@ -753,3 +753,77 @@ export interface ItemPedidoUniforme {
   tamanho: string | null
   quantidade: number
 }
+
+// Eventos (Entrega 1, 08/10): cadastro do evento. Produtos, previsão, insumos e simulador vêm nas próximas entregas.
+export type StatusEvento = 'negociacao' | 'planejamento' | 'aprovado' | 'preparacao' | 'execucao' | 'finalizado' | 'cancelado'
+export const STATUS_EVENTO: { valor: StatusEvento; nome: string; cor: 'cinza' | 'ambar' | 'verde' | 'vermelho' | 'azul' }[] = [
+  { valor: 'negociacao', nome: 'Em negociação', cor: 'cinza' },
+  { valor: 'planejamento', nome: 'Em planejamento', cor: 'azul' },
+  { valor: 'aprovado', nome: 'Aprovado', cor: 'verde' },
+  { valor: 'preparacao', nome: 'Em preparação', cor: 'ambar' },
+  { valor: 'execucao', nome: 'Em execução', cor: 'ambar' },
+  { valor: 'finalizado', nome: 'Finalizado', cor: 'verde' },
+  { valor: 'cancelado', nome: 'Cancelado', cor: 'vermelho' },
+]
+export const nomeStatusEvento = (s: StatusEvento) => STATUS_EVENTO.find((x) => x.valor === s)?.nome ?? s
+export interface Operacao {
+  id: string
+  nome: string
+  ativa: boolean
+}
+export interface DiaEvento {
+  data: string
+  abre: string | null
+  fecha: string | null
+}
+export interface ResponsavelEvento {
+  funcionarioId: string
+  papel: string | null
+}
+export interface Evento {
+  id: string
+  numero: number
+  nome: string
+  status: StatusEvento
+  statusMotivo: string | null
+  tipo: string | null
+  organizador: string | null
+  organizadorContato: string | null
+  local: string | null
+  endereco: string | null
+  publicoEstimado: number | null
+  // 'AAAA-MM-DDTHH:MM', horário de São Paulo.
+  montagemInicio: string | null
+  montagemFim: string | null
+  desmontagemInicio: string | null
+  desmontagemFim: string | null
+  // Taxa do organizador (descontada antes do repasse). Não é imposto.
+  taxaOrganizadorPct: number | null
+  valorFixo: number | null
+  condicoes: string | null
+  quemRecebe: 'organizador' | 'the_ozzy' | null
+  repassePrazoDias: number | null
+  repasseObs: string | null
+  infraestrutura: string | null
+  observacao: string | null
+  dias: DiaEvento[]
+  operacoes: string[]
+  responsaveis: ResponsavelEvento[]
+  criadoPor: string | null
+  criadoEm: string
+  atualizadoPor: string | null
+  // Serve também para perceber quando outra pessoa salvou o evento enquanto eu editava.
+  atualizadoEm: string
+}
+export type NovoEvento = Omit<Evento, 'id' | 'numero' | 'criadoPor' | 'criadoEm' | 'atualizadoPor' | 'atualizadoEm'> & { id?: string; atualizadoEm?: string }
+export interface HistoricoEvento {
+  id: string
+  eventoId: string
+  em: string
+  por: string | null
+  tipo: 'criado' | 'status' | 'dados'
+  de: string | null
+  para: string | null
+  campos: string[] | null
+  motivo: string | null
+}
