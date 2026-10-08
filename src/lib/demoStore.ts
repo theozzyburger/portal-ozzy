@@ -1,5 +1,5 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
-import { soDigitos, type Store } from './store'
+import { nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
 import type { EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
@@ -488,6 +488,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async salvarFuncionario(dados) {
       const u = exigeGestao()
+      if (dados.nome !== undefined) dados = { ...dados, nome: nomeProprio(dados.nome) }
       const alvo = dados.id ? porId(dados.id) : null
       if ((alvo && !possoAlterar(u, alvo)) || degrau(dados.nivel) > degrau(u.nivel)) throw new Error('Você não pode alterar quem está acima de você')
       if (dados.id) {
@@ -941,7 +942,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const cpf = f.cpf ? soDigitos(f.cpf) : null
       if (cpf && freelas.some((x) => x.cpf === cpf && x.id !== f.id)) throw new Error('Já existe freelancer com esse CPF.')
       if (f.funcionarioId && freelas.some((x) => x.funcionarioId === f.funcionarioId && x.id !== f.id)) throw new Error('Esse funcionário já está cadastrado como freelancer.')
-      const novo: Freelancer = { ...f, id: f.id ?? novoId('fl'), cpf, celular: f.celular ? soDigitos(f.celular) : null }
+      const novo: Freelancer = { ...f, nome: nomeProprio(f.nome), id: f.id ?? novoId('fl'), cpf, celular: f.celular ? soDigitos(f.celular) : null }
       const i = freelas.findIndex((x) => x.id === novo.id)
       if (i >= 0) freelas[i] = novo
       else freelas.push(novo)
@@ -999,7 +1000,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (quem.tipo === 'funcionario') throw new Error('Esse CPF é de alguém do time. Mande a diária pelo Portal do Time, com o seu login.')
       const cpf = soDigitos(e.cpf)
       const f = freelas.find((x) => x.cpf === cpf)
-      const nome = e.nome.trim() || (quem.tipo === 'freelancer' ? f?.nome : '') || ''
+      const nome = nomeProprio(e.nome) || (quem.tipo === 'freelancer' ? f?.nome : '') || ''
       const pix = e.pix.trim() || (quem.tipo === 'freelancer' ? f?.pix : '') || ''
       if (nome.split(/\s+/).length < 2) throw new Error('Coloque o nome completo.')
       return gravarEnvios(e.dias, { cpf, celular: soDigitos(e.celular).slice(-11), nome, pix, freelancerId: f?.id ?? null, funcionarioId: null, unidadeId: e.unidadeId, funcao: e.funcao })

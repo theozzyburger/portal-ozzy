@@ -209,3 +209,15 @@ export interface Store {
 }
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')
+
+// Nome com a inicial maiúscula (pedido de 08/10): "MARIA DA silva" vira "Maria da Silva".
+// Preposições do meio do nome ficam minúsculas. O banco faz o mesmo (migration 0025), isto é só para já mostrar certo.
+const PARTICULAS = new Set(['da', 'das', 'de', 'di', 'do', 'dos', 'du', 'e'])
+export const nomeProprio = (nome: string) =>
+  nome
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('pt-BR')
+    .split(' ')
+    .map((p, i) => (i > 0 && PARTICULAS.has(p) ? p : p.replace(/(^|[-'’])(\p{L})/gu, (_, a: string, l: string) => a + l.toLocaleUpperCase('pt-BR'))))
+    .join(' ')

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { soDigitos, type Store } from './store'
+import { nomeProprio, soDigitos, type Store } from './store'
 import type { EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
@@ -67,7 +67,7 @@ const paraOcorrencia = (r: any): Ocorrencia => ({
 })
 
 const deFuncionario = (f: Partial<Funcionario>) => ({
-  nome: f.nome, celular: f.celular ? soDigitos(f.celular) : undefined, cargo: f.cargo, unidade_id: f.unidadeId,
+  nome: f.nome === undefined ? undefined : nomeProprio(f.nome), celular: f.celular ? soDigitos(f.celular) : undefined, cargo: f.cargo, unidade_id: f.unidadeId,
   nivel: f.nivel, status: f.status, data_admissao: f.dataAdmissao, data_desligamento: f.dataDesligamento || null,
   responde_para: f.respondePara || null, setor: f.setor || null, pix: f.pix?.trim() || null,
   opta_vt: f.optaVt ?? false,
@@ -615,7 +615,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async salvarFreelancer(f) {
       const linha = {
-        nome: f.nome.trim(), cpf: f.cpf ? soDigitos(f.cpf) : null, pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular) : null,
+        nome: nomeProprio(f.nome), cpf: f.cpf ? soDigitos(f.cpf) : null, pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular) : null,
         ativo: f.ativo, funcionario_id: f.funcionarioId,
       }
       const r = f.id
@@ -659,7 +659,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async enviarDiarias(e) {
       return ok(await sb.rpc('freela_enviar_diarias', {
-        p_cpf: e.cpf, p_celular: e.celular, p_nome: e.nome, p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias,
+        p_cpf: e.cpf, p_celular: e.celular, p_nome: nomeProprio(e.nome), p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias,
       }))
     },
     async enviarMinhasDiarias(e) {
