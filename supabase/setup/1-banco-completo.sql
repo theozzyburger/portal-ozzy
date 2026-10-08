@@ -1722,3 +1722,8 @@ begin
   if v_nome is null or array_length(regexp_split_to_array(v_nome, '\s+'), 1) < 2 then raise exception 'Coloque o nome completo.'; end if;
   return freela_gravar_envios(v_cpf, v_cel, v_nome, v_pix, f.id, null, p_unidade, p_funcao, p_dias, p_local);
 end $$;
+
+-- 0028
+alter table funcionarios add column if not exists rg text;
+alter table funcionarios add column if not exists ctps text;
+alter table funcionarios add column if not exists endereco text;

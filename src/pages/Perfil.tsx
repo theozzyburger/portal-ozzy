@@ -14,6 +14,7 @@ import Uniformes from './Uniformes'
 import FeriasPessoa from './FeriasPessoa'
 import DocumentoOcorrencia, { temDocumento } from '../components/DocumentoOcorrencia'
 import DeclaracaoVinculo from '../components/DeclaracaoVinculo'
+import { ContratoExperiencia, GuiaExame } from '../components/DocumentosAdmissao'
 import TermosGravidez from '../components/TermosGravidez'
 import { formatarCpf } from '../lib/cpf'
 import { Contracheque } from './Salarios'
@@ -41,6 +42,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   const [readmitir, setReadmitir] = useState(false)
   const [imprimir, setImprimir] = useState<Ocorrencia | null>(null)
   const [declaracao, setDeclaracao] = useState(false)
+  const [admissao, setAdmissao] = useState<'contrato' | 'guia' | null>(null)
   const [termos, setTermos] = useState(false)
   const [modal, setModal] = useState<'editar' | 'documento' | 'ocorrencia' | 'desligar' | null>(null)
   // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
@@ -177,6 +179,18 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
             <Botao variante="secundario" onClick={() => setModal('ocorrencia')}>
               Registrar ocorrência
             </Botao>
+            {pessoa.nivel !== 'proprietario' && (
+              <>
+                {pessoa.status === 'ativo' && (
+                  <Botao variante="secundario" onClick={() => setAdmissao('contrato')}>
+                    Contrato de experiência
+                  </Botao>
+                )}
+                <Botao variante="secundario" onClick={() => setAdmissao('guia')}>
+                  Encaminhamento para exame
+                </Botao>
+              </>
+            )}
             {pessoa.status === 'ativo' && pessoa.nivel !== 'proprietario' && (
               <Botao variante="secundario" onClick={() => setDeclaracao(true)}>
                 Declaração de vínculo
@@ -385,6 +399,8 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         }}
       />
       {termos && <TermosGravidez pessoa={pessoa} aoFechar={() => setTermos(false)} />}
+      {admissao === 'contrato' && <ContratoExperiencia pessoa={pessoa} aoFechar={() => setAdmissao(null)} />}
+      {admissao === 'guia' && <GuiaExame pessoa={pessoa} aoFechar={() => setAdmissao(null)} />}
       {declaracao && <DeclaracaoVinculo pessoa={pessoa} aoFechar={() => setDeclaracao(false)} />}
       {imprimir && <DocumentoOcorrencia o={imprimir} pessoa={pessoa} aoFechar={() => setImprimir(null)} />}
       {readmitir && (

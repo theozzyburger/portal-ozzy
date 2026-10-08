@@ -24,6 +24,9 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
     pix: existente?.pix ?? '',
     cpf: existente?.cpf ? formatarCpf(existente.cpf) : '',
     sexo: existente?.sexo ?? '',
+    rg: existente?.rg ?? '',
+    ctps: existente?.ctps ?? '',
+    endereco: existente?.endereco ?? '',
     dataNascimento: existente?.dataNascimento ?? '',
     tamCamiseta: existente?.tamCamiseta ?? '',
     tamCalca: existente?.tamCalca ?? '',
@@ -108,6 +111,17 @@ export default function FormFuncionario({ aberto, aoFechar, existente }: { abert
             </select>
           </Campo>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="RG">
+            <input className={estiloEntrada} value={f.rg} onChange={mudar('rg')} />
+          </Campo>
+          <Campo rotulo="Carteira de trabalho">
+            <input className={estiloEntrada} placeholder="Número/série/UF" value={f.ctps} onChange={mudar('ctps')} />
+          </Campo>
+        </div>
+        <Campo rotulo="Endereço" dica="Rua, número, complemento e cidade. Sai no contrato.">
+          <input className={estiloEntrada} value={f.endereco} onChange={mudar('endereco')} />
+        </Campo>
         <Campo rotulo="Chave Pix" dica="CPF, celular, e-mail ou chave aleatória. Só a pessoa e a gestão veem.">
           <input className={estiloEntrada} value={f.pix} onChange={mudar('pix')} />
         </Campo>

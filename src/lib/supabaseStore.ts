@@ -9,6 +9,7 @@ const emailDoCelular = (celular: string) => `${soDigitos(celular)}@portal.theozz
 const paraFuncionario = (r: any): Funcionario => ({
   id: r.id, nome: r.nome, celular: r.celular, cargo: r.cargo, unidadeId: r.unidade_id, nivel: r.nivel,
   status: r.status, dataAdmissao: r.data_admissao, dataDesligamento: r.data_desligamento, respondePara: r.responde_para, setor: r.setor, turnoId: r.turno_id, pix: r.pix, foto: r.foto, optaVt: r.opta_vt ?? false, cpf: r.cpf ?? null, sexo: r.sexo ?? null,
+  rg: r.rg ?? null, ctps: r.ctps ?? null, endereco: r.endereco ?? null,
   tamCamiseta: r.tam_camiseta ?? null, tamCalca: r.tam_calca ?? null, tamCalcado: r.tam_calcado ?? null,
   dataNascimento: r.data_nascimento ?? null, experienciaDias1: r.experiencia_dias1 ?? null, experienciaDias2: r.experiencia_dias2 ?? null,
 })
@@ -72,6 +73,7 @@ const deFuncionario = (f: Partial<Funcionario>) => ({
   responde_para: f.respondePara || null, setor: f.setor || null, pix: f.pix?.trim() || null,
   opta_vt: f.optaVt ?? false,
   cpf: f.cpf ? soDigitos(f.cpf) : null, sexo: f.sexo || null,
+  rg: f.rg?.trim() || null, ctps: f.ctps?.trim() || null, endereco: f.endereco?.trim() || null,
   data_nascimento: f.dataNascimento || null,
   tam_camiseta: f.tamCamiseta || null, tam_calca: f.tamCalca || null, tam_calcado: f.tamCalcado || null,
   experiencia_dias1: f.experienciaDias1 || null, experiencia_dias2: f.experienciaDias1 ? f.experienciaDias2 ?? 0 : null,

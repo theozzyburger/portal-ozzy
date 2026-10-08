@@ -28,6 +28,10 @@ export interface Funcionario {
   optaVt?: boolean
   // Só números. Sai nos documentos impressos.
   cpf?: string | null
+  // Saem no contrato de experiência e na guia de exame admissional.
+  rg?: string | null
+  ctps?: string | null
+  endereco?: string | null
   // Feminino: no desligamento, o portal gera os termos de exame de gravidez.
   sexo?: 'feminino' | 'masculino' | null
   // Para a mensagem de aniversário.

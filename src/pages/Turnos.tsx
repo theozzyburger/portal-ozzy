@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
+import MapaTurnos from '../components/MapaTurnos'
 import { useApp } from '../lib/contexto'
 import { podeGerenciar } from '../lib/permissoes'
 import { DIAS_SEMANA, LIMITE_SEMANA_MIN, LOCAIS_EXTRAS, horas, minutosSemana, minutosTrabalhados, textoPausa, viraNoite } from '../lib/turnos'
@@ -10,6 +11,7 @@ export default function Turnos() {
   const gestao = podeGerenciar(eu.nivel)
   const [turnos, setTurnos] = useState<Turno[]>([])
   const [local, setLocal] = useState('')
+  const [visao, setVisao] = useState<'turnos' | 'mapa'>('turnos')
   // Turno aberto no editor; 'novo' = criando um.
   const [editando, setEditando] = useState<Turno | 'novo' | null>(null)
 
@@ -40,11 +42,20 @@ export default function Turnos() {
             Horário-padrão de cada posto. {gestao ? 'Coloque cada pessoa no turno em que trabalha.' : 'Folgas do dia a dia ficam na aba Folgas.'}
           </p>
         </div>
-        {gestao && (
-          <Botao variante="secundario" onClick={() => setEditando('novo')}>
-            + Novo turno
-          </Botao>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <div className="flex rounded-xl bg-stone-200 p-1 text-sm font-semibold">
+            {(['turnos', 'mapa'] as const).map((v) => (
+              <button key={v} onClick={() => setVisao(v)} className={`rounded-lg px-3 py-1.5 ${visao === v ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+                {v === 'turnos' ? 'Turnos' : 'Mapa da semana'}
+              </button>
+            ))}
+          </div>
+          {gestao && visao === 'turnos' && (
+            <Botao variante="secundario" onClick={() => setEditando('novo')}>
+              + Novo turno
+            </Botao>
+          )}
+        </div>
       </div>
 
       {meuTurno && (
@@ -85,6 +96,8 @@ export default function Turnos() {
 
       {turnos.length === 0 ? (
         <Vazio>Carregando turnos…</Vazio>
+      ) : visao === 'mapa' ? (
+        <MapaTurnos turnos={visiveis} nomeLocal={nomeLocal} />
       ) : (
         <div className="space-y-3">
           {visiveis.map((t) => (
