@@ -4,7 +4,7 @@ import { Botao, Campo, Modal, estiloEntrada } from './ui'
 import logoSouza from '../assets/logo-souza.png'
 import { useApp } from '../lib/contexto'
 import { formatarCpf } from '../lib/cpf'
-import { hoje } from '../lib/datas'
+import { addDias, dataCurta, hoje } from '../lib/datas'
 import { EMPRESAS } from '../lib/empresas'
 import { EXPERIENCIA_PADRAO } from '../lib/pessoal'
 import type { Funcionario } from '../lib/types'
@@ -284,7 +284,7 @@ export function GuiaExame({ pessoa, aoFechar }: { pessoa: Funcionario; aoFechar:
             <input className={estiloEntrada} value={telefone} onChange={(e) => setTelefone(e.target.value)} />
           </Campo>
         </div>
-        <p className="text-xs text-stone-500">Não precisa agendar: a pessoa leva a guia e um documento com foto à clínica, de segunda a sexta, das 8h às 16h40.</p>
+        <p className="text-xs text-stone-500">Não precisa agendar: a pessoa vai no dia útil seguinte, das 8h às 11h, com a guia, o RG e a amostra de fezes. Depois de gerar, o botão WhatsApp abre a mensagem pronta.</p>
         <Botao className="w-full">Gerar guia</Botao>
       </form>
     </Modal>
@@ -292,19 +292,33 @@ export function GuiaExame({ pessoa, aoFechar }: { pessoa: Funcionario; aoFechar:
 }
 
 // Mensagem pronta para a pessoa (pedido de 08/10): abre o WhatsApp dela e é só apertar Enviar.
-function linkWhatsApp(p: Funcionario, tipo: TipoExame, extras: string[], responsavel: string) {
+const SEMANA = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado']
+// O exame é no dia seguinte ao encaminhamento; a clínica não abre no fim de semana, então pula para segunda.
+export function diaDoExame(de: string) {
+  let d = addDias(de, 1)
+  while ([0, 6].includes(new Date(d + 'T12:00:00').getDay())) d = addDias(d, 1)
+  const nome = SEMANA[new Date(d + 'T12:00:00').getDay()]
+  return { data: d, texto: d === addDias(de, 1) ? `amanhã, ${nome}, ${dataCurta(d)}` : `na ${nome}, ${dataCurta(d)}` }
+}
+
+function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string) {
   const d = p.celular.replace(/\D/g, '')
   if (d.length < 10) return null
   const nomeExame = TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()
+  // Texto que a Ana já manda hoje (enviado pelo Heitor em 08/10); o nome é de quem gera a guia.
   const msg = [
-    `Oi, ${p.nome.split(' ')[0]}! Aqui é ${responsavel.split(' ')[0]}, da The Ozzy. Segue a guia do seu exame ${nomeExame}.`,
+    'Olá, tudo bem?',
     '',
-    'Não precisa agendar. É só ir à clínica Souza Segurança do Trabalho com a guia e um documento com foto:',
-    '📍 Rua John Harrison, 299, 1º andar, sala 109 (perto da estação Lapa)',
-    '🕗 Segunda a sexta, das 8h às 16h40',
-    ...(extras.length ? ['', `Os exames de laboratório (${extras.join(', ').toLowerCase()}) são feitos só de manhã, das 8h às 12h.`] : []),
+    `Me chamo ${responsavel.split(' ')[0]} e faço parte da administração da The Ozzy Burger.`,
     '',
-    'Qualquer dúvida, é só chamar!',
+    `Segue a carta de encaminhamento para o exame ${nomeExame}. A clínica funciona das 08h às 11h. É necessário levar uma amostra de fezes e o RG.`,
+    '',
+    `*Você deve ir fazer o exame ${diaDoExame(hoje()).texto}.*`,
+    '',
+    'Endereço da clínica:',
+    'R. John Harrison, 299 – 1º andar – Lapa, São Paulo – SP, 05074-080.',
+    '',
+    'Qualquer dúvida, fico à disposição!',
   ].join('\n')
   return `https://wa.me/${d.startsWith('55') && d.length > 11 ? d : '55' + d}?text=${encodeURIComponent(msg)}`
 }
@@ -330,7 +344,7 @@ function FolhaGuia({
   const linhas = [...extras]
   while (linhas.length < 4) linhas.push('')
   const [ajuda, setAjuda] = useState(false)
-  const whats = linkWhatsApp(pessoa, tipo, extras, responsavel)
+  const whats = linkWhatsApp(pessoa, tipo, responsavel)
   return (
     <Impressao
       titulo={`Encaminhamento para exame · ${pessoa.nome}`}
