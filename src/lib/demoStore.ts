@@ -172,6 +172,15 @@ const eventosDemo: Evento[] = [
     responsaveis: [{ funcionarioId: 'p-maria-costa', papel: 'Responsável geral' }, { funcionarioId: 'p-cibeli-costa', papel: 'Estoque' }],
     diariaFreela: 150, latitude: -23.5401, longitude: -46.6802,
   }),
+  // Edição do ano anterior e outra gastronomia, para o painel ter comparação (EXEMPLO).
+  eventoDemo(7, [-425, -424, -423], {
+    nome: 'Festival Italiano Interior 2025 (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Shopping Exemplo',
+    cidade: 'Sorocaba', gastronomia: 'Italiano', barracas: 2, taxaOrganizadorPct: 21, quemRecebe: 'organizador',
+  }),
+  eventoDemo(8, [-150, -149], {
+    nome: 'Festival Árabe (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Praça Exemplo',
+    cidade: 'São Paulo', gastronomia: 'Árabe', barracas: 1, taxaOrganizadorPct: 20, quemRecebe: 'organizador',
+  }),
 ]
 eventosDemo.find((e) => e.id === 'ev2')!.gastronomia = 'Italiano'
 // Insumos e fichas de EXEMPLO (nomes e preços inventados), só para a demonstração.
@@ -202,6 +211,7 @@ const receitasDemo: Receita[] = [
   rec('re2', 'Focaccia de presunto (exemplo)', 'produto', { precoVenda: 55, tempoFinalizacaoMin: 3, capacidadeHora: 60, equipamentos: 'Forno elétrico', versaoAtual: 2 }),
   rec('re3', 'Refrigerante (exemplo)', 'produto', { linha: 'Bebidas', origem: 'revenda', precoVenda: 9 }),
   rec('re4', 'Pizza margherita (exemplo)', 'produto', { linha: 'Pizza', precoVenda: 50 }),
+  rec('re5', 'Cannoli (exemplo)', 'produto', { linha: 'Sobremesa', precoVenda: 25, versaoAtual: 0 }),
 ]
 const it = (insumoId: string | null, subReceitaId: string | null, quantidade: number, aproveitamento = 1) => ({ insumoId, subReceitaId, quantidade, aproveitamento })
 const versoesReceitaDemo: VersaoReceita[] = [
@@ -218,6 +228,9 @@ const vendasEventosDemo: VendaEvento[] = [
   ...[[-20, 120, 210], [-19, 150, 260]].flatMap(([d, a, b]) => [vendaDemo('ev1', d, 're2', a, 50), vendaDemo('ev1', d, 're3', b, 8)]),
   ...[[-90, 380, 420, 300], [-89, 450, 500, 340]].flatMap(([d, a, b, c]) => [vendaDemo('ev4', d, 're2', a, 55), vendaDemo('ev4', d, 're3', b, 9), vendaDemo('ev4', d, 're4', c, 50)]),
   ...[[-60, 180, 200, 150], [-59, 420, 470, 330], [-58, 360, 390, 280]].flatMap(([d, a, b, c]) => [vendaDemo('ev5', d, 're2', a, 55), vendaDemo('ev5', d, 're3', b, 9), vendaDemo('ev5', d, 're4', c, 50)]),
+  ...[[-425, 150, 180, 120], [-424, 300, 330, 220], [-423, 260, 280, 190]].flatMap(([d, a, b, c]) => [vendaDemo('ev7', d, 're2', a, 50), vendaDemo('ev7', d, 're3', b, 8), vendaDemo('ev7', d, 're4', c, 45)]),
+  ...[[-150, 140, 160, 60], [-149, 190, 220, 80]].flatMap(([d, a, b, c]) => [vendaDemo('ev8', d, 're2', a, 55), vendaDemo('ev8', d, 're3', b, 9), vendaDemo('ev8', d, 're5', c, 25)]),
+  vendaDemo('ev5', -59, 're5', 90, 25), vendaDemo('ev5', -58, 're5', 70, 25),
   vendaDemo('ev6', -1, 're2', 260, 55), vendaDemo('ev6', -1, 're3', 300, 9), vendaDemo('ev6', -1, 're4', 210, 50),
 ]
 const cardapiosDemo: Record<string, ProdutoEvento[]> = {

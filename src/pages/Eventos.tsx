@@ -7,6 +7,7 @@ import FichasEvento from './FichasEvento'
 import Insumos from './Insumos'
 import EstoqueBase from './EstoqueBase'
 import ComparativoEventos from './ComparativoEventos'
+import PainelEventos from './PainelEventos'
 import FreelasEventos, { FreelasDoEvento } from './FreelasEventos'
 import { AbasEvento, CardapioPrevisao, Separacao, Sobras, VendasEvento, useDadosLogistica } from './EventoLogistica'
 import { STATUS_EVENTO, nomeStatusEvento, type DiaEvento, type Evento, type HistoricoEvento, type NovoEvento, type Operacao, type StatusEvento } from '../lib/types'
@@ -62,6 +63,7 @@ function pendencias(e: Evento): string[] {
 
 const ABAS = [
   { id: '', nome: 'Eventos' },
+  { id: 'painel', nome: 'Painel' },
   { id: 'historico', nome: 'Comparativo' },
   { id: 'estoque', nome: 'Estoque e checklist' },
   { id: 'freelancers', nome: 'Freelancers' },
@@ -89,6 +91,7 @@ export default function ModuloEventos({ sub, param }: { sub?: string; param?: st
       {aba === 'fichas' ? <FichasEvento id={param} />
         : aba === 'insumos' || aba === 'fornecedores' ? <Insumos aba={aba} />
         : aba === 'estoque' ? <EstoqueBase />
+        : aba === 'painel' ? <PainelEventos />
         : aba === 'historico' ? <ComparativoEventos />
         : aba === 'freelancers' ? <FreelasEventos />
         : <Eventos id={sub} aba={param ?? ''} />}
