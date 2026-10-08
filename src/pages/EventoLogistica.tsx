@@ -23,6 +23,7 @@ export const ABAS_EVENTO = [
   { id: 'vendas', nome: 'Vendas' },
   { id: 'separacao', nome: 'Separação' },
   { id: 'sobras', nome: 'Sobras do dia' },
+  { id: 'freelas', nome: 'Freelas' },
 ]
 
 export function AbasEvento({ id, aba, base = 'eventos', abas = ABAS_EVENTO }: { id: string; aba: string; base?: string; abas?: typeof ABAS_EVENTO }) {

@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -135,7 +135,7 @@ const eventoDemo = (n: number, dias: number[], extra: Partial<Evento>): Evento =
   local: null, endereco: null, publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null,
   taxaOrganizadorPct: null, valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null,
   infraestrutura: null, observacao: null, operacoes: [], responsaveis: [],
-  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null,
   dias: dias.map((d) => ({ data: addDias(hoje(), d), abre: '12:00', fecha: '22:00' })),
   criadoPor: 'f1', criadoEm: haHoras(24 * 30), atualizadoPor: 'f1', atualizadoEm: haHoras(24 * 2), ...extra,
 })
@@ -170,6 +170,7 @@ const eventosDemo: Evento[] = [
     nome: 'Festival Italiano do Bairro (exemplo)', status: 'execucao', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Rua Exemplo',
     cidade: 'São Paulo', gastronomia: 'Italiano', barracas: 2, taxaOrganizadorPct: 21, quemRecebe: 'organizador', operacoes: ['pizza'],
     responsaveis: [{ funcionarioId: 'p-maria-costa', papel: 'Responsável geral' }, { funcionarioId: 'p-cibeli-costa', papel: 'Estoque' }],
+    diariaFreela: 150, latitude: -23.5401, longitude: -46.6802,
   }),
 ]
 eventosDemo.find((e) => e.id === 'ev2')!.gastronomia = 'Italiano'
@@ -194,10 +195,10 @@ const insumosDemo: Insumo[] = [
 const precosInsumoDemo: PrecoInsumo[] = insumosDemo.map((i) => ({ id: 'pi' + i.id, insumoId: i.id, preco: i.preco, em: haHoras(24 * 5), por: null, origem: 'exemplo' }))
 const rec = (id: string, nome: string, tipo: Receita['tipo'], extra: Partial<Receita> = {}): Receita => ({
   id, nome, tipo, linha: 'Foca', operacaoId: null, origem: 'propria', unidade: tipo === 'produto' ? 'un' : 'kg', precoVenda: null,
-  tempoPreparoMin: null, tempoFinalizacaoMin: null, capacidadeHora: null, equipamentos: null, conservacao: null, validadeDias: null, ativo: true, versaoAtual: 1, ...extra,
+  tempoPreparoMin: null, tempoFinalizacaoMin: null, capacidadeHora: null, equipamentos: null, conservacao: null, validadeDias: null, modoPreparo: null, ativo: true, versaoAtual: 1, ...extra,
 })
 const receitasDemo: Receita[] = [
-  rec('re1', 'Creme de queijo (exemplo)', 'preparo', { conservacao: 'Refrigerado até 5 °C', validadeDias: 3 }),
+  rec('re1', 'Creme de queijo (exemplo)', 'preparo', { conservacao: 'Refrigerado até 5 °C', validadeDias: 3, modoPreparo: '1. Bata o queijo com o creme de leite até ficar liso.\n2. Coloque nas mangas de confeiteiro e guarde refrigerado.' }),
   rec('re2', 'Focaccia de presunto (exemplo)', 'produto', { precoVenda: 55, tempoFinalizacaoMin: 3, capacidadeHora: 60, equipamentos: 'Forno elétrico', versaoAtual: 2 }),
   rec('re3', 'Refrigerante (exemplo)', 'produto', { linha: 'Bebidas', origem: 'revenda', precoVenda: 9 }),
   rec('re4', 'Pizza margherita (exemplo)', 'produto', { linha: 'Pizza', precoVenda: 50 }),
@@ -254,6 +255,27 @@ const enviosDemo: EnvioEvento[] = [
       itemEnvioDemo('ei9', 'Utensílios', null, 'GNs', null, null, { operacao: 'Foca', quantidadeTexto: 'Todas' }),
     ].map((x, i) => ({ ...x, ordem: i + 1 })),
   },
+]
+// Freelancers de eventos (EXEMPLO, nomes e CPFs fictícios).
+const freelasEventoDemo: FreelaEvento[] = [
+  { id: 'fe1', nome: 'Bruno Carvalho Lima', cpf: '11144477735', pix: '11977776666', celular: '11977776666', funcao: 'Pizzaiolo', valorDiaria: 180, observacao: null, ativo: true },
+  { id: 'fe2', nome: 'Camila Duarte Nunes', cpf: '12345678909', pix: 'camila.nunes@email.com', celular: '11955554444', funcao: 'Atendente', valorDiaria: null, observacao: null, ativo: true },
+  { id: 'fe3', nome: 'Diego Ferraz Prado', cpf: '98765432100', pix: '98765432100', celular: '11933332222', funcao: 'Auxiliar de cozinha', valorDiaria: null, observacao: 'Só fins de semana', ativo: true },
+]
+const diariaEv = (id: string, eventoId: string, dia: number, f: FreelaEvento | null, extra: Partial<DiariaFreelaEvento>): DiariaFreelaEvento => ({
+  id, eventoId, freelaId: f?.id ?? null, cpf: f?.cpf ?? '', data: addDias(hoje(), dia), funcao: f?.funcao ?? 'Atendente', valor: null, observacao: null,
+  nome: f?.nome ?? null, pix: f?.pix ?? null, celular: f?.celular ?? null, origem: 'link', status: 'pendente', motivo: null, distanciaM: null, noLocal: false,
+  enviadoEm: haHoras(2), pagoEm: null, ...extra,
+})
+const diariasEventoDemo: DiariaFreelaEvento[] = [
+  diariaEv('de1', 'ev4', -90, freelasEventoDemo[0], { status: 'aprovado', valor: 180, pagoEm: haHoras(24 * 85) }),
+  diariaEv('de2', 'ev4', -89, freelasEventoDemo[0], { status: 'aprovado', valor: 180, pagoEm: haHoras(24 * 85) }),
+  diariaEv('de3', 'ev4', -89, freelasEventoDemo[1], { status: 'aprovado', valor: 150, pagoEm: haHoras(24 * 85) }),
+  diariaEv('de4', 'ev6', -1, freelasEventoDemo[0], { status: 'aprovado', valor: 180, noLocal: true, distanciaM: 40 }),
+  diariaEv('de5', 'ev6', -1, freelasEventoDemo[1], { status: 'aprovado', valor: 150, origem: 'gestao' }),
+  diariaEv('de6', 'ev6', 0, freelasEventoDemo[0], { noLocal: true, distanciaM: 35 }),
+  diariaEv('de7', 'ev6', -1, freelasEventoDemo[2], { distanciaM: 5200, enviadoEm: haHoras(1) }),
+  diariaEv('de8', 'ev6', 0, null, { cpf: '24681357928', nome: 'Elisa Gomes Ribeiro', pix: 'elisa.ribeiro@email.com', celular: '11922221111', funcao: 'Caixa', noLocal: true, distanciaM: 80 }),
 ]
 const inventariosDemo: Inventario[] = [
   {
@@ -1520,6 +1542,102 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       return eventosDemo
         .filter((e) => ['aprovado', 'preparacao', 'execucao'].includes(e.status) && e.responsaveis.some((r) => r.funcionarioId === u.id))
         .map((e) => ({ id: e.id, nome: e.nome, status: e.status, papel: e.responsaveis.find((r) => r.funcionarioId === u.id)?.papel ?? null, dias: structuredClone(e.dias) }))
+    },
+
+    async freelasEvento() {
+      exigeGestao()
+      return espera(structuredClone(freelasEventoDemo).sort((a, b) => a.nome.localeCompare(b.nome)))
+    },
+    async salvarFreelaEvento(f) {
+      exigeGestao()
+      const cpf = soDigitos(f.cpf)
+      if (freelasEventoDemo.some((x) => x.cpf === cpf && x.id !== f.id)) throw new Error('duplicate key freelas_evento_cpf_key')
+      const linha: FreelaEvento = { ...f, id: f.id ?? novoId('fe'), nome: nomeProprio(f.nome), cpf, pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular).slice(-11) : null }
+      const i = freelasEventoDemo.findIndex((x) => x.id === linha.id)
+      if (i >= 0) freelasEventoDemo[i] = linha
+      else freelasEventoDemo.push(linha)
+      return espera(structuredClone(linha))
+    },
+    async diariasFreelaEvento(filtro) {
+      exigeGestao()
+      const r = diariasEventoDemo.filter((d) => ('eventoId' in filtro ? d.eventoId === filtro.eventoId && d.status !== 'recusado' : d.status === filtro.status))
+      return espera(structuredClone(r).sort((a, b) => a.data.localeCompare(b.data) || a.enviadoEm.localeCompare(b.enviadoEm)))
+    },
+    async lancarDiariaFreelaEvento(d) {
+      exigeGestao()
+      const f = freelasEventoDemo.find((x) => x.id === d.freelaId)!
+      if (diariasEventoDemo.some((x) => x.eventoId === d.eventoId && x.cpf === f.cpf && x.data === d.data && x.status !== 'recusado')) throw new Error('duplicate key')
+      diariasEventoDemo.push({ ...diariaEv(novoId('de'), d.eventoId, 0, f, {}), data: d.data, funcao: d.funcao.trim(), valor: d.valor, observacao: d.observacao, origem: 'gestao', status: 'aprovado', enviadoEm: agora() })
+    },
+    async aprovarDiariaFreelaEvento(id, valor, funcao, usarPixNovo) {
+      exigeGestao()
+      const d = diariasEventoDemo.find((x) => x.id === id && x.status === 'pendente')
+      if (!d) throw new Error('Essa diária já foi resolvida.')
+      let f = freelasEventoDemo.find((x) => x.id === d.freelaId) ?? freelasEventoDemo.find((x) => x.cpf === d.cpf)
+      if (!f) {
+        f = { id: novoId('fe'), nome: d.nome ?? '', cpf: d.cpf, pix: d.pix ?? '', celular: d.celular, funcao: d.funcao, valorDiaria: null, observacao: null, ativo: true }
+        freelasEventoDemo.push(f)
+      } else if (usarPixNovo && d.pix) Object.assign(f, { pix: d.pix, celular: d.celular ?? f.celular, ativo: true })
+      Object.assign(d, { status: 'aprovado', freelaId: f.id, valor, funcao: funcao.trim() || d.funcao })
+    },
+    async recusarDiariaFreelaEvento(id, motivo) {
+      exigeGestao()
+      const d = diariasEventoDemo.find((x) => x.id === id && x.status === 'pendente')
+      if (d) Object.assign(d, { status: 'recusado', motivo: motivo.trim() || null })
+    },
+    async excluirDiariaFreelaEvento(id) {
+      exigeGestao()
+      const i = diariasEventoDemo.findIndex((x) => x.id === id)
+      if (i >= 0) diariasEventoDemo.splice(i, 1)
+    },
+    async marcarPagoFreelaEvento(eventoId, freelaId, pago) {
+      exigeGestao()
+      for (const d of diariasEventoDemo) if (d.eventoId === eventoId && d.freelaId === freelaId && d.status === 'aprovado') d.pagoEm = pago ? agora() : null
+    },
+    async definirLocalEvento(eventoId, lat, lng) {
+      exigeGestao()
+      Object.assign(eventosDemo.find((e) => e.id === eventoId)!, { latitude: lat, longitude: lng })
+    },
+    async eventosAbertosDiaria() {
+      const ini = addDias(hoje(), -13)
+      return espera(eventosDemo
+        .filter((e) => e.status !== 'cancelado' && e.dias.some((d) => d.data >= ini && d.data <= hoje()))
+        .map((e) => ({ id: e.id, nome: e.nome, dias: e.dias.map((d) => d.data).filter((d) => d >= ini && d <= hoje()) })))
+    },
+    async freelaEventoQuemSou(cpf, celular) {
+      const c = soDigitos(cpf)
+      if (!cpfValido(c)) return espera({ tipo: 'invalido' as const })
+      const f = freelasEventoDemo.find((x) => x.cpf === c)
+      if (!f || (f.celular && f.celular.slice(-11) !== soDigitos(celular).slice(-11))) return espera({ tipo: 'novo' as const })
+      return espera({ tipo: 'freelancer' as const, nome: f.nome.split(' ')[0], pixFinal: f.pix.slice(-4) })
+    },
+    async enviarDiariasEvento(e) {
+      const quem = await this.freelaEventoQuemSou(e.cpf, e.celular)
+      if (quem.tipo === 'invalido') throw new Error('CPF inválido. Confira os números.')
+      const cpf = soDigitos(e.cpf)
+      const celular = soDigitos(e.celular).slice(-11)
+      const ev = eventosDemo.find((x) => x.id === e.eventoId && x.status !== 'cancelado')
+      if (!ev) throw new Error('Evento não encontrado.')
+      const f = freelasEventoDemo.find((x) => x.cpf === cpf)
+      const nome = nomeProprio(e.nome) || (quem.tipo === 'freelancer' ? f?.nome : '') || ''
+      const pix = e.pix.trim() || (quem.tipo === 'freelancer' ? f?.pix : '') || ''
+      if (nome.split(/\s+/).length < 2) throw new Error('Coloque o nome completo.')
+      if (!pix) throw new Error('Coloque a chave Pix.')
+      if (!e.funcao.trim()) throw new Error('Diga a função que você fez.')
+      if (!e.dias.length) throw new Error('Escolha pelo menos um dia.')
+      const distancia = e.local && ev.latitude !== null && ev.longitude !== null ? Math.round(distanciaM(e.local.lat, e.local.lng, ev.latitude, ev.longitude)) : null
+      let n = 0
+      for (const d of e.dias) {
+        if (d.data > hoje() || d.data < addDias(hoje(), -13)) throw new Error('Só dá para mandar diárias dos últimos 14 dias.')
+        if (!ev.dias.some((x) => x.data === d.data)) throw new Error('O evento não teve esse dia.')
+        if (diariasEventoDemo.some((x) => x.eventoId === ev.id && x.cpf === cpf && x.data === d.data && x.status !== 'recusado')) continue
+        diariasEventoDemo.push({
+          ...diariaEv(novoId('de'), ev.id, 0, f ?? null, {}), cpf, data: d.data, funcao: e.funcao.trim(), observacao: d.observacao?.trim() || null, nome, pix, celular,
+          enviadoEm: agora(), distanciaM: distancia, noLocal: d.data === hoje() && distancia !== null && distancia - Math.min(e.local?.precisao ?? 0, 100) <= 300,
+        })
+        n++
+      }
+      return espera(n)
     },
   }
 }

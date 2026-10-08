@@ -212,6 +212,12 @@ function PaginaFicha({ r, d, aoMudar }: { r: Receita; d: Dados; aoMudar: () => P
             <dt className="text-stone-500">Conservação</dt><dd>{r.conservacao ?? '—'}</dd>
             <dt className="text-stone-500">Validade</dt><dd>{r.validadeDias !== null ? `${r.validadeDias} dias` : '—'}</dd>
           </dl>
+          {r.modoPreparo && (
+            <>
+              <h3 className="mt-3 mb-1 text-sm font-bold">Modo de preparo</h3>
+              <p className="text-sm whitespace-pre-line text-stone-700">{r.modoPreparo}</p>
+            </>
+          )}
         </Cartao>
         <Cartao>
           <h2 className="mb-2 font-bold">Versões</h2>
@@ -348,7 +354,7 @@ function EditarDadosFicha({ r, tipoInicial, operacoes, linhas, aoFechar, aoSalva
     nome: r?.nome ?? '', tipo: r?.tipo ?? tipoInicial, linha: r?.linha ?? '', operacaoId: r?.operacaoId ?? '', origem: r?.origem ?? 'propria',
     unidade: r?.unidade ?? (tipoInicial === 'produto' ? 'un' : 'kg'), precoVenda: doNumero(r?.precoVenda), tempoPreparoMin: doNumero(r?.tempoPreparoMin),
     tempoFinalizacaoMin: doNumero(r?.tempoFinalizacaoMin), capacidadeHora: doNumero(r?.capacidadeHora), equipamentos: r?.equipamentos ?? '',
-    conservacao: r?.conservacao ?? '', validadeDias: doNumero(r?.validadeDias),
+    conservacao: r?.conservacao ?? '', validadeDias: doNumero(r?.validadeDias), modoPreparo: r?.modoPreparo ?? '',
   })
   const [ativo, setAtivo] = useState(r?.ativo ?? true)
   const [erro, setErro] = useState('')
@@ -368,7 +374,7 @@ function EditarDadosFicha({ r, tipoInicial, operacoes, linhas, aoFechar, aoSalva
           id: r?.id, nome: f.nome, tipo: f.tipo as TipoReceita, linha: f.linha || null, operacaoId: f.operacaoId || null, origem: f.origem as OrigemProduto,
           unidade: (produto ? 'un' : f.unidade) as UnidadeMedida, precoVenda: produto ? preco : null, tempoPreparoMin: inteiro(f.tempoPreparoMin),
           tempoFinalizacaoMin: inteiro(f.tempoFinalizacaoMin), capacidadeHora: inteiro(f.capacidadeHora), equipamentos: f.equipamentos || null,
-          conservacao: f.conservacao || null, validadeDias: inteiro(f.validadeDias), ativo,
+          conservacao: f.conservacao || null, validadeDias: inteiro(f.validadeDias), modoPreparo: f.modoPreparo.trim() || null, ativo,
         }),
       )
     } catch (e) {
@@ -443,6 +449,9 @@ function EditarDadosFicha({ r, tipoInicial, operacoes, linhas, aoFechar, aoSalva
             <input className={estiloEntrada} inputMode="numeric" value={f.validadeDias} onChange={mudar('validadeDias')} />
           </Campo>
         </div>
+        <Campo rotulo="Modo de preparo" dica="Um passo por linha.">
+          <textarea className={estiloEntrada} rows={5} value={f.modoPreparo} onChange={mudar('modoPreparo')} />
+        </Campo>
         {r && (
           <label className="flex items-center gap-3 text-sm">
             <input type="checkbox" className="size-5 accent-carvao" checked={!ativo} onChange={(ev) => setAtivo(!ev.target.checked)} />

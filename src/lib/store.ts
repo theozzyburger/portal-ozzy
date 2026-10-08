@@ -1,4 +1,4 @@
-import type { ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -279,6 +279,21 @@ export interface Store {
   itensContagem(): Promise<ItemContagem[]>
   // Eventos aprovados, em preparação ou em execução em que estou escalado.
   meusEventosEscalados(): Promise<EventoEscalado[]>
+
+  // Freelancers de eventos (base separada da das lojas; só a gestão).
+  freelasEvento(): Promise<FreelaEvento[]>
+  salvarFreelaEvento(f: Omit<FreelaEvento, 'id'> & { id?: string }): Promise<FreelaEvento>
+  diariasFreelaEvento(filtro: { eventoId: string } | { status: 'pendente' }): Promise<DiariaFreelaEvento[]>
+  lancarDiariaFreelaEvento(d: { eventoId: string; freelaId: string; data: string; funcao: string; valor: number; observacao: string | null }): Promise<void>
+  aprovarDiariaFreelaEvento(id: string, valor: number, funcao: string, usarPixNovo: boolean): Promise<void>
+  recusarDiariaFreelaEvento(id: string, motivo: string): Promise<void>
+  excluirDiariaFreelaEvento(id: string): Promise<void>
+  marcarPagoFreelaEvento(eventoId: string, freelaId: string, pago: boolean): Promise<void>
+  definirLocalEvento(eventoId: string, lat: number, lng: number): Promise<void>
+  // Link dos freelas de evento (sem login).
+  eventosAbertosDiaria(): Promise<EventoAberto[]>
+  freelaEventoQuemSou(cpf: string, celular: string): Promise<QuemSouFreela>
+  enviarDiariasEvento(e: { cpf: string; celular: string; nome: string; pix: string; eventoId: string; funcao: string; dias: { data: string; observacao?: string }[]; local: LocalEnvio | null }): Promise<number>
 }
 
 export const EVENTO_ALTERADO = 'Outra pessoa salvou este evento enquanto você editava. Feche, abra de novo e refaça a alteração.'

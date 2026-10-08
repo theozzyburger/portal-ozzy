@@ -812,6 +812,11 @@ export interface Evento {
   barracas: number | null
   // Folga que a sugestão de "quanto levar" põe em cima da previsão (%).
   margemSegurancaPct: number
+  // Valor padrão da diária de freelancer neste evento.
+  diariaFreela: number | null
+  // Local do evento, para a diária mandada de lá valer como presença.
+  latitude: number | null
+  longitude: number | null
   dias: DiaEvento[]
   operacoes: string[]
   responsaveis: ResponsavelEvento[]
@@ -884,6 +889,8 @@ export interface Receita {
   equipamentos: string | null
   conservacao: string | null
   validadeDias: number | null
+  // Passo a passo da produção (das fichas de preparo).
+  modoPreparo: string | null
   ativo: boolean
   versaoAtual: number
 }
@@ -996,4 +1003,45 @@ export interface EventoEscalado {
   status: StatusEvento
   papel: string | null
   dias: DiaEvento[]
+}
+
+// Freelancers de eventos (08/10): base separada da das lojas. Diária por dia de evento (sem turno).
+export interface FreelaEvento {
+  id: string
+  nome: string
+  cpf: string
+  pix: string
+  celular: string | null
+  funcao: string | null
+  // Valor próprio da diária; vazio = usa o do evento.
+  valorDiaria: number | null
+  observacao: string | null
+  ativo: boolean
+}
+export type StatusDiariaEvento = 'pendente' | 'aprovado' | 'recusado'
+export interface DiariaFreelaEvento {
+  id: string
+  eventoId: string
+  freelaId: string | null
+  cpf: string
+  data: string
+  funcao: string
+  valor: number | null
+  observacao: string | null
+  // O que a pessoa mandou pelo link.
+  nome: string | null
+  pix: string | null
+  celular: string | null
+  origem: 'link' | 'gestao'
+  status: StatusDiariaEvento
+  motivo: string | null
+  distanciaM: number | null
+  noLocal: boolean
+  enviadoEm: string
+  pagoEm: string | null
+}
+export interface EventoAberto {
+  id: string
+  nome: string
+  dias: string[]
 }

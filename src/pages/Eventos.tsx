@@ -7,6 +7,7 @@ import FichasEvento from './FichasEvento'
 import Insumos from './Insumos'
 import EstoqueBase from './EstoqueBase'
 import ComparativoEventos from './ComparativoEventos'
+import FreelasEventos, { FreelasDoEvento } from './FreelasEventos'
 import { AbasEvento, CardapioPrevisao, Separacao, Sobras, VendasEvento, useDadosLogistica } from './EventoLogistica'
 import { STATUS_EVENTO, nomeStatusEvento, type DiaEvento, type Evento, type HistoricoEvento, type NovoEvento, type Operacao, type StatusEvento } from '../lib/types'
 
@@ -35,7 +36,7 @@ const CAMPOS: Record<string, string> = {
   desmontagem_inicio: 'início da desmontagem', desmontagem_fim: 'fim da desmontagem', taxa_organizador_pct: 'taxa do organizador',
   valor_fixo: 'valor fixo', condicoes: 'condições', quem_recebe: 'quem recebe as vendas', repasse_prazo_dias: 'prazo do repasse',
   repasse_obs: 'observação do repasse', infraestrutura: 'infraestrutura', observacao: 'observações',
-  cidade: 'cidade', gastronomia: 'gastronomia', barracas: 'barracas', margem_seguranca_pct: 'folga da separação',
+  cidade: 'cidade', gastronomia: 'gastronomia', barracas: 'barracas', margem_seguranca_pct: 'folga da separação', diaria_freela: 'diária do freela', latitude: 'local no mapa', longitude: 'local no mapa',
 }
 
 // O que ainda falta definir no evento, para a gestão não esquecer (não impede salvar).
@@ -63,6 +64,7 @@ const ABAS = [
   { id: '', nome: 'Eventos' },
   { id: 'historico', nome: 'Comparativo' },
   { id: 'estoque', nome: 'Estoque e checklist' },
+  { id: 'freelancers', nome: 'Freelancers' },
   { id: 'fichas', nome: 'Fichas' },
   { id: 'insumos', nome: 'Insumos' },
   { id: 'fornecedores', nome: 'Fornecedores' },
@@ -88,6 +90,7 @@ export default function ModuloEventos({ sub, param }: { sub?: string; param?: st
         : aba === 'insumos' || aba === 'fornecedores' ? <Insumos aba={aba} />
         : aba === 'estoque' ? <EstoqueBase />
         : aba === 'historico' ? <ComparativoEventos />
+        : aba === 'freelancers' ? <FreelasEventos />
         : <Eventos id={sub} aba={param ?? ''} />}
     </div>
   )
@@ -226,7 +229,9 @@ function PaginaEvento({ e, eventos, operacoes, aoMudar, aba }: { e: Evento; even
         </div>
       </div>
       <AbasEvento id={e.id} aba={aba} />
-      {aba === '' ? <ResumoEvento e={e} operacoes={operacoes} aoMudar={aoMudar} /> : <AbaLogistica e={e} eventos={eventos} aba={aba} />}
+      {aba === '' ? <ResumoEvento e={e} operacoes={operacoes} aoMudar={aoMudar} />
+        : aba === 'freelas' ? <FreelasDoEvento e={e} aoMudarEvento={aoMudar} />
+        : <AbaLogistica e={e} eventos={eventos} aba={aba} />}
     </div>
   )
 }
@@ -355,7 +360,7 @@ function ResumoEvento({ e, operacoes, aoMudar }: { e: Evento; operacoes: Operaca
                 <span className="text-stone-700">
                   {h.tipo === 'criado' && 'Evento cadastrado'}
                   {h.tipo === 'status' && <>Status: {nomeStatusEvento(h.de as StatusEvento)} → <b>{nomeStatusEvento(h.para as StatusEvento)}</b></>}
-                  {h.tipo === 'dados' && `Alterou ${(h.campos ?? []).map((c) => CAMPOS[c] ?? c).join(', ')}`}
+                  {h.tipo === 'dados' && `Alterou ${[...new Set((h.campos ?? []).map((c) => CAMPOS[c] ?? c))].join(', ')}`}
                 </span>
                 {h.motivo && <span className="block text-stone-600">“{h.motivo}”</span>}
                 <span className="block text-xs text-stone-400" title={new Date(h.em).toLocaleString('pt-BR')}>
@@ -440,7 +445,7 @@ const emBranco: NovoEvento = {
   nome: '', status: 'negociacao', statusMotivo: null, tipo: null, organizador: null, organizadorContato: null, local: null, endereco: null,
   publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null, taxaOrganizadorPct: null,
   valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null, infraestrutura: null, observacao: null,
-  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null,
   dias: [], operacoes: [], responsaveis: [],
 }
 
@@ -461,6 +466,7 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
     quemRecebe: base.quemRecebe ?? '', repassePrazoDias: base.repassePrazoDias === null ? '' : String(base.repassePrazoDias), repasseObs: base.repasseObs ?? '',
     infraestrutura: base.infraestrutura ?? '', observacao: base.observacao ?? '',
     cidade: base.cidade ?? '', gastronomia: base.gastronomia ?? '', barracas: doNumero(base.barracas), margemSegurancaPct: doNumero(base.margemSegurancaPct),
+    diariaFreela: doNumero(base.diariaFreela),
   })
   const [dias, setDias] = useState<DiaEvento[]>(base.dias)
   const [ops, setOps] = useState<string[]>(base.operacoes)
@@ -510,6 +516,8 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
     if (barracas !== null && (Number.isNaN(barracas) || barracas < 0)) return setErro('Confira o número de barracas.')
     const margem = numero(f.margemSegurancaPct) ?? 10
     if (Number.isNaN(margem) || margem < 0 || margem > 200) return setErro('A folga da separação é um percentual entre 0 e 200.')
+    const diaria = numero(f.diariaFreela)
+    if (diaria !== null && (Number.isNaN(diaria) || diaria < 0)) return setErro('Confira o valor da diária do freelancer.')
     setSalvando(true)
     try {
       aoSalvar(
@@ -521,7 +529,7 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
           montagemInicio: f.montagemInicio || null, montagemFim: f.montagemFim || null, desmontagemInicio: f.desmontagemInicio || null, desmontagemFim: f.desmontagemFim || null,
           taxaOrganizadorPct: taxa, valorFixo: fixo, condicoes: f.condicoes || null, quemRecebe: (f.quemRecebe || null) as Evento['quemRecebe'],
           repassePrazoDias: prazo, repasseObs: f.repasseObs || null, infraestrutura: f.infraestrutura || null, observacao: f.observacao || null,
-          cidade: f.cidade || null, gastronomia: f.gastronomia || null, barracas, margemSegurancaPct: margem,
+          cidade: f.cidade || null, gastronomia: f.gastronomia || null, barracas, margemSegurancaPct: margem, diariaFreela: diaria,
           dias: dias.filter((d) => d.data), operacoes: ops, responsaveis: resp,
         }),
       )
@@ -565,9 +573,14 @@ function EditarEvento({ e, operacoes, aoFechar, aoSalvar, aoMudarOperacoes }: {
             <input className={estiloEntrada} inputMode="decimal" value={f.barracas} onChange={mudar('barracas')} />
           </Campo>
         </div>
-        <Campo rotulo="Folga na separação (%)" dica="Quanto a sugestão de separação põe a mais em cima da previsão. Padrão 10%.">
-          <input className={estiloEntrada} inputMode="decimal" value={f.margemSegurancaPct} onChange={mudar('margemSegurancaPct')} />
-        </Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="Folga na separação (%)" dica="Quanto a sugestão de separação põe a mais em cima da previsão. Padrão 10%.">
+            <input className={estiloEntrada} inputMode="decimal" value={f.margemSegurancaPct} onChange={mudar('margemSegurancaPct')} />
+          </Campo>
+          <Campo rotulo="Diária do freela (R$)" dica="Valor padrão das diárias deste evento. Freela com valor próprio no cadastro recebe o dele.">
+            <input className={estiloEntrada} inputMode="decimal" value={f.diariaFreela} onChange={mudar('diariaFreela')} placeholder="Ex.: 150" />
+          </Campo>
+        </div>
 
         <h3 className={secao}>Dias e horários de funcionamento</h3>
         {dias.length === 0 && <p className="text-sm text-stone-500">Nenhum dia ainda.</p>}

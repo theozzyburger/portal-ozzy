@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
-import type { NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -789,7 +789,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         montagem_inicio: e.montagemInicio || null, montagem_fim: e.montagemFim || null, desmontagem_inicio: e.desmontagemInicio || null, desmontagem_fim: e.desmontagemFim || null,
         taxa_organizador_pct: e.taxaOrganizadorPct, valor_fixo: e.valorFixo, condicoes: texto(e.condicoes), quem_recebe: e.quemRecebe,
         repasse_prazo_dias: e.repassePrazoDias, repasse_obs: texto(e.repasseObs), infraestrutura: texto(e.infraestrutura), observacao: texto(e.observacao),
-        cidade: texto(e.cidade), gastronomia: texto(e.gastronomia), barracas: e.barracas, margem_seguranca_pct: e.margemSegurancaPct,
+        cidade: texto(e.cidade), gastronomia: texto(e.gastronomia), barracas: e.barracas, margem_seguranca_pct: e.margemSegurancaPct, diaria_freela: e.diariaFreela,
       }
       let id = e.id
       if (id) {
@@ -860,7 +860,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       const linha = {
         nome: r.nome.trim(), tipo: r.tipo, linha: texto(r.linha), operacao_id: r.operacaoId, origem: r.origem, unidade: r.unidade, preco_venda: r.precoVenda,
         tempo_preparo_min: r.tempoPreparoMin, tempo_finalizacao_min: r.tempoFinalizacaoMin, capacidade_hora: r.capacidadeHora, equipamentos: texto(r.equipamentos),
-        conservacao: texto(r.conservacao), validade_dias: r.validadeDias, ativo: r.ativo, atualizado_em: new Date().toISOString(),
+        conservacao: texto(r.conservacao), validade_dias: r.validadeDias, modo_preparo: texto(r.modoPreparo), ativo: r.ativo, atualizado_em: new Date().toISOString(),
       }
       return paraReceita(r.id
         ? ok(await sb.from('receitas').update(linha).eq('id', r.id).select().single())
@@ -985,8 +985,74 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         dias: (r.dias ?? []).map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null })),
       }))
     },
+
+    async freelasEvento() {
+      return (ok(await sb.from('freelas_evento').select('*').order('nome')) ?? []).map(paraFreelaEvento)
+    },
+    async salvarFreelaEvento(f) {
+      const linha = {
+        nome: nomeProprio(f.nome), cpf: soDigitos(f.cpf), pix: f.pix.trim(), celular: f.celular ? soDigitos(f.celular).slice(-11) : null,
+        funcao: texto(f.funcao), valor_diaria: f.valorDiaria, observacao: texto(f.observacao), ativo: f.ativo,
+      }
+      const r = f.id
+        ? ok(await sb.from('freelas_evento').update(linha).eq('id', f.id).select('*').single())
+        : ok(await sb.from('freelas_evento').insert(linha).select('*').single())
+      return paraFreelaEvento(r)
+    },
+    async diariasFreelaEvento(filtro) {
+      let q = sb.from('evento_freela_diarias').select('*')
+      q = 'eventoId' in filtro ? q.eq('evento_id', filtro.eventoId).neq('status', 'recusado') : q.eq('status', filtro.status)
+      return (ok(await q.order('data').order('enviado_em')) ?? []).map(paraDiariaEvento)
+    },
+    async lancarDiariaFreelaEvento(d) {
+      const f = ok(await sb.from('freelas_evento').select('cpf').eq('id', d.freelaId).single()) as { cpf: string }
+      ok(await sb.from('evento_freela_diarias').insert({
+        evento_id: d.eventoId, freela_id: d.freelaId, cpf: f.cpf, data: d.data, funcao: d.funcao.trim(), valor: d.valor, observacao: texto(d.observacao),
+        origem: 'gestao', status: 'aprovado', resolvido_por: exigeEu().id, resolvido_em: new Date().toISOString(),
+      }))
+    },
+    async aprovarDiariaFreelaEvento(id, valor, funcao, usarPixNovo) {
+      ok(await sb.rpc('freela_evento_aprovar', { p_diaria: id, p_valor: valor, p_funcao: funcao, p_usar_pix: usarPixNovo }))
+    },
+    async recusarDiariaFreelaEvento(id, motivo) {
+      ok(await sb.from('evento_freela_diarias').update({
+        status: 'recusado', motivo: motivo.trim() || null, resolvido_por: exigeEu().id, resolvido_em: new Date().toISOString(),
+      }).eq('id', id).eq('status', 'pendente'))
+    },
+    async excluirDiariaFreelaEvento(id) {
+      ok(await sb.from('evento_freela_diarias').delete().eq('id', id))
+    },
+    async marcarPagoFreelaEvento(eventoId, freelaId, pago) {
+      ok(await sb.from('evento_freela_diarias')
+        .update(pago ? { pago_em: new Date().toISOString(), pago_por: exigeEu().id } : { pago_em: null, pago_por: null })
+        .eq('evento_id', eventoId).eq('freela_id', freelaId).eq('status', 'aprovado'))
+    },
+    async definirLocalEvento(eventoId, lat, lng) {
+      ok(await sb.rpc('definir_local_evento', { p_evento: eventoId, p_lat: lat, p_lng: lng }))
+    },
+    async eventosAbertosDiaria() {
+      return (ok(await sb.rpc('freela_eventos_abertos')) ?? []).map((r: any) => ({ id: r.id, nome: r.nome, dias: r.dias ?? [] }))
+    },
+    async freelaEventoQuemSou(cpf, celular) {
+      return ok(await sb.rpc('freela_evento_quem_sou', { p_cpf: cpf, p_celular: celular }))
+    },
+    async enviarDiariasEvento(e) {
+      return ok(await sb.rpc('freela_evento_enviar', {
+        p_cpf: e.cpf, p_celular: e.celular, p_nome: e.nome ? nomeProprio(e.nome) : '', p_pix: e.pix, p_evento: e.eventoId, p_funcao: e.funcao, p_dias: e.dias, p_local: e.local,
+      }))
+    },
   }
 }
+
+const paraFreelaEvento = (r: any): FreelaEvento => ({
+  id: r.id, nome: r.nome, cpf: r.cpf, pix: r.pix, celular: r.celular, funcao: r.funcao, valorDiaria: numeroOuNulo(r.valor_diaria),
+  observacao: r.observacao, ativo: r.ativo,
+})
+const paraDiariaEvento = (r: any): DiariaFreelaEvento => ({
+  id: r.id, eventoId: r.evento_id, freelaId: r.freela_id, cpf: r.cpf, data: r.data, funcao: r.funcao, valor: numeroOuNulo(r.valor), observacao: r.observacao,
+  nome: r.nome, pix: r.pix, celular: r.celular, origem: r.origem, status: r.status, motivo: r.motivo, distanciaM: r.distancia_m,
+  noLocal: r.no_local, enviadoEm: r.enviado_em, pagoEm: r.pago_em,
+})
 
 const paraFornecedor = (r: any): Fornecedor => ({ id: r.id, nome: r.nome, contato: r.contato, telefone: r.telefone, observacao: r.observacao, ativo: r.ativo })
 const paraInsumo = (r: any): Insumo => ({
@@ -996,7 +1062,7 @@ const paraInsumo = (r: any): Insumo => ({
 const paraReceita = (r: any): Receita => ({
   id: r.id, nome: r.nome, tipo: r.tipo, linha: r.linha, operacaoId: r.operacao_id, origem: r.origem, unidade: r.unidade, precoVenda: numeroOuNulo(r.preco_venda),
   tempoPreparoMin: r.tempo_preparo_min, tempoFinalizacaoMin: r.tempo_finalizacao_min, capacidadeHora: r.capacidade_hora, equipamentos: r.equipamentos,
-  conservacao: r.conservacao, validadeDias: r.validade_dias, ativo: r.ativo, versaoAtual: r.versao_atual,
+  conservacao: r.conservacao, validadeDias: r.validade_dias, modoPreparo: r.modo_preparo ?? null, ativo: r.ativo, versaoAtual: r.versao_atual,
 })
 
 const linhaItemEnvio = (i: NovoItemEnvio) => ({
@@ -1013,6 +1079,7 @@ const paraEvento = (r: any): Evento => ({
   taxaOrganizadorPct: numeroOuNulo(r.taxa_organizador_pct), valorFixo: numeroOuNulo(r.valor_fixo), condicoes: r.condicoes, quemRecebe: r.quem_recebe,
   repassePrazoDias: r.repasse_prazo_dias, repasseObs: r.repasse_obs, infraestrutura: r.infraestrutura, observacao: r.observacao,
   cidade: r.cidade ?? null, gastronomia: r.gastronomia ?? null, barracas: numeroOuNulo(r.barracas), margemSegurancaPct: Number(r.margem_seguranca_pct ?? 10),
+  diariaFreela: numeroOuNulo(r.diaria_freela), latitude: r.latitude ?? null, longitude: r.longitude ?? null,
   dias: (r.evento_dias ?? [])
     .map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null }))
     .sort((a: DiaEvento, b: DiaEvento) => a.data.localeCompare(b.data)),

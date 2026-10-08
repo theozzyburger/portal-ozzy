@@ -8,6 +8,7 @@ import type { Funcionario } from './lib/types'
 import { nomeNivel } from './lib/types'
 import Login from './pages/Login'
 import EnviarDiaria from './pages/EnviarDiaria'
+import EnviarDiariaEvento from './pages/EnviarDiariaEvento'
 import AbrirGuia from './pages/AbrirGuia'
 import Inicio from './pages/Inicio'
 import Comunicados from './pages/Comunicados'
@@ -44,12 +45,15 @@ export default function App() {
   const [eu, setEu] = useState<Funcionario | null>(null)
   const [carregando, setCarregando] = useState(true)
   // Link da loja para o freelancer mandar a diária (#/diaria/<loja>): abre sem login.
-  const [diaria, setDiaria] = useState(() => location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+  const [diaria, setDiaria] = useState(() => location.hash.match(/^#\/?diaria(?!-evento)(?:\/([\w-]+))?/))
+  // Link dos freelas de evento (#/diaria-evento[/<evento>]): base separada, também sem login.
+  const [diariaEvento, setDiariaEvento] = useState(() => location.hash.match(/^#\/?diaria-evento(?:\/([\w-]+))?/))
   // Link curto da guia de exame (#/g/<código>), mandado no WhatsApp: abre sem login.
   const [guia, setGuia] = useState(() => location.hash.match(/^#\/?g\/([A-Za-z0-9]+)/))
   useEffect(() => {
     const ouvir = () => {
-      setDiaria(location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+      setDiaria(location.hash.match(/^#\/?diaria(?!-evento)(?:\/([\w-]+))?/))
+      setDiariaEvento(location.hash.match(/^#\/?diaria-evento(?:\/([\w-]+))?/))
       setGuia(location.hash.match(/^#\/?g\/([A-Za-z0-9]+)/))
     }
     window.addEventListener('hashchange', ouvir)
@@ -63,6 +67,7 @@ export default function App() {
     })
   }, [store])
 
+  if (diariaEvento) return <EnviarDiariaEvento store={store} eventoId={diariaEvento[1]} />
   if (diaria) return <EnviarDiaria store={store} lojaId={diaria[1]} />
   if (guia) return <AbrirGuia store={store} codigo={guia[1]} />
   if (carregando) return <div className="flex h-full items-center justify-center text-stone-400">Carregando…</div>
