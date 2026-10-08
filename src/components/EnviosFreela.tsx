@@ -209,14 +209,14 @@ function LinksDasLojas() {
             <img src={logo} alt="The Ozzy" className="h-24 w-24" />
             <div>
               <div className="text-3xl font-bold">Trabalhou de freela?</div>
-              <div className="mt-2 text-xl">Mande aqui os dias para receber na segunda</div>
+              <div className="mt-2 text-xl">Mande aqui os dias que você trabalhou</div>
             </div>
             <img src={qr} alt="QR Code" className="h-72 w-72" style={{ imageRendering: 'pixelated' }} />
-            <div className="rounded-xl border-2 border-black px-5 py-3 text-xl font-bold">Prazo: domingo até as 22h. Quem não enviar não recebe na segunda.</div>
+            <div className="rounded-xl border-2 border-black px-5 py-3 text-xl font-bold">Prazo: domingo até as 22h. O Pix cai até terça-feira.</div>
             <div className="text-lg">Aponte a câmera do celular · {loja.nome}</div>
             <div className="max-w-md text-sm text-stone-600">
-              Você vai precisar do CPF, do celular e da chave Pix. A gerente confere e aprova; o pagamento sai por Pix na
-              segunda-feira seguinte à semana trabalhada.
+              Você vai precisar do CPF, do celular e da chave Pix. A gerente confere e aprova; o pagamento cai por Pix até
+              a terça-feira seguinte à semana trabalhada.
             </div>
           </div>
         </Impressao>

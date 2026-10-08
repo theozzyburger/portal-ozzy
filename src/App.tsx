@@ -87,6 +87,10 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   const [area = 'inicio', sub, param] = useRota()
   const [menuAberto, setMenuAberto] = useState(false)
   const modulos = modulosVisiveis(eu.nivel)
+  // Freelancers saiu do Departamento Pessoal para o menu (08/10): link antigo continua funcionando.
+  useEffect(() => {
+    if (area === 'rh' && sub === 'freelancers') ir('freelancers')
+  }, [area, sub])
   const modulo = modulos.find((m) => m.id === area) ?? modulos[0]
 
   useEffect(() => setMenuAberto(false), [area, sub])
@@ -96,7 +100,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
     { id: 'turnos', nome: 'Turnos' },
     { id: 'folgas', nome: 'Folgas' },
     ...(podeVerEquipe(eu.nivel) ? [{ id: 'equipe', nome: 'Equipe' }] : []),
-    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }, { id: 'caixinha', nome: 'Caixinha' }, { id: 'freelancers', nome: 'Freelancers' }, { id: 'salarios', nome: 'Salários' }] : []),
+    ...(podeGerenciar(eu.nivel) ? [{ id: 'exames', nome: 'Exames' }, { id: 'caixinha', nome: 'Caixinha' }, { id: 'salarios', nome: 'Salários' }] : []),
     { id: 'ponto', nome: 'Ponto', emBreve: true },
     { id: 'perfil', nome: 'Meu perfil' },
   ]
@@ -109,6 +113,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (modulo.id === 'fichas') conteudo = <Fichas />
   else if (modulo.id === 'financeiro') conteudo = <Financeiro />
   else if (modulo.id === 'compras') conteudo = <Compras />
+  else if (modulo.id === 'freelancers') conteudo = <Freelancers />
   else if (modulo.id !== 'rh') conteudo = <EmBreve modulo={modulo} />
   else if (abaRh === 'turnos') conteudo = <Turnos />
   else if (abaRh === 'folgas') conteudo = <Escala />
@@ -116,7 +121,6 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (abaRh === 'equipe') conteudo = <Equipe />
   else if (abaRh === 'exames') conteudo = <Vencimentos />
   else if (abaRh === 'caixinha') conteudo = <Caixinha />
-  else if (abaRh === 'freelancers') conteudo = <Freelancers />
   else if (abaRh === 'salarios') conteudo = <Salarios />
   else if (abaRh === 'ponto') conteudo = <EmBreve modulo={PONTO} />
   else if (abaRh === 'perfil') conteudo = <Perfil funcionarioId={eu.id} />

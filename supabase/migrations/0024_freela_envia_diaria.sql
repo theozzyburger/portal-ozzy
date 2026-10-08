@@ -202,3 +202,18 @@ begin
 end $$;
 
 grant execute on function freela_aprovar_envio(uuid, numeric, text, boolean) to authenticated;
+
+-- Excluir cadastro de freelancer (pedido de 08/10, para tirar os de teste). Leva junto as diárias e os envios
+-- dele; não deixa excluir quem já tem pagamento marcado, para não sumir com o histórico do que foi pago.
+create function freela_excluir(p_freelancer uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not sou_gestao() then raise exception 'Só a gestão exclui cadastro de freelancer.'; end if;
+  if exists (select 1 from freela_pagamentos where freelancer_id = p_freelancer) then
+    raise exception 'Esse freelancer já tem pagamento marcado. Desmarque os pagamentos ou deixe o cadastro inativo.';
+  end if;
+  delete from freela_envios where freelancer_id = p_freelancer;
+  delete from freela_diarias where freelancer_id = p_freelancer;
+  delete from freelancers where id = p_freelancer;
+end $$;
+grant execute on function freela_excluir(uuid) to authenticated;

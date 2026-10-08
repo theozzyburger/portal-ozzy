@@ -2,7 +2,7 @@ import { podeGerenciar, vejoResultado } from './permissoes'
 import type { Nivel } from './types'
 
 export type IdIcone =
-  | 'inicio' | 'rh' | 'fichas' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
+  | 'inicio' | 'rh' | 'freelancers' | 'fichas' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
   | 'checklists' | 'regras' | 'treinamentos' | 'manutencao' | 'eventos'
 
 export interface Modulo {
@@ -23,6 +23,8 @@ export interface Modulo {
 export const MODULOS: Modulo[] = [
   { id: 'inicio', nome: 'Início', pronto: true },
   { id: 'rh', nome: 'Departamento Pessoal', pronto: true },
+  // Menu próprio (pedido de 08/10), para a gestão achar rápido as diárias enviadas.
+  { id: 'freelancers', nome: 'Freelancers', pronto: true, soGestao: true },
   { id: 'fichas', nome: 'Fichas técnicas', pronto: true, soGestao: true },
   {
     id: 'financeiro', nome: 'Financeiro', pronto: true, ve: vejoResultado,

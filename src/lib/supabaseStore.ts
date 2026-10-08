@@ -623,6 +623,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         : ok(await sb.from('freelancers').insert({ ...linha, criado_por: exigeEu().id }).select().single())
       return paraFreelancer(r)
     },
+    async excluirFreelancer(id) {
+      ok(await sb.rpc('freela_excluir', { p_freelancer: id }))
+    },
     async diariasFreela(inicio, fim) {
       return (ok(await sb.from('freela_diarias').select('*').gte('data', inicio).lte('data', fim).order('data')) ?? []).map(paraDiaria)
     },

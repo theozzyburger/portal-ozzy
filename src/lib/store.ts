@@ -190,6 +190,8 @@ export interface Store {
   // Freelancers (só a gestão). semana = segunda-feira que abre a semana.
   freelancers(): Promise<Freelancer[]>
   salvarFreelancer(f: Omit<Freelancer, 'id'> & { id?: string }): Promise<Freelancer>
+  // Leva junto diárias e envios; recusa se já houver pagamento marcado.
+  excluirFreelancer(id: string): Promise<void>
   diariasFreela(inicio: string, fim: string): Promise<DiariaFreela[]>
   lancarDiaria(d: Omit<DiariaFreela, 'id' | 'lancadoPor'>): Promise<DiariaFreela>
   excluirDiaria(id: string): Promise<void>

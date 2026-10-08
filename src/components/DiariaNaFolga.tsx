@@ -46,7 +46,7 @@ export default function DiariaNaFolga({ aoFechar }: { aoFechar: () => void }) {
   return (
     <Modal titulo="Fiz diária na folga" aberto aoFechar={aoFechar}>
       <form onSubmit={enviar} className="space-y-4">
-        <p className="text-sm text-stone-600">Marque os dias em que você trabalhou como freela. A gestão aprova e o Pix sai na segunda seguinte.</p>
+        <p className="text-sm text-stone-600">Marque os dias em que você trabalhou como freela. A gestão aprova e o Pix cai até a terça-feira seguinte.</p>
         <AvisoPrazo />
         <CamposDiaria v={v} mudar={setV} unidades={unidades} jaEnviados={meus.filter((m) => m.status !== 'recusado').map((m) => `${m.data}|${m.turno}`)} />
         <Campo rotulo="Chave Pix para receber" dica="Vem do seu cadastro; dá para trocar aqui.">

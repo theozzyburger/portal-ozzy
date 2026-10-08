@@ -60,7 +60,7 @@ export default function Freelancers() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Freelancers</h1>
-          <p className="text-sm text-stone-500">Trabalhou de segunda a domingo, recebe na segunda seguinte.</p>
+          <p className="text-sm text-stone-500">Trabalhou de segunda a domingo, recebe até a terça seguinte.</p>
         </div>
         {aba === 'cadastro' ? (
           <Botao onClick={() => setEditando('novo')}>+ Novo freelancer</Botao>
@@ -146,10 +146,10 @@ export default function Freelancers() {
         <FormFreelancer
           existente={editando === 'novo' ? undefined : editando}
           aoFechar={() => setEditando(null)}
-          aoSalvar={async () => {
+          aoSalvar={async (msg = 'Cadastro salvo') => {
             setEditando(null)
             await carregar()
-            avisar('Cadastro salvo')
+            avisar(msg)
           }}
         />
       )}
@@ -360,7 +360,7 @@ function Cadastro({ freelas, editar }: { freelas: Freelancer[]; editar: (f: Free
   )
 }
 
-function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelancer; aoFechar: () => void; aoSalvar: () => void }) {
+function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelancer; aoFechar: () => void; aoSalvar: (msg?: string) => void }) {
   const { store } = useApp()
   const [f, setF] = useState({
     nome: existente?.nome ?? '', cpf: existente?.cpf ? formatarCpf(existente.cpf) : '', pix: existente?.pix ?? '',
@@ -418,6 +418,27 @@ function FormFreelancer({ existente, aoFechar, aoSalvar }: { existente?: Freelan
         )}
         {erro && <p className="text-sm text-red-600">{erro}</p>}
         <Botao className="w-full" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+        {existente && (
+          <button
+            type="button"
+            disabled={salvando}
+            className="w-full text-sm font-semibold text-red-700"
+            onClick={async () => {
+              if (!confirm(`Excluir o cadastro de ${existente.nome}? As diárias dele também saem. Não dá para desfazer.`)) return
+              setSalvando(true)
+              try {
+                await store.excluirFreelancer(existente.id)
+                aoSalvar('Cadastro excluído')
+              } catch (err) {
+                setErro((err as Error).message)
+              } finally {
+                setSalvando(false)
+              }
+            }}
+          >
+            Excluir cadastro
+          </button>
+        )}
       </form>
     </Modal>
   )

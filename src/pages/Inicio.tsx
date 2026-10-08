@@ -120,7 +120,7 @@ export default function Inicio() {
         <button onClick={() => setDiariaFolga(true)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-left ring-1 ring-stone-200 hover:ring-carvao">
           <span>
             <span className="block font-semibold">Fiz diária na folga</span>
-            <span className="text-sm text-stone-500">Mande os dias para entrar no pagamento de segunda</span>
+            <span className="text-sm text-stone-500">Mande os dias até domingo 22h para entrar no pagamento</span>
           </span>
           <span className="text-lg text-stone-400">›</span>
         </button>

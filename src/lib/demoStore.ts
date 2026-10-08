@@ -947,6 +947,13 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       else freelas.push(novo)
       return espera(novo)
     },
+    async excluirFreelancer(id) {
+      exigeGestao()
+      if (pagamentos.some((p) => p.freelancerId === id)) throw new Error('Esse freelancer já tem pagamento marcado. Desmarque os pagamentos ou deixe o cadastro inativo.')
+      for (const lista of [diarias, envios] as { freelancerId: string | null }[][])
+        for (let i = lista.length - 1; i >= 0; i--) if (lista[i].freelancerId === id) lista.splice(i, 1)
+      freelas.splice(freelas.findIndex((f) => f.id === id), 1)
+    },
     async diariasFreela(inicio, fim) {
       exigeGestao()
       return espera(diarias.filter((d) => d.data >= inicio && d.data <= fim).map((d) => ({ ...d })))

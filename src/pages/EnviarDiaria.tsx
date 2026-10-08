@@ -92,13 +92,13 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
               {enviadas === 0 ? 'Esses dias já tinham sido enviados' : `${enviadas} ${enviadas === 1 ? 'diária enviada' : 'diárias enviadas'}`}
             </h1>
             <p className="text-sm text-stone-600">
-              A gerente confere e aprova. O pagamento sai por Pix na segunda-feira seguinte à semana trabalhada.
+              A gerente confere e aprova. O pagamento da semana cai por Pix até a terça-feira seguinte.
             </p>
             <Botao variante="secundario" className="w-full" onClick={recomecar}>Mandar outro dia</Botao>
           </div>
         ) : !quem || quem.tipo === 'invalido' ? (
           <form onSubmit={identificar} className="space-y-4 rounded-2xl bg-white p-5 ring-1 ring-stone-200">
-            <p className="text-sm text-stone-600">Trabalhou de freela com a gente? Mande aqui os dias para entrar no pagamento de segunda.</p>
+            <p className="text-sm text-stone-600">Trabalhou de freela com a gente? Mande aqui os dias para entrar no pagamento da semana.</p>
             <AvisoPrazo />
             <Campo rotulo="Seu CPF">
               <input
@@ -171,7 +171,7 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
 export function AvisoPrazo() {
   return (
     <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-300">
-      <b>Atenção:</b> mande suas diárias até <b>domingo, às 22h</b>. Quem não enviar não recebe na segunda-feira.
+      <b>Atenção:</b> mande suas diárias até <b>domingo, às 22h</b>. Quem não enviar no prazo não entra no pagamento da semana. O Pix cai até terça-feira.
     </div>
   )
 }

@@ -4,6 +4,7 @@ import type { IdIcone } from '../lib/modulos'
 const CAMINHOS: Record<IdIcone | 'menu' | 'relogio' | 'pedidos' | 'avaliacoes', string> = {
   inicio: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   rh: 'M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19M10 10.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6M20 19v-1.5a3.5 3.5 0 0 0-2.5-3.4M15.5 4.6a3 3 0 0 1 0 5.8',
+  freelancers: 'M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6M4 19v-1.5A3.5 3.5 0 0 1 7.5 14h5M15 15h6M18 12v6',
   fichas: 'M6 14a4 4 0 0 1 .9-7.9A5 5 0 0 1 17.1 6.1 4 4 0 0 1 18 14v6H6zM6 17h12',
   financeiro: 'M4 19V9M10 19V5M16 19v-7M3 19h18',
   administrativo: 'M4 7h16v12H4zM9 7V5h6v2M4 12h16',
