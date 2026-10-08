@@ -8,6 +8,7 @@ import type { Funcionario } from './lib/types'
 import { nomeNivel } from './lib/types'
 import Login from './pages/Login'
 import EnviarDiaria from './pages/EnviarDiaria'
+import AbrirGuia from './pages/AbrirGuia'
 import Inicio from './pages/Inicio'
 import Comunicados from './pages/Comunicados'
 import Escala from './pages/Escala'
@@ -39,8 +40,13 @@ export default function App() {
   const [carregando, setCarregando] = useState(true)
   // Link da loja para o freelancer mandar a diária (#/diaria/<loja>): abre sem login.
   const [diaria, setDiaria] = useState(() => location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+  // Link curto da guia de exame (#/g/<código>), mandado no WhatsApp: abre sem login.
+  const [guia, setGuia] = useState(() => location.hash.match(/^#\/?g\/([A-Za-z0-9]+)/))
   useEffect(() => {
-    const ouvir = () => setDiaria(location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+    const ouvir = () => {
+      setDiaria(location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+      setGuia(location.hash.match(/^#\/?g\/([A-Za-z0-9]+)/))
+    }
     window.addEventListener('hashchange', ouvir)
     return () => window.removeEventListener('hashchange', ouvir)
   }, [])
@@ -53,6 +59,7 @@ export default function App() {
   }, [store])
 
   if (diaria) return <EnviarDiaria store={store} lojaId={diaria[1]} />
+  if (guia) return <AbrirGuia store={store} codigo={guia[1]} />
   if (carregando) return <div className="flex h-full items-center justify-center text-stone-400">Carregando…</div>
   if (!eu) return <Login store={store} aoEntrar={setEu} />
 

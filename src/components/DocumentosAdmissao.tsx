@@ -360,11 +360,11 @@ function FolhaGuia({
     setEnviando(true)
     try {
       const arquivo = await gerarPdf()
-      const doc = await store.enviarDocumento({
+      await store.enviarDocumento({
         funcionarioId: pessoa.id, tipo: 'outro', arquivo,
         observacao: `Guia de encaminhamento para exame ${TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()}`,
       })
-      const url = await store.abrirDocumento(doc, 7 * 24 * 3600)
+      const url = await store.publicarGuia(pessoa.id, arquivo)
       const link = linkWhatsApp(pessoa, tipo, responsavel, url)!
       if (janela) janela.location.href = link
       else setLinkPronto(link)

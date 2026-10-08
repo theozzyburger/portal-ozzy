@@ -1,5 +1,5 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
-import { distanciaM, nomeProprio, soDigitos, type Store } from './store'
+import { codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
 import type { AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
@@ -159,6 +159,7 @@ const ASSINATURA_DEMO =
 // Tabela de desconto de EXEMPLO (a real a gestão preenche em Compras › Uniformes).
 const valoresUniforme: Record<string, number> = { Camiseta: 35, 'Calça': 60, Sapato: 120, Avental: 30, 'Boné': 25 }
 const devolucoes: DevolucaoUniforme[] = []
+const guiasDemo = new Map<string, string>()
 const ajustesPonto: AjustePonto[] = [
   { id: 'aj1', funcionarioId: 'p-cibeli-costa', data: addDias(hoje(), -1), tipo: 'esqueci_saida', horario: '23:20', motivo: 'Saí junto com a Queli e esqueci de bater.', status: 'pendente', resposta: null, criadoEm: new Date(Date.now() - 5 * 3600_000).toISOString(), resolvidoPor: null, resolvidoEm: null },
   { id: 'aj2', funcionarioId: 'p-dora-ramos', data: addDias(hoje(), -2), tipo: 'equipamento', horario: '13:30', motivo: 'O relógio estava travado na entrada.', status: 'pendente', resposta: null, criadoEm: new Date(Date.now() - 26 * 3600_000).toISOString(), resolvidoPor: null, resolvidoEm: null },
@@ -1051,6 +1052,15 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async desfazerPagoFreela(freelancerId, semana) {
       exigeGestao()
       pagamentos.splice(pagamentos.findIndex((p) => p.freelancerId === freelancerId && p.semana === semana), 1)
+    },
+    async publicarGuia(_fid, arquivo) {
+      exigeGestao()
+      const codigo = codigoAleatorio()
+      guiasDemo.set(codigo, URL.createObjectURL(arquivo))
+      return linkDaGuia(codigo)
+    },
+    async abrirGuia(codigo) {
+      return guiasDemo.get(codigo) ?? null
     },
     async lojasParaDiaria() {
       return espera(unidades.map((u) => ({ ...u })))

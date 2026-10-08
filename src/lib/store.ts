@@ -211,6 +211,10 @@ export interface Store {
   marcarPagoFreela(freelancerId: string, semana: string, valor: number): Promise<void>
   desfazerPagoFreela(freelancerId: string, semana: string): Promise<void>
   // Diárias mandadas pelo próprio freelancer (link da loja, sem login) ou pelo funcionário (login).
+  // Guia de exame com link curto (#/g/<código>), válido por 7 dias. publicarGuia devolve o link pronto.
+  publicarGuia(funcionarioId: string, arquivo: File): Promise<string>
+  // Página pública do link: endereço do PDF, ou null se o link venceu.
+  abrirGuia(codigo: string): Promise<string | null>
   lojasParaDiaria(): Promise<Unidade[]>
   freelaQuemSou(cpf: string, celular: string): Promise<QuemSouFreela>
   enviarDiarias(e: { cpf: string; celular: string; nome: string; pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[]; local: LocalEnvio | null }): Promise<number>
@@ -253,3 +257,11 @@ export function distanciaM(lat1: number, lng1: number, lat2: number, lng2: numbe
   const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lng2 - lng1) / 2) ** 2
   return 2 * 6371000 * Math.asin(Math.sqrt(a))
 }
+
+// Código aleatório do link curto (12 letras e números).
+export function codigoAleatorio(n = 12) {
+  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const r = crypto.getRandomValues(new Uint32Array(n))
+  return Array.from(r, (x) => letras[x % letras.length]).join('')
+}
+export const linkDaGuia = (codigo: string) => `${location.origin}${location.pathname.replace(/index\.html$/, '')}#/g/${codigo}`

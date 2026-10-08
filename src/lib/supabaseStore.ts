@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { nomeProprio, soDigitos, type Store } from './store'
+import { codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import type { AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
@@ -706,6 +706,17 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async desfazerPagoFreela(freelancerId, semana) {
       ok(await sb.from('freela_pagamentos').delete().eq('freelancer_id', freelancerId).eq('semana', semana))
+    },
+    async publicarGuia(funcionarioId, arquivo) {
+      const u = exigeEu()
+      const codigo = codigoAleatorio()
+      ok(await sb.storage.from('guias').upload(`${codigo}.pdf`, arquivo, { contentType: 'application/pdf' }))
+      ok(await sb.from('links_guia').insert({ codigo, funcionario_id: funcionarioId, expira_em: new Date(Date.now() + 7 * 86400_000).toISOString(), criado_por: u.id }))
+      return linkDaGuia(codigo)
+    },
+    async abrirGuia(codigo) {
+      const vale = ok(await sb.rpc('guia_valida', { p_codigo: codigo }))
+      return vale ? sb.storage.from('guias').getPublicUrl(`${codigo}.pdf`).data.publicUrl : null
     },
     async lojasParaDiaria() {
       return ok(await sb.rpc('freela_lojas')) ?? []
