@@ -26,6 +26,9 @@ jobs:
           JA_RODADAS_ATE: '0027'
         run: |
           if [ -z "$SUPABASE_DB_URL" ]; then echo "Secret SUPABASE_DB_URL não existe; nada a fazer."; exit 0; fi
+          if ! psql "$SUPABASE_DB_URL" -At -c "select 1" > /dev/null 2> erro.txt; then
+            echo "::error title=Não conectou no banco::$(tr '\n' ' ' < erro.txt | cut -c1-900)"; exit 1
+          fi
           psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q \
             -c "create table if not exists public._migracoes (nome text primary key, aplicada_em timestamptz not null default now())" \
             -c "alter table public._migracoes enable row level security"
@@ -48,12 +51,18 @@ jobs:
               fez_backup=1
             fi
             echo "::group::$n"
-            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f "$f" \
-              -c "insert into public._migracoes (nome) values ('$n')"
+            if ! psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f "$f" \
+              -c "insert into public._migracoes (nome) values ('$n')" 2> erro.txt; then
+              cat erro.txt
+              echo "::endgroup::"
+              # Aparece no resumo da execução (e para o Claude conferir sem baixar o log).
+              echo "::error title=$n não foi aplicada::$(tr '\n' ' ' < erro.txt | cut -c1-900)"
+              exit 1
+            fi
             echo "::endgroup::"
-            echo "Aplicada: $n"
+            echo "::notice title=Aplicada::$n"
           done
-          [ $fez_backup = 1 ] || echo "Nenhuma migration nova."
+          [ $fez_backup = 1 ] || echo "::notice title=Banco em dia::Nenhuma migration nova."
 
       - name: Guardar o backup de antes
         if: always()
