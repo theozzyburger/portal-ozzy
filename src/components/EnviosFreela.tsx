@@ -11,7 +11,8 @@ import { formatarCpf } from '../lib/cpf'
 import logo from '../assets/logo.png'
 
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-export const linkDiaria = (lojaId: string) => `${location.origin}${location.pathname}#/diaria/${lojaId}`
+// O link antigo com a loja no fim (#/diaria/<loja>) continua abrindo, já com a loja escolhida.
+export const linkDiaria = () => `${location.origin}${location.pathname}#/diaria`
 
 // A semana trabalhada fecha no domingo às 22h (horário de Brasília); depois disso o envio chegou atrasado.
 const foraDoPrazo = (e: EnvioFreela) => {
@@ -165,46 +166,41 @@ export default function EnviosFreela({ freelas, aoMudar }: { freelas: Freelancer
   )
 }
 
-// Link de cada loja para mandar aos freelas (WhatsApp) e cartaz com QR Code para colar na loja.
+// Um link só para todos os freelas (pedido de 08/10): a loja ele escolhe no formulário.
+// Mandar no WhatsApp ou imprimir o cartaz com QR Code para colar nas lojas.
 function LinksDasLojas() {
-  const { unidades, avisar } = useApp()
-  const [cartaz, setCartaz] = useState<string | null>(null)
-  const copiar = async (t: string) => {
+  const { avisar } = useApp()
+  const [cartaz, setCartaz] = useState(false)
+  const link = linkDiaria()
+  const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(t)
+      await navigator.clipboard.writeText(link)
       avisar('Link copiado')
     } catch {
       avisar('Não deu para copiar neste aparelho')
     }
   }
-  const loja = unidades.find((u) => u.id === cartaz)
   const qr = useMemo(() => {
-    if (!cartaz) return ''
     const q = qrcode(0, 'M')
-    q.addData(linkDiaria(cartaz))
+    q.addData(link)
     q.make()
     return q.createDataURL(8, 2)
-  }, [cartaz])
+  }, [link])
 
   return (
     <details className="rounded-2xl bg-white p-3 ring-1 ring-stone-200">
       <summary className="cursor-pointer text-sm font-semibold">Link para os freelas mandarem as diárias</summary>
       <p className="mt-2 text-sm text-stone-600">
-        Mande o link da loja no WhatsApp ou cole o cartaz com QR Code. O freela entra com CPF e celular, marca os dias e
-        a diária aparece aqui para aprovar. Funcionário manda pelo próprio login, em "Fiz diária na folga".
+        Um link só para as três lojas: mande no WhatsApp ou cole o cartaz com QR Code. O freela entra com CPF e celular,
+        escolhe a loja, marca os dias e a diária aparece aqui para aprovar. Funcionário manda pelo próprio login, em "Fiz diária na folga".
       </p>
-      <div className="mt-2 space-y-2">
-        {unidades.map((u) => (
-          <div key={u.id} className="flex flex-wrap items-center gap-2">
-            <span className="min-w-0 flex-1 text-sm font-medium">{apelidoUnidade(u.nome)}</span>
-            <Botao variante="secundario" className="py-1.5!" onClick={() => copiar(linkDiaria(u.id))}>Copiar link</Botao>
-            <Botao variante="secundario" className="py-1.5!" onClick={() => setCartaz(u.id)}>Cartaz</Botao>
-            <a href={linkDiaria(u.id)} target="_blank" rel="noreferrer" className="text-sm font-semibold text-sky-700">Abrir</a>
-          </div>
-        ))}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Botao variante="secundario" className="py-1.5!" onClick={copiar}>Copiar link</Botao>
+        <Botao variante="secundario" className="py-1.5!" onClick={() => setCartaz(true)}>Cartaz com QR Code</Botao>
+        <a href={link} target="_blank" rel="noreferrer" className="text-sm font-semibold text-sky-700">Abrir</a>
       </div>
-      {cartaz && loja && (
-        <Impressao titulo={`Cartaz · ${apelidoUnidade(loja.nome)}`} aoFechar={() => setCartaz(null)}>
+      {cartaz && (
+        <Impressao titulo="Cartaz das diárias" aoFechar={() => setCartaz(false)}>
           <div className="flex flex-col items-center gap-6 py-6 text-center">
             <img src={logo} alt="The Ozzy" className="h-24 w-24" />
             <div>
@@ -213,7 +209,7 @@ function LinksDasLojas() {
             </div>
             <img src={qr} alt="QR Code" className="h-72 w-72" style={{ imageRendering: 'pixelated' }} />
             <div className="rounded-xl border-2 border-black px-5 py-3 text-xl font-bold">Prazo: domingo até as 22h. O Pix cai até terça-feira.</div>
-            <div className="text-lg">Aponte a câmera do celular · {loja.nome}</div>
+            <div className="text-lg">Aponte a câmera do celular</div>
             <div className="max-w-md text-sm text-stone-600">
               Você vai precisar do CPF, do celular e da chave Pix. A gerente confere e aprova; o pagamento cai por Pix até
               a terça-feira seguinte à semana trabalhada.
