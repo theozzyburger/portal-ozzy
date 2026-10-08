@@ -1,0 +1,65 @@
+# Roda no banco (Supabase) as migrations novas de supabase/migrations, em ordem, uma vez cada
+# (combinado com o Heitor em 08/10). Usa o mesmo secret do backup (SUPABASE_DB_URL).
+# Antes de mexer, tira um backup do schema public. Cada migration roda numa transação só:
+# se der erro, nada dela fica aplicado e a rotina para.
+name: Rodar migrations
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/migrations/**']
+  workflow_dispatch:
+
+concurrency: migrations
+
+jobs:
+  migrations:
+    runs-on: ubuntu-latest
+    container: postgres:17
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Aplicar as que faltam
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Até a 0027 o Heitor rodou à mão no SQL Editor (08/10).
+          JA_RODADAS_ATE: '0027'
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "Secret SUPABASE_DB_URL não existe; nada a fazer."; exit 0; fi
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q \
+            -c "create table if not exists public._migracoes (nome text primary key, aplicada_em timestamptz not null default now())" \
+            -c "alter table public._migracoes enable row level security"
+          # Registra as que já foram rodadas à mão (só faz efeito na primeira vez).
+          for f in supabase/migrations/*.sql; do
+            n=$(basename "$f" .sql)
+            num=${n%%_*}
+            if [ "$num" -le "$JA_RODADAS_ATE" ] 2>/dev/null; then
+              psql "$SUPABASE_DB_URL" -q -c "insert into public._migracoes (nome) values ('$n') on conflict do nothing"
+            fi
+          done
+          aplicadas=$(psql "$SUPABASE_DB_URL" -At -c "select nome from public._migracoes")
+          mkdir -p backup
+          fez_backup=0
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            n=$(basename "$f" .sql)
+            if echo "$aplicadas" | grep -qx "$n"; then continue; fi
+            if [ $fez_backup = 0 ]; then
+              pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges --schema=public | gzip > backup/antes-das-migrations.sql.gz
+              fez_backup=1
+            fi
+            echo "::group::$n"
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f "$f" \
+              -c "insert into public._migracoes (nome) values ('$n')"
+            echo "::endgroup::"
+            echo "Aplicada: $n"
+          done
+          [ $fez_backup = 1 ] || echo "Nenhuma migration nova."
+
+      - name: Guardar o backup de antes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: antes-das-migrations-${{ github.run_number }}
+          path: backup/
+          retention-days: 90
+          if-no-files-found: ignore
