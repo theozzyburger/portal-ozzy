@@ -75,7 +75,7 @@ export default function CamposDiaria({ v, mudar, unidades, jaEnviados = [] }: {
         </div>
       </div>
       <Campo rotulo="Observação (opcional)">
-        <input className={estiloEntrada} placeholder="Ex.: fiquei até mais tarde" value={v.observacao} onChange={(e) => mudar({ ...v, observacao: e.target.value })} />
+        <input className={estiloEntrada} value={v.observacao} onChange={(e) => mudar({ ...v, observacao: e.target.value })} />
       </Campo>
     </div>
   )

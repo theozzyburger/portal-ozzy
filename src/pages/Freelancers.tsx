@@ -438,16 +438,16 @@ function FormDiaria({
   const exFuncionarios = semFreela('inativo')
   const [pixFunc, setPixFunc] = useState('')
   const [d, setD] = useState({
-    freelancerId: '', data, turno: 'noite' as TurnoFreela, unidadeId: eu.unidadeId, funcao: '', valor: '', observacao: '',
+    freelancerId: '', data, turno: 'noite' as TurnoFreela, unidadeId: eu.unidadeId, funcao: '', valor: '100', observacao: '',
   })
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
 
-  // Sugere função e valor da última diária da mesma pessoa.
+  // Sugere a função da última diária da mesma pessoa; o valor começa em R$ 100 (padrão de 08/10).
   const escolher = (freelancerId: string) => {
     setPixFunc(equipe.find((f) => 'func:' + f.id === freelancerId)?.pix ?? '')
     const ultima = [...ultimas].reverse().find((x) => x.freelancerId === freelancerId)
-    setD({ ...d, freelancerId, funcao: d.funcao || ultima?.funcao || '', valor: d.valor || (ultima ? String(ultima.valor) : ''), unidadeId: ultima?.unidadeId ?? d.unidadeId })
+    setD({ ...d, freelancerId, funcao: d.funcao || ultima?.funcao || '', valor: d.valor, unidadeId: ultima?.unidadeId ?? d.unidadeId })
   }
 
   const salvar = async (e: React.FormEvent) => {

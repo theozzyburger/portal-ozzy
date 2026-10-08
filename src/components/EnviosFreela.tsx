@@ -4,9 +4,9 @@ import { Botao, Selo, Vazio, estiloEntrada } from './ui'
 import Impressao from './Impressao'
 import { NOME_TURNO } from './CamposDiaria'
 import { useApp } from '../lib/contexto'
-import { addDias, dataCurta, diaSemana, hoje } from '../lib/datas'
+import { dataCurta, diaSemana } from '../lib/datas'
 import { soDigitos } from '../lib/store'
-import { apelidoUnidade, type DiariaFreela, type EnvioFreela, type Freelancer } from '../lib/types'
+import { apelidoUnidade, type EnvioFreela, type Freelancer } from '../lib/types'
 import { formatarCpf } from '../lib/cpf'
 import logo from '../assets/logo.png'
 
@@ -27,15 +27,12 @@ interface Grupo {
 export default function EnviosFreela({ freelas, aoMudar }: { freelas: Freelancer[]; aoMudar: () => void }) {
   const { store, unidades, avisar } = useApp()
   const [envios, setEnvios] = useState<EnvioFreela[] | null>(null)
-  const [recentes, setRecentes] = useState<DiariaFreela[]>([])
-  const [valores, setValores] = useState<Record<string, string>>({})
+    const [valores, setValores] = useState<Record<string, string>>({})
   const [usarPix, setUsarPix] = useState<Record<string, boolean>>({})
   const [ocupado, setOcupado] = useState(false)
 
   const carregar = useCallback(async () => {
-    const [es, ds] = await Promise.all([store.enviosFreela('pendente'), store.diariasFreela(addDias(hoje(), -60), hoje())])
-    setEnvios(es)
-    setRecentes(ds)
+    setEnvios(await store.enviosFreela('pendente'))
   }, [store])
   useEffect(() => {
     carregar()
@@ -58,14 +55,9 @@ export default function EnviosFreela({ freelas, aoMudar }: { freelas: Freelancer
     }).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [envios, freelas])
 
-  // Valor sugerido: a última diária da mesma pessoa; senão, a última da mesma função.
-  const sugestao = (g: Grupo, e: EnvioFreela) => {
-    const daPessoa = g.cadastro && [...recentes].reverse().find((d) => d.freelancerId === g.cadastro!.id)
-    const daFuncao = [...recentes].reverse().find((d) => d.funcao.toLowerCase() === e.funcao.toLowerCase())
-    const v = daPessoa?.valor ?? daFuncao?.valor
-    return v === undefined ? '' : String(v).replace('.', ',')
-  }
-  const valorDe = (g: Grupo, e: EnvioFreela) => valores[e.id] ?? sugestao(g, e)
+  // Diária padrão: R$ 100 (pedido de 08/10). A gestão muda antes de aprovar quando for outro valor.
+  const VALOR_PADRAO = '100'
+  const valorDe = (_g: Grupo, e: EnvioFreela) => valores[e.id] ?? VALOR_PADRAO
   const pixDo = (g: Grupo) => usarPix[g.chave] ?? !g.celularOutro
 
   const aprovar = async (g: Grupo, lista: EnvioFreela[]) => {
