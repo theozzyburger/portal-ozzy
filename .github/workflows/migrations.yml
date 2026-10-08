@@ -2,12 +2,14 @@
 # (combinado com o Heitor em 08/10). Usa o mesmo secret do backup (SUPABASE_DB_URL).
 # Antes de mexer, tira um backup do schema public. Cada migration roda numa transação só:
 # se der erro, nada dela fica aplicado e a rotina para.
+# Branch "teste" (08/10): mesma coisa no banco do ambiente de testes (secret SUPABASE_TESTE_DB_URL), rodando todas
+# desde a 0001 e depois os dados fictícios de supabase/teste. O banco real nunca é tocado a partir do "teste".
 name: Rodar migrations
 
 on:
   push:
-    branches: [main]
-    paths: ['supabase/migrations/**']
+    branches: [main, teste]
+    paths: ['supabase/migrations/**', 'supabase/teste/**']
   workflow_dispatch:
     inputs:
       marcar_como_aplicadas:
@@ -15,7 +17,7 @@ on:
         required: false
         default: ''
 
-concurrency: migrations
+concurrency: migrations-${{ github.ref_name }}
 
 jobs:
   migrations:
@@ -26,12 +28,13 @@ jobs:
 
       - name: Aplicar as que faltam
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          # Até a 0027 o Heitor rodou à mão no SQL Editor (08/10).
-          JA_RODADAS_ATE: '0027'
+          SUPABASE_DB_URL: ${{ github.ref_name == 'teste' && secrets.SUPABASE_TESTE_DB_URL || github.ref_name == 'main' && secrets.SUPABASE_DB_URL || '' }}
+          # Até a 0027 o Heitor rodou à mão no SQL Editor (08/10). O banco de teste nasce vazio.
+          JA_RODADAS_ATE: ${{ github.ref_name == 'teste' && '0000' || '0027' }}
+          TESTE: ${{ github.ref_name == 'teste' && '1' || '' }}
           MARCAR: ${{ github.event.inputs.marcar_como_aplicadas }}
         run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then echo "Secret SUPABASE_DB_URL não existe; nada a fazer."; exit 0; fi
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::notice title=Sem banco::Nenhum banco configurado para o branch ${GITHUB_REF_NAME}; nada a fazer."; exit 0; fi
           if ! psql "$SUPABASE_DB_URL" -At -c "select 1" > /dev/null 2> erro.txt; then
             echo "::error title=Não conectou no banco::$(tr '\n' ' ' < erro.txt | cut -c1-900)"; exit 1
           fi
@@ -76,6 +79,11 @@ jobs:
             echo "::notice title=Aplicada::$n"
           done
           [ $fez_backup = 1 ] || echo "::notice title=Banco em dia::Nenhuma migration nova."
+          if [ -n "$TESTE" ]; then
+            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f supabase/teste/dados-de-teste.sql 2> erro.txt \
+              || { echo "::error title=Dados de teste::$(tr '\n' ' ' < erro.txt | cut -c1-900)"; exit 1; }
+            echo "::notice title=Dados de teste::Pessoas de teste criadas e ligadas aos logins que existem."
+          fi
 
       - name: Guardar o backup de antes
         if: always()

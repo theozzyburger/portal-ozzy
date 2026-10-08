@@ -32,6 +32,9 @@ import { modulosVisiveis } from './lib/modulos'
 
 const URL_SB = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const CHAVE_SB = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+// Ambiente de testes (08/10): outro banco, para testar integrações sem tocar nos dados reais.
+const AMBIENTE_TESTE = import.meta.env.VITE_AMBIENTE === 'teste'
+if (AMBIENTE_TESTE) document.title = 'TESTE · ' + document.title
 const usarDemo = import.meta.env.MODE === 'preview' || !URL_SB || !CHAVE_SB
 
 export default function App() {
@@ -61,7 +64,13 @@ export default function App() {
   if (diaria) return <EnviarDiaria store={store} lojaId={diaria[1]} />
   if (guia) return <AbrirGuia store={store} codigo={guia[1]} />
   if (carregando) return <div className="flex h-full items-center justify-center text-stone-400">Carregando…</div>
-  if (!eu) return <Login store={store} aoEntrar={setEu} />
+  if (!eu)
+    return (
+      <>
+        {AMBIENTE_TESTE && <div className="bg-sky-600 px-4 py-1.5 text-center text-xs font-semibold text-white">Ambiente de testes</div>}
+        <Login store={store} aoEntrar={setEu} />
+      </>
+    )
 
   return (
     <ProvedorApp store={store} eu={eu}>
@@ -190,6 +199,11 @@ function Casca({ aoSair }: { aoSair: () => void }) {
         </div>
       )}
 
+      {AMBIENTE_TESTE && store.modo === 'supabase' && (
+        <div className="bg-sky-600 px-4 py-1.5 text-center text-xs font-semibold text-white print:hidden">
+          Ambiente de testes: banco separado, nada aqui chega ao portal real
+        </div>
+      )}
       {store.modo === 'demo' && (
         <div className="bg-ozzy-500 px-4 py-1.5 text-center text-xs font-semibold text-carvao print:hidden">
           Modo demonstração: dados de exemplo, nada é salvo de verdade
