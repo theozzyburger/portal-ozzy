@@ -209,7 +209,7 @@ function LinksDasLojas() {
       <summary className="cursor-pointer text-sm font-semibold">Link para os freelas mandarem as diárias</summary>
       <p className="mt-2 text-sm text-stone-600">
         Um link só para as três lojas: mande no WhatsApp ou cole o cartaz com QR Code. O freela entra com CPF e celular,
-        escolhe a loja, marca os dias e a diária aparece aqui para aprovar. Funcionário manda pelo próprio login, em "Fiz diária na folga".
+        escolhe a loja, marca os dias e a diária aparece aqui para aprovar. Funcionário do time usa o mesmo link: com CPF e celular do cadastro, nome e Pix vêm sozinhos.
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Botao variante="secundario" className="py-1.5!" onClick={copiar}>Copiar link</Botao>

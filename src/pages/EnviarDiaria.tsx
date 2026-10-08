@@ -38,7 +38,9 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
     setErro('')
     setEnviando(true)
     try {
-      setQuem(await store.freelaQuemSou(soDigitos(cpf), soDigitos(celular)))
+      const q = await store.freelaQuemSou(soDigitos(cpf), soDigitos(celular))
+      if (q.tipo === 'celular_errado') return setErro('Esse CPF é de alguém do time, mas o celular não é o do cadastro. Use o celular cadastrado ou fale com a gerente.')
+      setQuem(q)
     } catch (err) {
       setErro((err as Error).message)
     } finally {
@@ -50,7 +52,8 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
     e.preventDefault()
     const novo = quem?.tipo === 'novo'
     if (novo && nome.trim().split(/\s+/).length < 2) return setErro('Coloque o nome completo.')
-    if ((novo || trocarPix) && !pix.trim()) return setErro('Coloque a chave Pix.')
+    const semPix = quem && 'pixFinal' in quem && !quem.pixFinal
+    if ((novo || trocarPix || semPix) && !pix.trim()) return setErro('Coloque a chave Pix.')
     if (!v.unidadeId) return setErro('Escolha a loja.')
     if (!v.marcados.length) return setErro('Marque pelo menos um dia.')
     setErro('')
@@ -60,7 +63,7 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
       const local = await pegarLocalizacao()
       setSemLocal(!local)
       const n = await store.enviarDiarias({
-        cpf: soDigitos(cpf), celular: soDigitos(celular), nome: novo ? nome : '', pix: novo || trocarPix ? pix : '',
+        cpf: soDigitos(cpf), celular: soDigitos(celular), nome: novo ? nome : '', pix: novo || trocarPix || semPix ? pix : '',
         unidadeId: v.unidadeId, funcao: v.funcao, dias: diasMarcados(v), local,
       })
       setEnviadas(n)
@@ -106,7 +109,7 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
             )}
             <Botao variante="secundario" className="w-full" onClick={recomecar}>Mandar outro dia</Botao>
           </div>
-        ) : !quem || quem.tipo === 'invalido' ? (
+        ) : !quem || quem.tipo === 'invalido' || quem.tipo === 'celular_errado' ? (
           <form onSubmit={identificar} className="space-y-4 rounded-2xl bg-white p-5 ring-1 ring-stone-200">
             <p className="text-sm text-stone-600">Trabalhou de freela com a gente? Mande aqui os dias para entrar no pagamento da semana.</p>
             <AvisoPrazo />
@@ -127,22 +130,13 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
             {erro && <p className="text-sm text-red-600">{erro}</p>}
             <Botao className="w-full" disabled={enviando}>{enviando ? 'Conferindo…' : 'Continuar'}</Botao>
           </form>
-        ) : quem.tipo === 'funcionario' ? (
-          <div className="space-y-4 rounded-2xl bg-white p-5 ring-1 ring-stone-200">
-            <h1 className="text-lg font-bold">Você é do time The Ozzy</h1>
-            <p className="text-sm text-stone-600">
-              Diária na folga você manda pelo Portal do Time, entrando com o seu celular e senha. Lá na tela inicial, toque em
-              <b> Fiz diária na folga</b>.
-            </p>
-            <Botao className="w-full" onClick={() => (location.hash = '/inicio')}>Abrir o Portal do Time</Botao>
-            <button className="w-full text-sm font-semibold text-stone-500" onClick={() => setQuem(null)}>Não sou funcionário</button>
-          </div>
         ) : (
           <form onSubmit={enviar} className="space-y-4 rounded-2xl bg-white p-5 ring-1 ring-stone-200">
-            {quem.tipo === 'freelancer' ? (
+            {quem.tipo === 'freelancer' || quem.tipo === 'funcionario' ? (
               <div className="space-y-2">
                 <h1 className="text-lg font-bold">Oi, {quem.nome}!</h1>
-                {!trocarPix ? (
+                {quem.tipo === 'funcionario' && <p className="text-sm text-stone-600">Diária na folga: seus dados vêm do cadastro do time.</p>}
+                {!trocarPix && quem.pixFinal ? (
                   <p className="text-sm text-stone-600">
                     O Pix vai para a chave que termina em <b>{quem.pixFinal}</b>.{' '}
                     <button type="button" className="font-semibold text-sky-700" onClick={() => setTrocarPix(true)}>Trocar chave</button>

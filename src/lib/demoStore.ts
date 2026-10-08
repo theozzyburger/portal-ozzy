@@ -37,15 +37,13 @@ const f = (
 // CPF fictício com dígito verificador certo, a partir do celular de exemplo.
 function cpfDeExemplo(celular: string): string {
   const base = celular.slice(-9)
-  const digito = (n: number) => {
-    const s = [...base.slice(0, n - 1)].reduce((t, d, i) => t + Number(d) * (n + 1 - i), 0)
-    const r = 11 - (s % 11)
-    return r >= 10 ? 0 : r
+  const digito = (parte: string) => {
+    const soma = [...parte].reduce((t, d, i) => t + Number(d) * (parte.length + 1 - i), 0)
+    const r = (soma * 10) % 11
+    return r === 10 ? 0 : r
   }
-  const d1 = digito(10)
-  const s2 = [...(base + d1)].reduce((t, d, i) => t + Number(d) * (11 - i), 0)
-  const r2 = 11 - (s2 % 11)
-  return base + d1 + (r2 >= 10 ? 0 : r2)
+  const d1 = digito(base)
+  return base + d1 + digito(base + d1)
 }
 
 // Equipe real, da planilha de caixinha (06/10/2026). Celulares são fictícios.
@@ -1003,7 +1001,12 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async freelaQuemSou(cpf, celular) {
       const c = soDigitos(cpf)
       if (!cpfValido(c)) return espera({ tipo: 'invalido' as const })
-      if (funcionarios.some((f) => f.status === 'ativo' && f.cpf === c)) return espera({ tipo: 'funcionario' as const })
+      const fu = funcionarios.find((f) => f.status === 'ativo' && f.cpf === c)
+      if (fu) {
+        if (soDigitos(fu.celular).slice(-11) !== soDigitos(celular).slice(-11)) return espera({ tipo: 'celular_errado' as const })
+        const pixFu = freelas.find((x) => x.funcionarioId === fu.id)?.pix ?? fu.pix ?? ''
+        return espera({ tipo: 'funcionario' as const, nome: fu.nome.split(' ')[0], pixFinal: pixFu.slice(-4) })
+      }
       const f = freelas.find((x) => x.cpf === c)
       if (!f || (f.celular && f.celular.slice(-11) !== soDigitos(celular).slice(-11))) return espera({ tipo: 'novo' as const })
       return espera({ tipo: 'freelancer' as const, nome: f.nome.split(' ')[0], pixFinal: f.pix.slice(-4) })
@@ -1011,8 +1014,16 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async enviarDiarias(e) {
       const quem = await this.freelaQuemSou(e.cpf, e.celular)
       if (quem.tipo === 'invalido') throw new Error('CPF inválido. Confira os números.')
-      if (quem.tipo === 'funcionario') throw new Error('Esse CPF é de alguém do time. Mande a diária pelo Portal do Time, com o seu login.')
+      if (quem.tipo === 'celular_errado') throw new Error('Esse CPF é de alguém do time, mas o celular não é o do cadastro. Use o celular cadastrado ou fale com a gerente.')
       const cpf = soDigitos(e.cpf)
+      if (quem.tipo === 'funcionario') {
+        const fu = funcionarios.find((x) => x.status === 'ativo' && x.cpf === cpf)!
+        const fl = freelas.find((x) => x.funcionarioId === fu.id)
+        return gravarEnvios(e.dias, {
+          cpf, celular: soDigitos(e.celular).slice(-11), nome: fu.nome, pix: e.pix.trim() || fl?.pix || fu.pix || '',
+          freelancerId: fl?.id ?? null, funcionarioId: fu.id, unidadeId: e.unidadeId, funcao: e.funcao,
+        }, e.local)
+      }
       const f = freelas.find((x) => x.cpf === cpf)
       const nome = nomeProprio(e.nome) || (quem.tipo === 'freelancer' ? f?.nome : '') || ''
       const pix = e.pix.trim() || (quem.tipo === 'freelancer' ? f?.pix : '') || ''

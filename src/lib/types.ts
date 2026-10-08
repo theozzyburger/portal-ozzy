@@ -448,8 +448,8 @@ export interface DiaEnviado {
 
 // O que a página do link sabe de quem digitou CPF e celular (nada além do primeiro nome e do fim do Pix).
 export type QuemSouFreela =
-  | { tipo: 'invalido' | 'novo' | 'funcionario' }
-  | { tipo: 'freelancer'; nome: string; pixFinal: string }
+  | { tipo: 'invalido' | 'novo' | 'celular_errado' }
+  | { tipo: 'freelancer' | 'funcionario'; nome: string; pixFinal: string }
 
 export interface PagamentoFreela {
   freelancerId: string
