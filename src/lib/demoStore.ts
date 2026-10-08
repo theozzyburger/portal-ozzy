@@ -17,10 +17,11 @@ const unidades: Unidade[] = [
   { id: 'burger-va', nome: 'The Ozzy Burger Vila Anastácio' },
   { id: 'pizza', nome: 'The Ozzy Pizza' },
 ]
-// Local das lojas na demonstração (aproximado); a Pizza fica sem, para mostrar o aviso.
+// Local das lojas na demonstração (os reais, passados pelo Heitor em 08/10); Vila Anastácio e Pizza no mesmo endereço.
 const locais: Record<string, { latitude: number; longitude: number } | undefined> = {
-  'burger-psd': { latitude: -23.4895, longitude: -46.7426 },
-  'burger-va': { latitude: -23.5179, longitude: -46.7275 },
+  'burger-psd': { latitude: -23.5022234, longitude: -46.7391611 },
+  'burger-va': { latitude: -23.5174364, longitude: -46.7198938 },
+  pizza: { latitude: -23.5174364, longitude: -46.7198938 },
 }
 
 const f = (
