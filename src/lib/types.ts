@@ -401,6 +401,38 @@ export interface DiariaFreela {
   lancadoPor: string | null
 }
 
+// Diária que o próprio freelancer (pelo link da loja) ou o funcionário (pelo login) mandou. Vira DiariaFreela
+// quando a gestão aprova e põe o valor.
+export type StatusEnvioFreela = 'pendente' | 'aprovado' | 'recusado'
+export interface EnvioFreela {
+  id: string
+  cpf: string | null
+  celular: string | null
+  nome: string
+  pix: string
+  freelancerId: string | null
+  funcionarioId: string | null
+  data: string
+  turno: TurnoFreela
+  unidadeId: string
+  funcao: string
+  observacao: string | null
+  status: StatusEnvioFreela
+  motivo: string | null
+  enviadoEm: string
+}
+
+export interface DiaEnviado {
+  data: string
+  turno: TurnoFreela
+  observacao?: string
+}
+
+// O que a página do link sabe de quem digitou CPF e celular (nada além do primeiro nome e do fim do Pix).
+export type QuemSouFreela =
+  | { tipo: 'invalido' | 'novo' | 'funcionario' }
+  | { tipo: 'freelancer'; nome: string; pixFinal: string }
+
 export interface PagamentoFreela {
   freelancerId: string
   // Segunda-feira que abre a semana trabalhada.

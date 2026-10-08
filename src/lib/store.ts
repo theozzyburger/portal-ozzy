@@ -1,4 +1,4 @@
-import type { ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -196,6 +196,14 @@ export interface Store {
   pagamentosFreela(semana: string): Promise<PagamentoFreela[]>
   marcarPagoFreela(freelancerId: string, semana: string, valor: number): Promise<void>
   desfazerPagoFreela(freelancerId: string, semana: string): Promise<void>
+  // Diárias mandadas pelo próprio freelancer (link da loja, sem login) ou pelo funcionário (login).
+  lojasParaDiaria(): Promise<Unidade[]>
+  freelaQuemSou(cpf: string, celular: string): Promise<QuemSouFreela>
+  enviarDiarias(e: { cpf: string; celular: string; nome: string; pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[] }): Promise<number>
+  enviarMinhasDiarias(e: { pix: string; unidadeId: string; funcao: string; dias: DiaEnviado[] }): Promise<number>
+  enviosFreela(status: StatusEnvioFreela | 'meus'): Promise<EnvioFreela[]>
+  aprovarEnvioFreela(id: string, valor: number, funcao: string, usarPixNovo: boolean): Promise<void>
+  recusarEnvioFreela(id: string, motivo: string): Promise<void>
 }
 
 export const soDigitos = (s: string) => s.replace(/\D/g, '')

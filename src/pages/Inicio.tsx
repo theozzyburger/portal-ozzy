@@ -18,6 +18,7 @@ import type { Comunicado, Documento, EntregaUniforme, Folga, Ocorrencia } from '
 import { exigenciasDe, pendencias, textoSituacao, type Pendencia } from '../lib/vencimentos'
 import { nomeTipoOcorrencia } from '../lib/types'
 import type { Desligamento } from '../lib/types'
+import DiariaNaFolga from '../components/DiariaNaFolga'
 import { LIMITE_AFASTAMENTO, JANELA_AFASTAMENTO, alertasAfastamento, alertasExperiencia, aniversariantesDaSemana, prazoRescisao, progressoDesligamento, situacaoAniversario } from '../lib/pessoal'
 
 export default function Inicio() {
@@ -31,6 +32,7 @@ export default function Inicio() {
   const [meusUniformes, setMeusUniformes] = useState<EntregaUniforme[]>([])
   const [docsEquipe, setDocsEquipe] = useState<Documento[]>([])
   const [assinouRegulamento, setAssinouRegulamento] = useState(true)
+  const [diariaFolga, setDiariaFolga] = useState(false)
 
   useEffect(() => {
     store.documentos(eu.id).then(setMeusDocs)
@@ -113,6 +115,17 @@ export default function Inicio() {
         </Cartao>
         </>)}
       </div>
+
+      {!isentoDeRotinas(eu.nivel) && (
+        <button onClick={() => setDiariaFolga(true)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-left ring-1 ring-stone-200 hover:ring-carvao">
+          <span>
+            <span className="block font-semibold">Fiz diária na folga</span>
+            <span className="text-sm text-stone-500">Mande os dias para entrar no pagamento de segunda</span>
+          </span>
+          <span className="text-lg text-stone-400">›</span>
+        </button>
+      )}
+      {diariaFolga && <DiariaNaFolga aoFechar={() => setDiariaFolga(false)} />}
 
       <Aniversariantes />
 

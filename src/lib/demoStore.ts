@@ -1,6 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { soDigitos, type Store } from './store'
-import type { ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import { cpfValido } from './cpf'
+import type { EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -189,6 +190,20 @@ const diarias: DiariaFreela[] = (() => {
   ].filter((x) => x.data <= hoje())
 })()
 const pagamentos: PagamentoFreela[] = []
+// Diárias mandadas pelo link (freelancer) e pelo login (funcionário), esperando a gestão aprovar.
+const envios: EnvioFreela[] = (() => {
+  const e = (id: string, dias: number, turno: 'manha' | 'noite', x: Partial<EnvioFreela>): EnvioFreela => ({
+    id, cpf: null, celular: null, nome: '', pix: '', freelancerId: null, funcionarioId: null, data: addDias(hoje(), -dias), turno,
+    unidadeId: 'burger-psd', funcao: 'Chapeiro', observacao: null, status: 'pendente', motivo: null, enviadoEm: new Date().toISOString(), ...x,
+  })
+  return [
+    e('env1', 1, 'noite', { cpf: '52998224725', celular: '11988887777', nome: 'Rafael Mendes Teixeira', pix: '11988887777', freelancerId: 'fl1' }),
+    e('env2', 2, 'noite', { cpf: '86288366757', celular: '11966665555', nome: 'Lucas Almeida Rocha', pix: 'lucas.rocha@email.com', unidadeId: 'burger-va', funcao: 'Entregador' }),
+    e('env3', 1, 'noite', { cpf: '86288366757', celular: '11966665555', nome: 'Lucas Almeida Rocha', pix: 'lucas.rocha@email.com', unidadeId: 'burger-va', funcao: 'Entregador', observacao: 'Fiquei até 0h30' }),
+    e('env4', 1, 'manha', { cpf: '39053344705', celular: '11955554444', nome: 'Diego Ferreira Santos', pix: '11955554444', freelancerId: 'fl3', unidadeId: 'pizza', funcao: 'Atendente' }),
+    e('env5', 2, 'noite', { nome: 'Cibeli Alves da Costa', pix: '11999990012', funcionarioId: 'p-cibeli-costa', unidadeId: 'burger-va', funcao: 'Auxiliar de cozinha' }),
+  ].filter((x) => x.data >= inicioDaSemana(addDias(hoje(), -7)))
+})()
 
 const caixinhas: Record<string, Record<string, number>> = {
   '2026-09': { 'burger-psd': 3616.18, 'burger-va': 1118.34 },
@@ -431,6 +446,21 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
   const tira = <T extends { id: string }>(lista: T[], id: string) => {
     const i = lista.findIndex((x) => x.id === id)
     if (i >= 0) lista.splice(i, 1)
+  }
+
+  const gravarEnvios = (dias: { data: string; turno: 'manha' | 'noite'; observacao?: string }[], base: Omit<EnvioFreela, 'id' | 'data' | 'turno' | 'observacao' | 'status' | 'motivo' | 'enviadoEm'>) => {
+    if (!dias.length) throw new Error('Escolha pelo menos um dia.')
+    if (!base.funcao.trim()) throw new Error('Diga a função que você fez.')
+    if (!base.pix.trim()) throw new Error('Coloque a chave Pix.')
+    if (dias.some((d) => d.data > hoje() || d.data < addDias(hoje(), -13))) throw new Error('Só dá para mandar diárias dos últimos 14 dias.')
+    let n = 0
+    for (const d of dias) {
+      const quem = base.funcionarioId ?? base.cpf
+      if (envios.some((x) => x.status !== 'recusado' && (x.funcionarioId ?? x.cpf) === quem && x.data === d.data && x.turno === d.turno)) continue
+      envios.push({ ...base, id: novoId('env'), data: d.data, turno: d.turno, observacao: d.observacao?.trim() || null, status: 'pendente', motivo: null, enviadoEm: agora() })
+      n++
+    }
+    return espera(n)
   }
 
   return {
@@ -944,6 +974,64 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async desfazerPagoFreela(freelancerId, semana) {
       exigeGestao()
       pagamentos.splice(pagamentos.findIndex((p) => p.freelancerId === freelancerId && p.semana === semana), 1)
+    },
+    async lojasParaDiaria() {
+      return espera(unidades.map((u) => ({ ...u })))
+    },
+    async freelaQuemSou(cpf, celular) {
+      const c = soDigitos(cpf)
+      if (!cpfValido(c)) return espera({ tipo: 'invalido' as const })
+      if (funcionarios.some((f) => f.status === 'ativo' && f.cpf === c)) return espera({ tipo: 'funcionario' as const })
+      const f = freelas.find((x) => x.cpf === c)
+      if (!f || (f.celular && f.celular.slice(-11) !== soDigitos(celular).slice(-11))) return espera({ tipo: 'novo' as const })
+      return espera({ tipo: 'freelancer' as const, nome: f.nome.split(' ')[0], pixFinal: f.pix.slice(-4) })
+    },
+    async enviarDiarias(e) {
+      const quem = await this.freelaQuemSou(e.cpf, e.celular)
+      if (quem.tipo === 'invalido') throw new Error('CPF inválido. Confira os números.')
+      if (quem.tipo === 'funcionario') throw new Error('Esse CPF é de alguém do time. Mande a diária pelo Portal do Time, com o seu login.')
+      const cpf = soDigitos(e.cpf)
+      const f = freelas.find((x) => x.cpf === cpf)
+      const nome = e.nome.trim() || (quem.tipo === 'freelancer' ? f?.nome : '') || ''
+      const pix = e.pix.trim() || (quem.tipo === 'freelancer' ? f?.pix : '') || ''
+      if (nome.split(/\s+/).length < 2) throw new Error('Coloque o nome completo.')
+      return gravarEnvios(e.dias, { cpf, celular: soDigitos(e.celular).slice(-11), nome, pix, freelancerId: f?.id ?? null, funcionarioId: null, unidadeId: e.unidadeId, funcao: e.funcao })
+    },
+    async enviarMinhasDiarias(e) {
+      const u = exigeEu()
+      return gravarEnvios(e.dias, {
+        cpf: u.cpf ?? null, celular: u.celular, nome: u.nome, pix: e.pix.trim() || u.pix || '', unidadeId: e.unidadeId, funcao: e.funcao,
+        freelancerId: freelas.find((x) => x.funcionarioId === u.id)?.id ?? null, funcionarioId: u.id,
+      })
+    },
+    async enviosFreela(status) {
+      if (status === 'meus') {
+        const u = exigeEu()
+        return espera(envios.filter((x) => x.funcionarioId === u.id).sort((a, b) => b.data.localeCompare(a.data)).map((x) => ({ ...x })))
+      }
+      exigeGestao()
+      return espera(envios.filter((x) => x.status === status).sort((a, b) => a.data.localeCompare(b.data)).map((x) => ({ ...x })))
+    },
+    async aprovarEnvioFreela(id, valor, funcao, usarPixNovo) {
+      const u = exigeGestao()
+      const e = envios.find((x) => x.id === id && x.status === 'pendente')
+      if (!e) throw new Error('Esse envio já foi resolvido.')
+      let f = freelas.find((x) => (e.freelancerId && x.id === e.freelancerId) || (e.funcionarioId && x.funcionarioId === e.funcionarioId) || (e.cpf && x.cpf === e.cpf))
+      if (!f) {
+        f = { id: novoId('fl'), nome: e.nome, cpf: e.cpf, pix: e.pix, celular: e.celular, ativo: true, funcionarioId: e.funcionarioId }
+        freelas.push(f)
+      } else {
+        f.ativo = true
+        if (usarPixNovo) Object.assign(f, { pix: e.pix, celular: e.celular ?? f.celular })
+      }
+      if (!diarias.some((x) => x.freelancerId === f.id && x.data === e.data && x.turno === e.turno))
+        diarias.push({ id: novoId('d'), freelancerId: f.id, data: e.data, turno: e.turno, unidadeId: e.unidadeId, funcao: funcao.trim() || e.funcao, valor, observacao: e.observacao, lancadoPor: u.id })
+      Object.assign(e, { status: 'aprovado', freelancerId: f.id })
+    },
+    async recusarEnvioFreela(id, motivo) {
+      exigeGestao()
+      const e = envios.find((x) => x.id === id && x.status === 'pendente')
+      if (e) Object.assign(e, { status: 'recusado', motivo: motivo.trim() || null })
     },
   }
 }

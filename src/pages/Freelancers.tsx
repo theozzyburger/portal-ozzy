@@ -12,9 +12,10 @@ const NOME_TURNO: Record<TurnoFreela, string> = { manha: 'Manhã', noite: 'Noite
 export { cpfValido, formatarCpf } from '../lib/cpf'
 import { cpfValido, formatarCpf } from '../lib/cpf'
 import ArquivoBanco from '../components/ArquivoBanco'
+import EnviosFreela from '../components/EnviosFreela'
 import type { PagamentoBanco } from '../lib/sispag'
 
-type Aba = 'lancamentos' | 'relatorio' | 'cadastro'
+type Aba = 'lancamentos' | 'enviadas' | 'relatorio' | 'cadastro'
 
 // Freelancer ligado a um cadastro: funcionário ativo (diária na folga) ou ex-funcionário que voltou como freela.
 const vinculo = (f: Freelancer, equipe: Funcionario[]) => {
@@ -31,12 +32,16 @@ export default function Freelancers() {
   const [pagos, setPagos] = useState<PagamentoFreela[]>([])
   const [lancando, setLancando] = useState<string | null>(null)
   const [editando, setEditando] = useState<Freelancer | 'novo' | null>(null)
+  const [pendentes, setPendentes] = useState(0)
 
   const fim = addDias(semana, 6)
   const pagamento = addDias(semana, 7)
 
   const carregar = useCallback(async () => {
-    const [f, d, p] = await Promise.all([store.freelancers(), store.diariasFreela(semana, addDias(semana, 6)), store.pagamentosFreela(semana)])
+    const [f, d, p, e] = await Promise.all([
+      store.freelancers(), store.diariasFreela(semana, addDias(semana, 6)), store.pagamentosFreela(semana), store.enviosFreela('pendente'),
+    ])
+    setPendentes(e.length)
     setFreelas(f)
     setDiarias(d)
     setPagos(p)
@@ -64,15 +69,18 @@ export default function Freelancers() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
-        {([['lancamentos', 'Semana'], ['relatorio', 'Pagamento'], ['cadastro', 'Cadastro']] as const).map(([a, nome]) => (
-          <button key={a} onClick={() => setAba(a)} className={`rounded-lg py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+      <div className="grid grid-cols-4 gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
+        {([['lancamentos', 'Semana'], ['enviadas', 'Enviadas'], ['relatorio', 'Pagamento'], ['cadastro', 'Cadastro']] as const).map(([a, nome]) => (
+          <button key={a} onClick={() => setAba(a)} className={`flex items-center justify-center gap-1 rounded-lg py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
             {nome}
+            {a === 'enviadas' && pendentes > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[11px] leading-5 text-white">{pendentes}</span>}
           </button>
         ))}
       </div>
 
-      {aba !== 'cadastro' && (
+      {aba === 'enviadas' && <EnviosFreela freelas={freelas} aoMudar={carregar} />}
+
+      {(aba === 'lancamentos' || aba === 'relatorio') && (
         <div className="flex items-center justify-between gap-2 rounded-2xl bg-white p-2 ring-1 ring-stone-200">
           <button onClick={() => setSemana(addDias(semana, -7))} className="rounded-xl px-3 py-2 text-lg hover:bg-stone-100" aria-label="Semana anterior">‹</button>
           <div className="text-center">

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { soDigitos, type Store } from './store'
-import type { ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -648,6 +648,33 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async desfazerPagoFreela(freelancerId, semana) {
       ok(await sb.from('freela_pagamentos').delete().eq('freelancer_id', freelancerId).eq('semana', semana))
     },
+    async lojasParaDiaria() {
+      return ok(await sb.rpc('freela_lojas')) ?? []
+    },
+    async freelaQuemSou(cpf, celular) {
+      return ok(await sb.rpc('freela_quem_sou', { p_cpf: cpf, p_celular: celular }))
+    },
+    async enviarDiarias(e) {
+      return ok(await sb.rpc('freela_enviar_diarias', {
+        p_cpf: e.cpf, p_celular: e.celular, p_nome: e.nome, p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias,
+      }))
+    },
+    async enviarMinhasDiarias(e) {
+      return ok(await sb.rpc('freela_enviar_minhas_diarias', { p_pix: e.pix, p_unidade: e.unidadeId, p_funcao: e.funcao, p_dias: e.dias }))
+    },
+    async enviosFreela(status) {
+      let q = sb.from('freela_envios').select('*')
+      q = status === 'meus' ? q.eq('funcionario_id', exigeEu().id).order('data', { ascending: false }).limit(30) : q.eq('status', status).order('data')
+      return (ok(await q) ?? []).map(paraEnvio)
+    },
+    async aprovarEnvioFreela(id, valor, funcao, usarPixNovo) {
+      ok(await sb.rpc('freela_aprovar_envio', { p_envio: id, p_valor: valor, p_funcao: funcao, p_usar_pix: usarPixNovo }))
+    },
+    async recusarEnvioFreela(id, motivo) {
+      ok(await sb.from('freela_envios').update({
+        status: 'recusado', motivo: motivo.trim() || null, resolvido_por: exigeEu().id, resolvido_em: new Date().toISOString(),
+      }).eq('id', id).eq('status', 'pendente'))
+    },
   }
 }
 
@@ -658,6 +685,12 @@ const paraFreelancer = (r: any): Freelancer => ({
 const paraDiaria = (r: any): DiariaFreela => ({
   id: r.id, freelancerId: r.freelancer_id, data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao,
   valor: Number(r.valor), observacao: r.observacao, lancadoPor: r.lancado_por,
+})
+
+const paraEnvio = (r: any): EnvioFreela => ({
+  id: r.id, cpf: r.cpf, celular: r.celular, nome: r.nome, pix: r.pix, freelancerId: r.freelancer_id, funcionarioId: r.funcionario_id,
+  data: r.data, turno: r.turno, unidadeId: r.unidade_id, funcao: r.funcao, observacao: r.observacao, status: r.status,
+  motivo: r.motivo, enviadoEm: r.enviado_em,
 })
 
 const paraConta = (r: any): ContaPagamento => ({

@@ -7,6 +7,7 @@ import { ir } from './lib/rota'
 import type { Funcionario } from './lib/types'
 import { nomeNivel } from './lib/types'
 import Login from './pages/Login'
+import EnviarDiaria from './pages/EnviarDiaria'
 import Inicio from './pages/Inicio'
 import Comunicados from './pages/Comunicados'
 import Escala from './pages/Escala'
@@ -35,6 +36,13 @@ export default function App() {
   const store = useMemo(() => (usarDemo ? criarDemoStore() : criarSupabaseStore(URL_SB!, CHAVE_SB!)), [])
   const [eu, setEu] = useState<Funcionario | null>(null)
   const [carregando, setCarregando] = useState(true)
+  // Link da loja para o freelancer mandar a diária (#/diaria/<loja>): abre sem login.
+  const [diaria, setDiaria] = useState(() => location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+  useEffect(() => {
+    const ouvir = () => setDiaria(location.hash.match(/^#\/?diaria(?:\/([\w-]+))?/))
+    window.addEventListener('hashchange', ouvir)
+    return () => window.removeEventListener('hashchange', ouvir)
+  }, [])
 
   useEffect(() => {
     store.sessaoAtual().then((f) => {
@@ -43,6 +51,7 @@ export default function App() {
     })
   }, [store])
 
+  if (diaria) return <EnviarDiaria store={store} lojaId={diaria[1]} />
   if (carregando) return <div className="flex h-full items-center justify-center text-stone-400">Carregando…</div>
   if (!eu) return <Login store={store} aoEntrar={setEu} />
 
