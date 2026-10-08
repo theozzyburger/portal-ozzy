@@ -3,6 +3,8 @@ import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../comp
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, dataLonga, diaSemana, hoje, tempoDesde } from '../lib/datas'
 import { ir } from '../lib/rota'
+import FichasEvento from './FichasEvento'
+import Insumos from './Insumos'
 import { STATUS_EVENTO, nomeStatusEvento, type DiaEvento, type Evento, type HistoricoEvento, type NovoEvento, type Operacao, type StatusEvento } from '../lib/types'
 
 const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -53,8 +55,36 @@ function pendencias(e: Evento): string[] {
   return p
 }
 
+const ABAS = [
+  { id: '', nome: 'Eventos' },
+  { id: 'fichas', nome: 'Fichas' },
+  { id: 'insumos', nome: 'Insumos' },
+  { id: 'fornecedores', nome: 'Fornecedores' },
+]
+
+// Módulo Eventos: eventos (#/eventos/<id>), fichas (#/eventos/fichas/<id>), insumos e fornecedores.
+export default function ModuloEventos({ sub, param }: { sub?: string; param?: string }) {
+  const aba = ABAS.some((a) => a.id && a.id === sub) ? sub! : ''
+  return (
+    <div className="space-y-4">
+      <div className="-mx-1 flex gap-1 overflow-x-auto px-1">
+        {ABAS.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => ir(a.id ? 'eventos/' + a.id : 'eventos')}
+            className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-semibold ${aba === a.id ? 'bg-carvao text-white' : 'text-stone-600 hover:bg-stone-200'}`}
+          >
+            {a.nome}
+          </button>
+        ))}
+      </div>
+      {aba === 'fichas' ? <FichasEvento id={param} /> : aba === 'insumos' || aba === 'fornecedores' ? <Insumos aba={aba} /> : <Eventos id={sub} />}
+    </div>
+  )
+}
+
 // Eventos (Entrega 1, 08/10): lista e cadastro. Cada evento tem sua página (#/eventos/<id>).
-export default function Eventos({ id }: { id?: string }) {
+function Eventos({ id }: { id?: string }) {
   const { store } = useApp()
   const [lista, setLista] = useState<Evento[] | null>(null)
   const [operacoes, setOperacoes] = useState<Operacao[]>([])
@@ -103,10 +133,6 @@ function ListaEventos({ lista, operacoes, aoMudar }: { lista: Evento[]; operacoe
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold tracking-tight">Eventos</h1>
-        <Botao onClick={() => setNovo(true)}>+ Novo evento</Botao>
-      </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1 overflow-x-auto">
           {([['ativos', 'Em andamento'], ['finalizado', 'Finalizados'], ['cancelado', 'Cancelados'], ['todos', 'Todos']] as const).map(([v, n]) => (
@@ -120,6 +146,7 @@ function ListaEventos({ lista, operacoes, aoMudar }: { lista: Evento[]; operacoe
           ))}
         </div>
         <input className={`${estiloEntrada} py-2! sm:ml-auto sm:w-64!`} placeholder="Buscar evento, organizador ou local" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar evento" />
+        <Botao onClick={() => setNovo(true)}>+ Novo evento</Botao>
       </div>
 
       {filtrados.length === 0 ? (

@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -157,6 +157,41 @@ const eventosDemo: Evento[] = [
     nome: 'Festa Junina do Clube (exemplo)', status: 'finalizado', tipo: 'Festa', organizador: 'Clube Exemplo', local: 'Clube Exemplo',
     publicoEstimado: 1500, taxaOrganizadorPct: 15, quemRecebe: 'the_ozzy', operacoes: ['burger'],
   }),
+]
+// Insumos e fichas de EXEMPLO (nomes e preços inventados), só para a demonstração.
+const fornecedoresDemo: Fornecedor[] = [
+  { id: 'fo1', nome: 'Distribuidora Exemplo', contato: 'Vendedor Exemplo', telefone: '(11) 90000-0001', observacao: null, ativo: true },
+  { id: 'fo2', nome: 'Hortifruti Exemplo', contato: null, telefone: null, observacao: 'Entrega às terças', ativo: true },
+]
+const ins = (id: string, nome: string, categoria: string, unidade: Insumo['unidade'], preco: number | null, fornecedorId: string | null, extra: Partial<Insumo> = {}): Insumo => ({
+  id, nome, categoria, unidade, embalagem: null, embalagemQtd: null, preco, precoEm: haHoras(24 * 5), fornecedorId, observacao: null, ativo: true, ...extra,
+})
+const insumosDemo: Insumo[] = [
+  ins('in1', 'Pão focaccia (forma)', 'Massas / Pães', 'un', 28, 'fo1'),
+  ins('in2', 'Presunto cru', 'Embutidos / Frios', 'kg', 150, 'fo1'),
+  ins('in3', 'Queijo branco', 'Laticínios / Queijos', 'kg', 42, 'fo1'),
+  ins('in4', 'Creme de leite', 'Laticínios', 'kg', 18, 'fo1'),
+  ins('in5', 'Rúcula', 'Hortifruti', 'kg', 20, 'fo2'),
+  ins('in6', 'Tomate', 'Hortifruti', 'kg', 9, 'fo2'),
+  ins('in7', 'Refrigerante lata', 'Bebidas', 'un', 3.2, 'fo1', { embalagem: 'fardo', embalagemQtd: 12 }),
+  ins('in8', 'Azeite', 'Óleos / Gorduras', 'l', null, null, { observacao: 'Sem preço: cadastre para o custo ficar completo.' }),
+]
+const precosInsumoDemo: PrecoInsumo[] = insumosDemo.map((i) => ({ id: 'pi' + i.id, insumoId: i.id, preco: i.preco, em: haHoras(24 * 5), por: null, origem: 'exemplo' }))
+const rec = (id: string, nome: string, tipo: Receita['tipo'], extra: Partial<Receita> = {}): Receita => ({
+  id, nome, tipo, linha: 'Foca', operacaoId: null, origem: 'propria', unidade: tipo === 'produto' ? 'un' : 'kg', precoVenda: null,
+  tempoPreparoMin: null, tempoFinalizacaoMin: null, capacidadeHora: null, equipamentos: null, conservacao: null, validadeDias: null, ativo: true, versaoAtual: 1, ...extra,
+})
+const receitasDemo: Receita[] = [
+  rec('re1', 'Creme de queijo (exemplo)', 'preparo', { conservacao: 'Refrigerado até 5 °C', validadeDias: 3 }),
+  rec('re2', 'Focaccia de presunto (exemplo)', 'produto', { precoVenda: 55, tempoFinalizacaoMin: 3, capacidadeHora: 60, equipamentos: 'Forno elétrico', versaoAtual: 2 }),
+  rec('re3', 'Refrigerante (exemplo)', 'produto', { linha: 'Bebidas', origem: 'revenda', precoVenda: 9 }),
+]
+const it = (insumoId: string | null, subReceitaId: string | null, quantidade: number, aproveitamento = 1) => ({ insumoId, subReceitaId, quantidade, aproveitamento })
+const versoesReceitaDemo: VersaoReceita[] = [
+  { id: 've1', receitaId: 're1', numero: 1, rendimento: 1, custoTotal: 34.08, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in4', null, 0.33), it('in3', null, 0.67)] },
+  { id: 've2', receitaId: 're2', numero: 1, rendimento: 1, custoTotal: 7.78, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025)] },
+  { id: 've3', receitaId: 're2', numero: 2, rendimento: 1, custoTotal: 8.28, nota: 'Mais rúcula, a pedido da cozinha', criadaEm: haHoras(24 * 3), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025), it('in5', null, 0.02, 0.8)] },
+  { id: 've4', receitaId: 're3', numero: 1, rendimento: 1, custoTotal: 3.2, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in7', null, 1)] },
 ]
 const historicoEventosDemo: HistoricoEvento[] = [
   { id: 'he1', eventoId: 'ev2', em: haHoras(24 * 30), por: 'f1', tipo: 'criado', de: null, para: 'negociacao', campos: null, motivo: null },
@@ -1239,6 +1274,68 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async historicoEvento(eventoId) {
       exigeGestao()
       return historicoEventosDemo.filter((h) => h.eventoId === eventoId).sort((a, b) => b.em.localeCompare(a.em))
+    },
+
+    async fornecedores() {
+      exigeGestao()
+      return structuredClone(fornecedoresDemo).sort((a, b) => a.nome.localeCompare(b.nome))
+    },
+    async salvarFornecedor(f) {
+      exigeGestao()
+      const nome = f.nome.trim()
+      if (fornecedoresDemo.some((x) => x.id !== f.id && x.nome.toLowerCase() === nome.toLowerCase())) throw new Error('Já existe um fornecedor com esse nome.')
+      const atual = fornecedoresDemo.find((x) => x.id === f.id)
+      if (atual) return structuredClone(Object.assign(atual, f, { nome }))
+      const novo = { ...f, nome, id: novoId('fo') }
+      fornecedoresDemo.push(novo)
+      return structuredClone(novo)
+    },
+    async insumos() {
+      exigeGestao()
+      return structuredClone(insumosDemo).sort((a, b) => a.nome.localeCompare(b.nome))
+    },
+    async salvarInsumo(i) {
+      const u = exigeGestao()
+      const nome = i.nome.trim()
+      if (insumosDemo.some((x) => x.id !== i.id && x.nome.toLowerCase() === nome.toLowerCase())) throw new Error('Já existe um insumo com esse nome.')
+      const atual = insumosDemo.find((x) => x.id === i.id)
+      const mudouPreco = !atual || atual.preco !== i.preco
+      const salvo: Insumo = { ...(atual ?? { id: novoId('in') }), ...i, nome, id: atual?.id ?? novoId('in'), precoEm: mudouPreco ? agora() : atual!.precoEm }
+      if (atual) Object.assign(atual, salvo)
+      else insumosDemo.push(salvo)
+      if (mudouPreco) precosInsumoDemo.push({ id: novoId('pi'), insumoId: salvo.id, preco: salvo.preco, em: agora(), por: u.id, origem: 'manual' })
+      return structuredClone(salvo)
+    },
+    async precosInsumo(id) {
+      exigeGestao()
+      return precosInsumoDemo.filter((p) => p.insumoId === id).sort((a, b) => b.em.localeCompare(a.em))
+    },
+    async receitas() {
+      exigeGestao()
+      return structuredClone(receitasDemo).sort((a, b) => a.nome.localeCompare(b.nome))
+    },
+    async versoesReceitas() {
+      exigeGestao()
+      return structuredClone(versoesReceitaDemo)
+    },
+    async salvarReceita(r) {
+      exigeGestao()
+      const nome = r.nome.trim()
+      if (receitasDemo.some((x) => x.id !== r.id && x.tipo === r.tipo && x.nome.toLowerCase() === nome.toLowerCase())) throw new Error('Já existe uma ficha com esse nome.')
+      const atual = receitasDemo.find((x) => x.id === r.id)
+      if (atual) return structuredClone(Object.assign(atual, r, { nome }))
+      const nova: Receita = { ...r, nome, id: novoId('re'), versaoAtual: 0 }
+      receitasDemo.push(nova)
+      return structuredClone(nova)
+    },
+    async salvarVersaoReceita(receitaId, rendimento, custoTotal, nota, itens) {
+      const u = exigeGestao()
+      const r = receitasDemo.find((x) => x.id === receitaId)
+      if (!r) throw new Error('Ficha não encontrada.')
+      if (itens.some((i) => i.subReceitaId === receitaId)) throw new Error('Uma ficha não pode usar ela mesma.')
+      r.versaoAtual += 1
+      versoesReceitaDemo.push({ id: novoId('ve'), receitaId, numero: r.versaoAtual, rendimento, custoTotal, nota: nota.trim() || null, criadaEm: agora(), criadaPor: u.id, itens: structuredClone(itens) })
+      return r.versaoAtual
     },
   }
 }

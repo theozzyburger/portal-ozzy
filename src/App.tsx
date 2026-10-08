@@ -132,7 +132,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (modulo.id === 'financeiro') conteudo = <Financeiro />
   else if (modulo.id === 'compras') conteudo = <Compras />
   else if (modulo.id === 'freelancers') conteudo = <Freelancers />
-  else if (modulo.id === 'eventos') conteudo = <Eventos id={sub} />
+  else if (modulo.id === 'eventos') conteudo = <Eventos sub={sub} param={param} />
   else if (modulo.id !== 'rh') conteudo = <EmBreve modulo={modulo} />
   else if (abaRh === 'turnos') conteudo = <Turnos />
   else if (abaRh === 'folgas') conteudo = <Escala />

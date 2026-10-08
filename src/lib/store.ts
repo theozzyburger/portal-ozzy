@@ -1,4 +1,4 @@
-import type { Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -237,6 +237,20 @@ export interface Store {
   eventos(): Promise<Evento[]>
   salvarEvento(e: NovoEvento): Promise<Evento>
   historicoEvento(eventoId: string): Promise<HistoricoEvento[]>
+
+  // Cadastro único de fornecedores, insumos e fichas de eventos (só a gestão).
+  fornecedores(): Promise<Fornecedor[]>
+  salvarFornecedor(f: Omit<Fornecedor, 'id'> & { id?: string }): Promise<Fornecedor>
+  insumos(): Promise<Insumo[]>
+  salvarInsumo(i: Omit<Insumo, 'id' | 'precoEm'> & { id?: string }): Promise<Insumo>
+  precosInsumo(insumoId: string): Promise<PrecoInsumo[]>
+  receitas(): Promise<Receita[]>
+  // Todas as versões de todas as fichas, com os itens (a tela calcula o custo da versão atual).
+  versoesReceitas(): Promise<VersaoReceita[]>
+  // Dados da ficha (nome, preço, tempos…); a composição muda só por salvarVersaoReceita.
+  salvarReceita(r: Omit<Receita, 'id' | 'versaoAtual'> & { id?: string }): Promise<Receita>
+  // Cria a versão seguinte e passa a usá-la; as anteriores não mudam. Devolve o número da versão.
+  salvarVersaoReceita(receitaId: string, rendimento: number, custoTotal: number | null, nota: string, itens: ItemReceita[]): Promise<number>
 }
 
 export const EVENTO_ALTERADO = 'Outra pessoa salvou este evento enquanto você editava. Feche, abra de novo e refaça a alteração.'

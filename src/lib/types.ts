@@ -827,3 +827,75 @@ export interface HistoricoEvento {
   campos: string[] | null
   motivo: string | null
 }
+
+// Eventos, Entregas 2 e 3 (08/10): cadastro único de fornecedores, insumos e fichas (com versões).
+export type UnidadeMedida = 'kg' | 'l' | 'un'
+export interface Fornecedor {
+  id: string
+  nome: string
+  contato: string | null
+  telefone: string | null
+  observacao: string | null
+  ativo: boolean
+}
+export interface Insumo {
+  id: string
+  nome: string
+  categoria: string | null
+  // Unidade da ficha e do preço (preço é por 1 unidade desta).
+  unidade: UnidadeMedida
+  embalagem: string | null
+  embalagemQtd: number | null
+  preco: number | null
+  precoEm: string | null
+  fornecedorId: string | null
+  observacao: string | null
+  ativo: boolean
+}
+export interface PrecoInsumo {
+  id: string
+  insumoId: string
+  preco: number | null
+  em: string
+  por: string | null
+  origem: string | null
+}
+export type TipoReceita = 'produto' | 'preparo'
+export type OrigemProduto = 'propria' | 'revenda' | 'terceirizada'
+export const ORIGEM_PRODUTO: Record<OrigemProduto, string> = { propria: 'Fabricação própria', revenda: 'Compra pronta', terceirizada: 'Produção terceirizada' }
+export interface Receita {
+  id: string
+  nome: string
+  tipo: TipoReceita
+  linha: string | null
+  operacaoId: string | null
+  origem: OrigemProduto
+  unidade: UnidadeMedida
+  precoVenda: number | null
+  tempoPreparoMin: number | null
+  tempoFinalizacaoMin: number | null
+  capacidadeHora: number | null
+  equipamentos: string | null
+  conservacao: string | null
+  validadeDias: number | null
+  ativo: boolean
+  versaoAtual: number
+}
+export interface ItemReceita {
+  insumoId: string | null
+  subReceitaId: string | null
+  quantidade: number
+  aproveitamento: number
+}
+export interface VersaoReceita {
+  id: string
+  receitaId: string
+  numero: number
+  rendimento: number
+  // Custo calculado no dia em que a versão foi salva.
+  custoTotal: number | null
+  nota: string | null
+  criadaEm: string
+  criadaPor: string | null
+  itens: ItemReceita[]
+}

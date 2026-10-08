@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
-import type { DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -813,8 +813,76 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         id: r.id, eventoId: r.evento_id, em: r.em, por: r.por, tipo: r.tipo, de: r.de, para: r.para, campos: r.campos, motivo: r.motivo,
       }))
     },
+
+    async fornecedores() {
+      return (ok(await sb.from('fornecedores').select('*').order('nome')) ?? []).map(paraFornecedor)
+    },
+    async salvarFornecedor(f) {
+      const linha = { nome: f.nome.trim(), contato: texto(f.contato), telefone: texto(f.telefone), observacao: texto(f.observacao), ativo: f.ativo }
+      return paraFornecedor(f.id
+        ? ok(await sb.from('fornecedores').update(linha).eq('id', f.id).select().single())
+        : ok(await sb.from('fornecedores').insert(linha).select().single()))
+    },
+    async insumos() {
+      return (ok(await sb.from('insumos').select('*').order('nome')) ?? []).map(paraInsumo)
+    },
+    async salvarInsumo(i) {
+      const linha = {
+        nome: i.nome.trim(), categoria: texto(i.categoria), unidade: i.unidade, embalagem: texto(i.embalagem), embalagem_qtd: i.embalagemQtd,
+        preco: i.preco, fornecedor_id: i.fornecedorId, observacao: texto(i.observacao), ativo: i.ativo,
+      }
+      return paraInsumo(i.id
+        ? ok(await sb.from('insumos').update(linha).eq('id', i.id).select().single())
+        : ok(await sb.from('insumos').insert(linha).select().single()))
+    },
+    async precosInsumo(id) {
+      return (ok(await sb.from('insumo_precos').select('*').eq('insumo_id', id).order('em', { ascending: false })) ?? []).map((r: any) => ({
+        id: r.id, insumoId: r.insumo_id, preco: numeroOuNulo(r.preco), em: r.em, por: r.por, origem: r.origem,
+      }))
+    },
+    async receitas() {
+      return (ok(await sb.from('receitas').select('*').order('nome')) ?? []).map(paraReceita)
+    },
+    async versoesReceitas() {
+      return (ok(await sb.from('receita_versoes').select('*, receita_itens(ordem, insumo_id, sub_receita_id, quantidade, aproveitamento)').order('numero')) ?? []).map(
+        (r: any): VersaoReceita => ({
+          id: r.id, receitaId: r.receita_id, numero: r.numero, rendimento: Number(r.rendimento), custoTotal: numeroOuNulo(r.custo_total), nota: r.nota,
+          criadaEm: r.criada_em, criadaPor: r.criada_por,
+          itens: (r.receita_itens ?? [])
+            .sort((a: any, b: any) => a.ordem - b.ordem)
+            .map((i: any) => ({ insumoId: i.insumo_id, subReceitaId: i.sub_receita_id, quantidade: Number(i.quantidade), aproveitamento: Number(i.aproveitamento) })),
+        }),
+      )
+    },
+    async salvarReceita(r) {
+      const linha = {
+        nome: r.nome.trim(), tipo: r.tipo, linha: texto(r.linha), operacao_id: r.operacaoId, origem: r.origem, unidade: r.unidade, preco_venda: r.precoVenda,
+        tempo_preparo_min: r.tempoPreparoMin, tempo_finalizacao_min: r.tempoFinalizacaoMin, capacidade_hora: r.capacidadeHora, equipamentos: texto(r.equipamentos),
+        conservacao: texto(r.conservacao), validade_dias: r.validadeDias, ativo: r.ativo, atualizado_em: new Date().toISOString(),
+      }
+      return paraReceita(r.id
+        ? ok(await sb.from('receitas').update(linha).eq('id', r.id).select().single())
+        : ok(await sb.from('receitas').insert(linha).select().single()))
+    },
+    async salvarVersaoReceita(receitaId, rendimento, custoTotal, nota, itens) {
+      return ok(await sb.rpc('salvar_versao_receita', {
+        p_receita: receitaId, p_rendimento: rendimento, p_custo: custoTotal, p_nota: nota,
+        p_itens: itens.map((i) => ({ insumo_id: i.insumoId, sub_receita_id: i.subReceitaId, quantidade: i.quantidade, aproveitamento: i.aproveitamento })),
+      })) as number
+    },
   }
 }
+
+const paraFornecedor = (r: any): Fornecedor => ({ id: r.id, nome: r.nome, contato: r.contato, telefone: r.telefone, observacao: r.observacao, ativo: r.ativo })
+const paraInsumo = (r: any): Insumo => ({
+  id: r.id, nome: r.nome, categoria: r.categoria, unidade: r.unidade, embalagem: r.embalagem, embalagemQtd: numeroOuNulo(r.embalagem_qtd),
+  preco: numeroOuNulo(r.preco), precoEm: r.preco_em, fornecedorId: r.fornecedor_id, observacao: r.observacao, ativo: r.ativo,
+})
+const paraReceita = (r: any): Receita => ({
+  id: r.id, nome: r.nome, tipo: r.tipo, linha: r.linha, operacaoId: r.operacao_id, origem: r.origem, unidade: r.unidade, precoVenda: numeroOuNulo(r.preco_venda),
+  tempoPreparoMin: r.tempo_preparo_min, tempoFinalizacaoMin: r.tempo_finalizacao_min, capacidadeHora: r.capacidade_hora, equipamentos: r.equipamentos,
+  conservacao: r.conservacao, validadeDias: r.validade_dias, ativo: r.ativo, versaoAtual: r.versao_atual,
+})
 
 const SELECT_EVENTO = '*, evento_dias(data, abre, fecha), evento_operacoes(operacao_id), evento_responsaveis(funcionario_id, papel)'
 const numeroOuNulo = (v: unknown) => (v === null || v === undefined ? null : Number(v))

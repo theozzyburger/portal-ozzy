@@ -1,0 +1,557 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
+import { useApp } from '../lib/contexto'
+import { cmv, custoFicha, custoItens, montarCatalogo, nomeUnidade, qtd, reais, usadoEm, type Catalogo } from '../lib/custos'
+import { dataLonga } from '../lib/datas'
+import { ir } from '../lib/rota'
+import { ORIGEM_PRODUTO, type Insumo, type ItemReceita, type Operacao, type OrigemProduto, type Receita, type TipoReceita, type UnidadeMedida, type VersaoReceita } from '../lib/types'
+
+const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
+const doNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n).replace('.', ','))
+const inteiro = (s: string) => (s.trim() === '' ? null : Math.max(0, Math.round(Number(s.replace(',', '.')))))
+
+interface Dados {
+  insumos: Insumo[]
+  receitas: Receita[]
+  versoes: VersaoReceita[]
+  operacoes: Operacao[]
+  cat: Catalogo
+}
+
+// Fichas técnicas de eventos: produtos vendidos e pré-preparos, com versões e custo calculado.
+export default function FichasEvento({ id }: { id?: string }) {
+  const { store } = useApp()
+  const [d, setD] = useState<Dados | null>(null)
+  const [erro, setErro] = useState('')
+  const carregar = useCallback(async () => {
+    try {
+      const [insumos, receitas, versoes, operacoes] = await Promise.all([store.insumos(), store.receitas(), store.versoesReceitas(), store.operacoes()])
+      setD({ insumos, receitas, versoes, operacoes, cat: montarCatalogo(insumos, receitas, versoes) })
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }, [store])
+  useEffect(() => {
+    carregar()
+  }, [carregar])
+
+  if (erro) return <p className="text-red-600">{erro}</p>
+  if (!d) return <p className="text-stone-400">Carregando…</p>
+  if (id) {
+    const r = d.receitas.find((x) => x.id === id)
+    if (!r) return <Vazio>Ficha não encontrada. <button className="font-semibold underline" onClick={() => ir('eventos/fichas')}>Voltar</button></Vazio>
+    return <PaginaFicha r={r} d={d} aoMudar={carregar} />
+  }
+  return <ListaFichas d={d} aoMudar={carregar} />
+}
+
+function ListaFichas({ d, aoMudar }: { d: Dados; aoMudar: () => Promise<void> }) {
+  const { avisar } = useApp()
+  const [tipo, setTipo] = useState<TipoReceita>('produto')
+  const [linha, setLinha] = useState('')
+  const [busca, setBusca] = useState('')
+  const [inativas, setInativas] = useState(false)
+  const [nova, setNova] = useState(false)
+  const linhas = [...new Set(d.receitas.map((r) => r.linha).filter(Boolean) as string[])].sort()
+  const lista = d.receitas
+    .filter((r) => r.tipo === tipo && (inativas || r.ativo) && (!linha || r.linha === linha) && (!busca || r.nome.toLowerCase().includes(busca.toLowerCase())))
+    .map((r) => ({ r, c: custoFicha(d.cat, r.id) }))
+  const conta = (t: TipoReceita) => d.receitas.filter((r) => r.tipo === t && (inativas || r.ativo)).length
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {(['produto', 'preparo'] as const).map((t) => (
+          <button key={t} onClick={() => setTipo(t)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tipo === t ? 'bg-carvao text-white' : 'text-stone-600 hover:bg-stone-200'}`}>
+            {t === 'produto' ? 'Produtos' : 'Pré-preparos'} <span className="opacity-60">{conta(t)}</span>
+          </button>
+        ))}
+        <Botao className="ml-auto" onClick={() => setNova(true)}>+ Nova ficha</Botao>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input className={`${estiloEntrada} basis-full py-2! sm:basis-0 sm:flex-1`} placeholder="Buscar ficha" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar ficha" />
+        <select className={`${estiloEntrada} w-auto! py-2!`} value={linha} onChange={(e) => setLinha(e.target.value)} aria-label="Linha">
+          <option value="">Todas as linhas</option>
+          {linhas.map((l) => <option key={l}>{l}</option>)}
+        </select>
+        <label className="flex items-center gap-2 text-sm text-stone-600">
+          <input type="checkbox" className="accent-carvao" checked={inativas} onChange={(e) => setInativas(e.target.checked)} /> Mostrar inativas
+        </label>
+      </div>
+
+      {lista.length === 0 ? (
+        <Vazio>Nenhuma ficha {tipo === 'produto' ? 'de produto' : 'de pré-preparo'} neste filtro.</Vazio>
+      ) : (
+        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-stone-200">
+          <table className="w-full text-sm">
+            <thead className="bg-stone-50 text-left text-xs text-stone-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">Ficha</th>
+                <th className="px-3 py-2 text-right font-semibold">Custo</th>
+                {tipo === 'produto' && <th className="px-3 py-2 text-right font-semibold">Preço</th>}
+                {tipo === 'produto' && <th className="px-3 py-2 text-right font-semibold">CMV</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map(({ r, c }) => {
+                const pct = c ? cmv(c.porUnidade, r.precoVenda) : null
+                return (
+                  <tr key={r.id} onClick={() => ir('eventos/fichas/' + r.id)} className="cursor-pointer border-t border-stone-100 hover:bg-stone-50">
+                    <td className="px-3 py-2">
+                      <div className="font-semibold">{r.nome} {!r.ativo && <Selo>Inativa</Selo>}</div>
+                      <div className="text-xs text-stone-500">
+                        {[r.linha, r.tipo === 'produto' ? ORIGEM_PRODUTO[r.origem] : null, `versão ${r.versaoAtual}`].filter(Boolean).join(' · ')}
+                        {c && c.semPreco.length > 0 && <span className="font-semibold text-amber-700"> · {c.semPreco.length} sem preço</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">{c ? `${reais(c.porUnidade)}/${nomeUnidade(r.unidade)}` : '—'}</td>
+                    {tipo === 'produto' && <td className="px-3 py-2 text-right whitespace-nowrap">{r.precoVenda !== null ? reais(r.precoVenda) : '—'}</td>}
+                    {tipo === 'produto' && (
+                      <td className={`px-3 py-2 text-right font-semibold whitespace-nowrap ${pct !== null && pct > 35 ? 'text-red-700' : ''}`}>{pct !== null ? `${pct.toFixed(1).replace('.', ',')}%` : '—'}</td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="text-xs text-stone-500">O custo usa o preço atual de cada insumo e o aproveitamento de cada item. O CMV fica em vermelho acima de 35%.</p>
+
+      {nova && (
+        <EditarDadosFicha
+          r={null}
+          tipoInicial={tipo}
+          operacoes={d.operacoes}
+          linhas={linhas}
+          aoFechar={() => setNova(false)}
+          aoSalvar={async (salva) => {
+            setNova(false)
+            await aoMudar()
+            avisar('Ficha criada. Agora monte a composição.')
+            ir('eventos/fichas/' + salva.id)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function PaginaFicha({ r, d, aoMudar }: { r: Receita; d: Dados; aoMudar: () => Promise<void> }) {
+  const { nomeDe, avisar } = useApp()
+  const [editandoDados, setEditandoDados] = useState(false)
+  const [editandoComposicao, setEditandoComposicao] = useState(false)
+  const [verVersao, setVerVersao] = useState<VersaoReceita | null>(null)
+  const versoes = d.versoes.filter((v) => v.receitaId === r.id).sort((a, b) => b.numero - a.numero)
+  const atual = d.cat.atual.get(r.id) ?? null
+  const c = custoFicha(d.cat, r.id)
+  const pct = c ? cmv(c.porUnidade, r.precoVenda) : null
+  const usos = usadoEm(d.cat, { receitaId: r.id })
+  const nomeOp = (id: string | null) => d.operacoes.find((o) => o.id === id)?.nome
+
+  return (
+    <div className="space-y-4">
+      <button onClick={() => ir('eventos/fichas')} className="text-sm font-semibold text-stone-500 hover:text-carvao">← Fichas</button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold text-stone-400">
+            {r.tipo === 'produto' ? 'Produto' : 'Pré-preparo'}
+            {r.linha && ` · ${r.linha}`} · versão {r.versaoAtual}
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">{r.nome}</h1>
+          {!r.ativo && <Selo>Inativa</Selo>}
+        </div>
+        <div className="flex gap-2">
+          <Botao variante="secundario" onClick={() => setEditandoDados(true)}>Editar dados</Botao>
+          <Botao onClick={() => setEditandoComposicao(true)}>{atual ? 'Alterar composição' : 'Montar composição'}</Botao>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Numero rotulo={`Custo por ${nomeUnidade(r.unidade)}`} valor={c ? reais(c.porUnidade) : '—'} />
+        {r.tipo === 'produto' ? (
+          <>
+            <Numero rotulo="Preço de venda padrão" valor={r.precoVenda !== null ? reais(r.precoVenda) : '—'} />
+            <Numero rotulo="CMV" valor={pct !== null ? `${pct.toFixed(1).replace('.', ',')}%` : '—'} alerta={pct !== null && pct > 35} />
+            <Numero rotulo="Margem por unidade" valor={c && r.precoVenda !== null ? reais(r.precoVenda - c.porUnidade) : '—'} />
+          </>
+        ) : (
+          <>
+            <Numero rotulo="Rende por receita" valor={atual ? `${qtd(atual.rendimento)} ${nomeUnidade(r.unidade)}` : '—'} />
+            <Numero rotulo="Custo da receita" valor={c ? reais(c.total) : '—'} />
+            <Numero rotulo="Usado em" valor={`${usos.length} ficha${usos.length === 1 ? '' : 's'}`} />
+          </>
+        )}
+      </div>
+
+      {c && c.semPreco.length > 0 && (
+        <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+          <b>Custo incompleto:</b> sem preço em {c.semPreco.join(', ')}. Cadastre o preço em Insumos.
+        </div>
+      )}
+
+      <Cartao>
+        <h2 className="mb-2 font-bold">Composição {atual && <span className="text-sm font-normal text-stone-500">(versão {atual.numero}, rende {qtd(atual.rendimento)} {nomeUnidade(r.unidade)})</span>}</h2>
+        {!atual || !c ? (
+          <p className="text-sm text-stone-500">Ainda sem composição. Use “Montar composição”.</p>
+        ) : (
+          <TabelaItens c={c} />
+        )}
+      </Cartao>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <Cartao>
+          <h2 className="mb-2 font-bold">Dados</h2>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            {r.tipo === 'produto' && (<><dt className="text-stone-500">Origem</dt><dd>{ORIGEM_PRODUTO[r.origem]}</dd></>)}
+            <dt className="text-stone-500">Operação</dt><dd>{nomeOp(r.operacaoId) ?? '—'}</dd>
+            <dt className="text-stone-500">Preparo</dt><dd>{r.tempoPreparoMin !== null ? `${r.tempoPreparoMin} min` : '—'}</dd>
+            <dt className="text-stone-500">Finalização</dt><dd>{r.tempoFinalizacaoMin !== null ? `${r.tempoFinalizacaoMin} min` : '—'}</dd>
+            <dt className="text-stone-500">Capacidade</dt><dd>{r.capacidadeHora !== null ? `${r.capacidadeHora} por hora` : '—'}</dd>
+            <dt className="text-stone-500">Equipamentos</dt><dd>{r.equipamentos ?? '—'}</dd>
+            <dt className="text-stone-500">Conservação</dt><dd>{r.conservacao ?? '—'}</dd>
+            <dt className="text-stone-500">Validade</dt><dd>{r.validadeDias !== null ? `${r.validadeDias} dias` : '—'}</dd>
+          </dl>
+        </Cartao>
+        <Cartao>
+          <h2 className="mb-2 font-bold">Versões</h2>
+          {versoes.length === 0 && <p className="text-sm text-stone-500">Nenhuma ainda.</p>}
+          <ul className="space-y-2 text-sm">
+            {versoes.map((v) => (
+              <li key={v.id}>
+                <button className="text-left hover:underline" onClick={() => setVerVersao(v)}>
+                  <b>Versão {v.numero}</b>
+                  {v.numero === r.versaoAtual && <span className="ml-1 text-xs text-emerald-700">em uso</span>}
+                  <span className="text-stone-500"> · {dataLonga(v.criadaEm)}{v.criadaPor && ` · ${nomeDe(v.criadaPor)}`}</span>
+                  {v.custoTotal !== null && <span className="text-stone-500"> · custo na época {reais(v.custoTotal / v.rendimento)}</span>}
+                </button>
+                {v.nota && <div className="text-stone-600">{v.nota}</div>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-stone-500">Alterar a composição cria uma versão nova. As anteriores ficam como estavam, para os eventos que já usaram.</p>
+        </Cartao>
+      </div>
+
+      {usos.length > 0 && (
+        <Cartao>
+          <h2 className="mb-2 font-bold">Usado nas fichas</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {usos.map((u) => (
+              <button key={u.id} onClick={() => ir('eventos/fichas/' + u.id)} className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold hover:bg-stone-200">{u.nome}</button>
+            ))}
+          </div>
+        </Cartao>
+      )}
+
+      {editandoDados && (
+        <EditarDadosFicha
+          r={r}
+          tipoInicial={r.tipo}
+          operacoes={d.operacoes}
+          linhas={[...new Set(d.receitas.map((x) => x.linha).filter(Boolean) as string[])].sort()}
+          aoFechar={() => setEditandoDados(false)}
+          aoSalvar={async () => {
+            setEditandoDados(false)
+            await aoMudar()
+            avisar('Ficha atualizada')
+          }}
+        />
+      )}
+      {editandoComposicao && (
+        <EditarComposicao
+          r={r}
+          d={d}
+          aoFechar={() => setEditandoComposicao(false)}
+          aoSalvar={async (n) => {
+            setEditandoComposicao(false)
+            await aoMudar()
+            avisar(`Versão ${n} salva e em uso`)
+          }}
+        />
+      )}
+      {verVersao && (
+        <Modal titulo={`${r.nome}: versão ${verVersao.numero}`} aberto aoFechar={() => setVerVersao(null)}>
+          <p className="mb-3 text-sm text-stone-600">
+            Salva em {dataLonga(verVersao.criadaEm)}{verVersao.criadaPor && ` por ${nomeDe(verVersao.criadaPor)}`}. Rende {qtd(verVersao.rendimento)} {nomeUnidade(r.unidade)}.
+            {verVersao.custoTotal !== null && ` Custo na época: ${reais(verVersao.custoTotal / verVersao.rendimento)} por ${nomeUnidade(r.unidade)}.`}
+          </p>
+          <TabelaItens c={custoItens(d.cat, verVersao.itens, verVersao.rendimento, [r.id])} legenda="Custos com os preços de hoje." />
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+function Numero({ rotulo, valor, alerta }: { rotulo: string; valor: string; alerta?: boolean }) {
+  return (
+    <div className="rounded-2xl bg-white p-3 ring-1 ring-stone-200">
+      <div className="text-xs text-stone-500">{rotulo}</div>
+      <div className={`text-lg font-bold ${alerta ? 'text-red-700' : ''}`}>{valor}</div>
+    </div>
+  )
+}
+
+function TabelaItens({ c, legenda }: { c: ReturnType<typeof custoItens>; legenda?: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-left text-xs text-stone-500">
+          <tr>
+            <th className="py-1 pr-2 font-semibold">Item</th>
+            <th className="py-1 pr-2 text-right font-semibold">Qtd</th>
+            <th className="py-1 pr-2 text-right font-semibold">Aprov.</th>
+            <th className="hidden py-1 pr-2 text-right font-semibold sm:table-cell">Preço</th>
+            <th className="py-1 text-right font-semibold">Custo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {c.itens.map((l, i) => (
+            <tr key={i} className="border-t border-stone-100">
+              <td className="py-1.5 pr-2">
+                {l.item.subReceitaId ? (
+                  <button className="font-semibold underline decoration-stone-300 hover:decoration-carvao" onClick={() => ir('eventos/fichas/' + l.item.subReceitaId)}>{l.nome}</button>
+                ) : (
+                  l.nome
+                )}
+                {l.item.subReceitaId && <span className="ml-1 text-xs text-stone-400"> pré-preparo</span>}
+                {l.precoUnit === null && <span className="ml-1 text-xs font-semibold text-amber-700 sm:hidden"> sem preço</span>}
+              </td>
+              <td className="py-1.5 pr-2 text-right whitespace-nowrap">{qtd(l.item.quantidade)} {nomeUnidade(l.unidade)}</td>
+              <td className="py-1.5 pr-2 text-right">{l.item.aproveitamento < 1 ? `${Math.round(l.item.aproveitamento * 100)}%` : '—'}</td>
+              <td className="hidden py-1.5 pr-2 text-right whitespace-nowrap sm:table-cell">{l.precoUnit !== null ? `${reais(l.precoUnit)}/${nomeUnidade(l.unidade)}` : <span className="font-semibold text-amber-700">sem preço</span>}</td>
+              <td className="py-1.5 text-right whitespace-nowrap">{l.custo !== null ? reais(l.custo) : '—'}</td>
+            </tr>
+          ))}
+          <tr className="border-t border-stone-300 font-bold">
+            <td className="py-1.5" colSpan={3}>Total</td>
+            <td className="hidden sm:table-cell" />
+            <td className="py-1.5 text-right">{reais(c.total)}</td>
+          </tr>
+        </tbody>
+      </table>
+      {legenda && <p className="mt-1 text-xs text-stone-500">{legenda}</p>}
+    </div>
+  )
+}
+
+function EditarDadosFicha({ r, tipoInicial, operacoes, linhas, aoFechar, aoSalvar }: {
+  r: Receita | null
+  tipoInicial: TipoReceita
+  operacoes: Operacao[]
+  linhas: string[]
+  aoFechar: () => void
+  aoSalvar: (salva: Receita) => void
+}) {
+  const { store } = useApp()
+  const [f, setF] = useState({
+    nome: r?.nome ?? '', tipo: r?.tipo ?? tipoInicial, linha: r?.linha ?? '', operacaoId: r?.operacaoId ?? '', origem: r?.origem ?? 'propria',
+    unidade: r?.unidade ?? (tipoInicial === 'produto' ? 'un' : 'kg'), precoVenda: doNumero(r?.precoVenda), tempoPreparoMin: doNumero(r?.tempoPreparoMin),
+    tempoFinalizacaoMin: doNumero(r?.tempoFinalizacaoMin), capacidadeHora: doNumero(r?.capacidadeHora), equipamentos: r?.equipamentos ?? '',
+    conservacao: r?.conservacao ?? '', validadeDias: doNumero(r?.validadeDias),
+  })
+  const [ativo, setAtivo] = useState(r?.ativo ?? true)
+  const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const mudar = (c: keyof typeof f) => (ev: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [c]: ev.target.value })
+  const produto = f.tipo === 'produto'
+
+  const salvar = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!f.nome.trim()) return setErro('Dê um nome à ficha.')
+    const preco = numero(f.precoVenda)
+    if (preco !== null && (Number.isNaN(preco) || preco < 0)) return setErro('Confira o preço de venda.')
+    setSalvando(true)
+    try {
+      aoSalvar(
+        await store.salvarReceita({
+          id: r?.id, nome: f.nome, tipo: f.tipo as TipoReceita, linha: f.linha || null, operacaoId: f.operacaoId || null, origem: f.origem as OrigemProduto,
+          unidade: (produto ? 'un' : f.unidade) as UnidadeMedida, precoVenda: produto ? preco : null, tempoPreparoMin: inteiro(f.tempoPreparoMin),
+          tempoFinalizacaoMin: inteiro(f.tempoFinalizacaoMin), capacidadeHora: inteiro(f.capacidadeHora), equipamentos: f.equipamentos || null,
+          conservacao: f.conservacao || null, validadeDias: inteiro(f.validadeDias), ativo,
+        }),
+      )
+    } catch (e) {
+      setErro((e as Error).message)
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Modal titulo={r ? 'Editar dados da ficha' : 'Nova ficha'} aberto aoFechar={aoFechar}>
+      <form onSubmit={salvar} className="space-y-4">
+        <Campo rotulo="Nome">
+          <input className={estiloEntrada} value={f.nome} onChange={mudar('nome')} required />
+        </Campo>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="Tipo">
+            <select className={estiloEntrada} value={f.tipo} onChange={mudar('tipo')} disabled={!!r}>
+              <option value="produto">Produto (vendido)</option>
+              <option value="preparo">Pré-preparo</option>
+            </select>
+          </Campo>
+          <Campo rotulo="Linha">
+            <input className={estiloEntrada} list="linhas-ficha" value={f.linha} onChange={mudar('linha')} placeholder="Foca, Pizza…" />
+            <datalist id="linhas-ficha">{linhas.map((l) => <option key={l} value={l} />)}</datalist>
+          </Campo>
+        </div>
+        {produto ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Origem">
+              <select className={estiloEntrada} value={f.origem} onChange={mudar('origem')}>
+                {Object.entries(ORIGEM_PRODUTO).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+              </select>
+            </Campo>
+            <Campo rotulo="Preço de venda padrão (R$)" dica="Cada evento pode ter o seu.">
+              <input className={estiloEntrada} inputMode="decimal" value={f.precoVenda} onChange={mudar('precoVenda')} placeholder="0,00" />
+            </Campo>
+          </div>
+        ) : (
+          <Campo rotulo="Unidade do que a receita rende">
+            <select className={estiloEntrada} value={f.unidade} onChange={mudar('unidade')}>
+              <option value="kg">kg</option>
+              <option value="l">litro</option>
+              <option value="un">unidade</option>
+            </select>
+          </Campo>
+        )}
+        <Campo rotulo="Operação">
+          <select className={estiloEntrada} value={f.operacaoId} onChange={mudar('operacaoId')}>
+            <option value="">—</option>
+            {operacoes.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          </select>
+        </Campo>
+        <div className="grid grid-cols-3 gap-3">
+          <Campo rotulo="Preparo (min)">
+            <input className={estiloEntrada} inputMode="numeric" value={f.tempoPreparoMin} onChange={mudar('tempoPreparoMin')} />
+          </Campo>
+          <Campo rotulo="Finalização (min)">
+            <input className={estiloEntrada} inputMode="numeric" value={f.tempoFinalizacaoMin} onChange={mudar('tempoFinalizacaoMin')} />
+          </Campo>
+          <Campo rotulo="Por hora">
+            <input className={estiloEntrada} inputMode="numeric" value={f.capacidadeHora} onChange={mudar('capacidadeHora')} placeholder="Capacidade" />
+          </Campo>
+        </div>
+        <Campo rotulo="Equipamentos necessários">
+          <input className={estiloEntrada} value={f.equipamentos} onChange={mudar('equipamentos')} placeholder="Forno, chapa…" />
+        </Campo>
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <Campo rotulo="Conservação">
+            <input className={estiloEntrada} value={f.conservacao} onChange={mudar('conservacao')} placeholder="Refrigerado até 5 °C…" />
+          </Campo>
+          <Campo rotulo="Validade (dias)">
+            <input className={estiloEntrada} inputMode="numeric" value={f.validadeDias} onChange={mudar('validadeDias')} />
+          </Campo>
+        </div>
+        {r && (
+          <label className="flex items-center gap-3 text-sm">
+            <input type="checkbox" className="size-5 accent-carvao" checked={!ativo} onChange={(ev) => setAtivo(!ev.target.checked)} />
+            Inativar (sai das listas; o histórico continua)
+          </label>
+        )}
+        {erro && <p className="text-sm text-red-600">{erro}</p>}
+        <Botao className="w-full" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+      </form>
+    </Modal>
+  )
+}
+
+interface Linha {
+  ref: string // 'i:<id>' insumo, 'r:<id>' pré-preparo
+  quantidade: string
+  aproveitamento: string // em %
+}
+
+function EditarComposicao({ r, d, aoFechar, aoSalvar }: { r: Receita; d: Dados; aoFechar: () => void; aoSalvar: (numero: number) => void }) {
+  const { store } = useApp()
+  const atual = d.cat.atual.get(r.id)
+  const [linhas, setLinhas] = useState<Linha[]>(
+    atual?.itens.map((i) => ({ ref: i.insumoId ? 'i:' + i.insumoId : 'r:' + i.subReceitaId, quantidade: doNumero(i.quantidade), aproveitamento: doNumero(Math.round(i.aproveitamento * 1000) / 10) })) ?? [
+      { ref: '', quantidade: '', aproveitamento: '100' },
+    ],
+  )
+  const [rendimento, setRendimento] = useState(doNumero(atual?.rendimento ?? 1))
+  const [nota, setNota] = useState('')
+  const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  const itens: ItemReceita[] = linhas
+    .filter((l) => l.ref && (numero(l.quantidade) ?? 0) > 0)
+    .map((l) => ({
+      insumoId: l.ref.startsWith('i:') ? l.ref.slice(2) : null,
+      subReceitaId: l.ref.startsWith('r:') ? l.ref.slice(2) : null,
+      quantidade: numero(l.quantidade)!,
+      aproveitamento: Math.min(1, Math.max(0.01, (numero(l.aproveitamento) ?? 100) / 100)),
+    }))
+  const rend = numero(rendimento) ?? 0
+  const previa = useMemo(() => custoItens(d.cat, itens, rend || 1, [r.id]), [d.cat, JSON.stringify(itens), rend, r.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const insumos = d.insumos.filter((i) => i.ativo || linhas.some((l) => l.ref === 'i:' + i.id))
+  const preparos = d.receitas.filter((x) => x.tipo === 'preparo' && x.id !== r.id && (x.ativo || linhas.some((l) => l.ref === 'r:' + x.id)))
+  const unidadeDe = (ref: string) =>
+    ref.startsWith('i:') ? nomeUnidade(d.cat.insumos.get(ref.slice(2))?.unidade ?? '') : ref.startsWith('r:') ? nomeUnidade(d.cat.receitas.get(ref.slice(2))?.unidade ?? '') : ''
+  const mudar = (i: number, m: Partial<Linha>) => setLinhas(linhas.map((l, j) => (j === i ? { ...l, ...m } : l)))
+
+  const salvar = async () => {
+    if (!itens.length) return setErro('Inclua pelo menos um item com quantidade.')
+    if (linhas.some((l) => l.ref && !((numero(l.quantidade) ?? 0) > 0))) return setErro('Há item sem quantidade.')
+    if (!(rend > 0)) return setErro('O rendimento precisa ser maior que zero.')
+    if (previa.ciclo) return setErro('Um pré-preparo desta ficha usa a própria ficha. Confira a composição.')
+    setSalvando(true)
+    try {
+      aoSalvar(await store.salvarVersaoReceita(r.id, rend, Math.round(previa.total * 10000) / 10000, nota, itens))
+    } catch (e) {
+      setErro((e as Error).message)
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Modal titulo={`Composição: ${r.nome}`} aberto aoFechar={aoFechar}>
+      <div className="space-y-3">
+        <p className="text-sm text-stone-600">Quantidade líquida por {r.tipo === 'produto' ? 'unidade vendida' : 'receita'}, na unidade do item. Aproveitamento: quanto sobra depois de limpar (cenoura 85%).</p>
+        {linhas.map((l, i) => (
+          <div key={i} className="grid grid-cols-[1fr_5.5rem_4.5rem_auto] items-end gap-2">
+            <Campo rotulo={i === 0 ? 'Item' : ' '}>
+              <select className={`${estiloEntrada} py-2!`} value={l.ref} onChange={(e) => mudar(i, { ref: e.target.value })} aria-label={`Item ${i + 1}`}>
+                <option value="">Escolha…</option>
+                <optgroup label="Pré-preparos">
+                  {preparos.map((p) => <option key={p.id} value={'r:' + p.id}>{p.nome}</option>)}
+                </optgroup>
+                <optgroup label="Insumos">
+                  {insumos.map((x) => <option key={x.id} value={'i:' + x.id}>{x.nome}</option>)}
+                </optgroup>
+              </select>
+            </Campo>
+            <Campo rotulo={i === 0 ? 'Qtd' : ' '}>
+              <div className="relative">
+                <input className={`${estiloEntrada} py-2! pr-8!`} inputMode="decimal" value={l.quantidade} onChange={(e) => mudar(i, { quantidade: e.target.value })} aria-label={`Quantidade do item ${i + 1}`} />
+                <span className="absolute top-1/2 right-2 -translate-y-1/2 text-xs text-stone-400">{unidadeDe(l.ref)}</span>
+              </div>
+            </Campo>
+            <Campo rotulo={i === 0 ? 'Aprov. %' : ' '}>
+              <input className={`${estiloEntrada} py-2!`} inputMode="decimal" value={l.aproveitamento} onChange={(e) => mudar(i, { aproveitamento: e.target.value })} aria-label={`Aproveitamento do item ${i + 1}`} />
+            </Campo>
+            <button type="button" onClick={() => setLinhas(linhas.filter((_, j) => j !== i))} className="mb-1 rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-red-600" aria-label={`Tirar item ${i + 1}`}>✕</button>
+          </div>
+        ))}
+        <Botao type="button" variante="secundario" onClick={() => setLinhas([...linhas, { ref: '', quantidade: '', aproveitamento: '100' }])}>+ Item</Botao>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo={`Rende (${nomeUnidade(r.unidade)})`} dica={r.tipo === 'produto' ? 'Normalmente 1 unidade.' : 'Quanto sai de uma receita.'}>
+            <input className={estiloEntrada} inputMode="decimal" value={rendimento} onChange={(e) => setRendimento(e.target.value)} />
+          </Campo>
+          <div className="rounded-xl bg-stone-50 p-3 text-sm">
+            <div className="text-xs text-stone-500">Custo desta versão</div>
+            <div className="text-lg font-bold">{reais(previa.porUnidade)}/{nomeUnidade(r.unidade)}</div>
+            {r.precoVenda && r.tipo === 'produto' && <div className="text-xs text-stone-500">CMV {cmv(previa.porUnidade, r.precoVenda)!.toFixed(1).replace('.', ',')}%</div>}
+          </div>
+        </div>
+        {previa.semPreco.length > 0 && <p className="text-xs text-amber-700">Sem preço: {previa.semPreco.join(', ')}.</p>}
+        <Campo rotulo="O que mudou nesta versão">
+          <input className={estiloEntrada} value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ex.: menos copa, mais crema" />
+        </Campo>
+        {erro && <p className="text-sm text-red-600">{erro}</p>}
+        <Botao className="w-full" onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : `Salvar como versão ${(r.versaoAtual ?? 0) + 1}`}</Botao>
+      </div>
+    </Modal>
+  )
+}
