@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Botao, Campo, Modal, Selo, estiloEntrada } from './ui'
 import CamposDiaria, { NOME_TURNO, diasMarcados, type DiariaParaEnviar } from './CamposDiaria'
 import { useApp } from '../lib/contexto'
+import { AvisoPrazo } from '../pages/EnviarDiaria'
 import { dataCurta, diaSemana } from '../lib/datas'
 import { apelidoUnidade, type EnvioFreela } from '../lib/types'
 
@@ -46,6 +47,7 @@ export default function DiariaNaFolga({ aoFechar }: { aoFechar: () => void }) {
     <Modal titulo="Fiz diária na folga" aberto aoFechar={aoFechar}>
       <form onSubmit={enviar} className="space-y-4">
         <p className="text-sm text-stone-600">Marque os dias em que você trabalhou como freela. A gestão aprova e o Pix sai na segunda seguinte.</p>
+        <AvisoPrazo />
         <CamposDiaria v={v} mudar={setV} unidades={unidades} jaEnviados={meus.filter((m) => m.status !== 'recusado').map((m) => `${m.data}|${m.turno}`)} />
         <Campo rotulo="Chave Pix para receber" dica="Vem do seu cadastro; dá para trocar aqui.">
           <input className={estiloEntrada} value={pix} onChange={(e) => setPix(e.target.value)} required />

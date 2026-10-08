@@ -4,7 +4,7 @@ import { Botao, Selo, Vazio, estiloEntrada } from './ui'
 import Impressao from './Impressao'
 import { NOME_TURNO } from './CamposDiaria'
 import { useApp } from '../lib/contexto'
-import { dataCurta, diaSemana } from '../lib/datas'
+import { addDias, dataCurta, diaSemana, inicioDaSemana } from '../lib/datas'
 import { soDigitos } from '../lib/store'
 import { apelidoUnidade, type EnvioFreela, type Freelancer } from '../lib/types'
 import { formatarCpf } from '../lib/cpf'
@@ -12,6 +12,12 @@ import logo from '../assets/logo.png'
 
 const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 export const linkDiaria = (lojaId: string) => `${location.origin}${location.pathname}#/diaria/${lojaId}`
+
+// A semana trabalhada fecha no domingo às 22h (horário de Brasília); depois disso o envio chegou atrasado.
+const foraDoPrazo = (e: EnvioFreela) => {
+  const domingo = addDias(inicioDaSemana(e.data), 6)
+  return new Date(e.enviadoEm) > new Date(`${domingo}T22:00:00-03:00`)
+}
 
 interface Grupo {
   chave: string
@@ -132,6 +138,7 @@ export default function EnviosFreela({ freelas, aoMudar }: { freelas: Freelancer
                   <div className="min-w-0 flex-1 text-sm">
                     <div className="font-medium">{diaSemana(e.data)} {dataCurta(e.data)} · {NOME_TURNO[e.turno]}</div>
                     <div className="text-xs text-stone-500">{nomeLoja(e.unidadeId)} · {e.funcao}{e.observacao && ` · ${e.observacao}`}</div>
+                    {foraDoPrazo(e) && <div className="text-xs font-semibold text-red-700">Enviada depois do prazo (domingo 22h)</div>}
                   </div>
                   <input
                     className={`${estiloEntrada} w-24! py-1.5!`}
@@ -205,6 +212,7 @@ function LinksDasLojas() {
               <div className="mt-2 text-xl">Mande aqui os dias para receber na segunda</div>
             </div>
             <img src={qr} alt="QR Code" className="h-72 w-72" style={{ imageRendering: 'pixelated' }} />
+            <div className="rounded-xl border-2 border-black px-5 py-3 text-xl font-bold">Prazo: domingo até as 22h. Quem não enviar não recebe na segunda.</div>
             <div className="text-lg">Aponte a câmera do celular · {loja.nome}</div>
             <div className="max-w-md text-sm text-stone-600">
               Você vai precisar do CPF, do celular e da chave Pix. A gerente confere e aprova; o pagamento sai por Pix na

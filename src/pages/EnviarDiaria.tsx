@@ -99,6 +99,7 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
         ) : !quem || quem.tipo === 'invalido' ? (
           <form onSubmit={identificar} className="space-y-4 rounded-2xl bg-white p-5 ring-1 ring-stone-200">
             <p className="text-sm text-stone-600">Trabalhou de freela com a gente? Mande aqui os dias para entrar no pagamento de segunda.</p>
+            <AvisoPrazo />
             <Campo rotulo="Seu CPF">
               <input
                 className={estiloEntrada}
@@ -162,6 +163,15 @@ export default function EnviarDiaria({ store, lojaId }: { store: Store; lojaId?:
           </form>
         )}
       </main>
+    </div>
+  )
+}
+
+// Prazo do envio (pedido de 08/10): a semana fecha no domingo às 22h.
+export function AvisoPrazo() {
+  return (
+    <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-300">
+      <b>Atenção:</b> mande suas diárias até <b>domingo, às 22h</b>. Quem não enviar não recebe na segunda-feira.
     </div>
   )
 }
