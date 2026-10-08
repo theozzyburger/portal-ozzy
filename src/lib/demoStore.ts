@@ -505,6 +505,12 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async sair() {
       eu = null
     },
+    async trocarSenha(atual) {
+      exigeEu()
+      if (atual !== SENHA_DEMO) throw new Error('A senha atual não confere.')
+      // Na demonstração a senha continua a mesma para todos.
+      return espera(undefined)
+    },
     unidades: () => espera(unidades),
     nomes: () => espera(funcionarios.map(({ id, nome }) => ({ id, nome }))),
     async funcionarios() {

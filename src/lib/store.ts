@@ -58,6 +58,8 @@ export interface Store {
   // lembrar: mantém o acesso neste aparelho até a pessoa tocar em Sair.
   entrar(celular: string, senha: string, lembrar?: boolean): Promise<Funcionario>
   sair(): Promise<void>
+  // A própria pessoa troca a senha (confere a atual antes).
+  trocarSenha(atual: string, nova: string): Promise<void>
 
   unidades(): Promise<Unidade[]>
   // Só id e nome de todos (inclusive inativos), para mostrar quem publicou um aviso ou registrou algo.

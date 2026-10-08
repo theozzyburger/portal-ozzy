@@ -154,6 +154,15 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       await sb.auth.signOut()
       eu = null
     },
+    async trocarSenha(atual, nova) {
+      const { data } = await sb.auth.getUser()
+      const email = data.user?.email
+      if (!email) throw new Error('Sessão expirada. Entre de novo.')
+      const { error: erroAtual } = await sb.auth.signInWithPassword({ email, password: atual })
+      if (erroAtual) throw new Error('A senha atual não confere.')
+      const { error } = await sb.auth.updateUser({ password: nova })
+      if (error) throw new Error(error.message.includes('different') ? 'A nova senha precisa ser diferente da atual.' : 'Não deu para trocar a senha. Tente de novo.')
+    },
     async unidades() {
       return ok(await sb.from('unidades').select('id, nome').order('nome')) ?? []
     },

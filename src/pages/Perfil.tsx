@@ -51,6 +51,7 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
   // Gestão sobre esta pessoa: só quem está no mesmo degrau ou acima.
   const gestao = !!pessoa && possoAlterar(eu, pessoa)
   const souEu = funcionarioId === eu.id
+  const [trocarSenha, setTrocarSenha] = useState(false)
 
   const carregar = useCallback(async () => {
     setDocs(await store.documentos(funcionarioId))
@@ -213,6 +214,18 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
                 Reativar / readmitir
               </Botao>
             ) : null}
+            {souEu && (
+              <Botao variante="secundario" onClick={() => setTrocarSenha(true)}>
+                Trocar minha senha
+              </Botao>
+            )}
+          </div>
+        )}
+        {souEu && !gestao && (
+          <div className="mt-4">
+            <Botao variante="secundario" onClick={() => setTrocarSenha(true)}>
+              Trocar minha senha
+            </Botao>
           </div>
         )}
       </Cartao>
@@ -393,6 +406,15 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
         </section>
       )}
 
+      {trocarSenha && (
+        <TrocarSenha
+          aoFechar={() => setTrocarSenha(false)}
+          aoTrocar={() => {
+            setTrocarSenha(false)
+            avisar('Senha trocada. Use a nova no próximo acesso.')
+          }}
+        />
+      )}
       {modal === 'editar' && <FormFuncionario aberto existente={pessoa} aoFechar={() => setModal(null)} />}
       <EnviarDocumento
         key={tipoInicial + String(modal === 'documento')}
@@ -821,5 +843,57 @@ function HistoricoVinculos({ vinculos, pessoa }: { vinculos: VinculoAnterior[]; 
         ))}
       </ol>
     </Cartao>
+  )
+}
+
+// A própria pessoa troca a senha (pedido de 08/10). Confere a atual antes, para ninguém trocar a senha de
+// outra pessoa num celular esquecido aberto.
+function TrocarSenha({ aoFechar, aoTrocar }: { aoFechar: () => void; aoTrocar: () => void }) {
+  const { store } = useApp()
+  const [atual, setAtual] = useState('')
+  const [nova, setNova] = useState('')
+  const [repetir, setRepetir] = useState('')
+  const [ver, setVer] = useState(false)
+  const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (nova.length < 6) return setErro('A nova senha precisa ter pelo menos 6 caracteres.')
+    if (nova !== repetir) return setErro('As duas senhas novas estão diferentes.')
+    if (nova === atual) return setErro('A nova senha precisa ser diferente da atual.')
+    setErro('')
+    setSalvando(true)
+    try {
+      await store.trocarSenha(atual, nova)
+      aoTrocar()
+    } catch (err) {
+      setErro((err as Error).message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const tipo = ver ? 'text' : 'password'
+  return (
+    <Modal titulo="Trocar minha senha" aberto aoFechar={aoFechar}>
+      <form onSubmit={salvar} className="space-y-4">
+        <Campo rotulo="Senha atual">
+          <input className={estiloEntrada} type={tipo} autoComplete="current-password" value={atual} onChange={(e) => setAtual(e.target.value)} required />
+        </Campo>
+        <Campo rotulo="Nova senha" dica="Pelo menos 6 caracteres.">
+          <input className={estiloEntrada} type={tipo} autoComplete="new-password" value={nova} onChange={(e) => setNova(e.target.value)} required />
+        </Campo>
+        <Campo rotulo="Repita a nova senha">
+          <input className={estiloEntrada} type={tipo} autoComplete="new-password" value={repetir} onChange={(e) => setRepetir(e.target.value)} required />
+        </Campo>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="size-4 accent-carvao" checked={ver} onChange={(e) => setVer(e.target.checked)} />
+          Mostrar as senhas
+        </label>
+        {erro && <p className="text-sm text-red-600">{erro}</p>}
+        <Botao className="w-full" disabled={salvando}>{salvando ? 'Trocando…' : 'Trocar senha'}</Botao>
+      </form>
+    </Modal>
   )
 }
