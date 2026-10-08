@@ -7,4 +7,6 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), ...(mode === 'preview' ? [viteSingleFile()] : [])],
   build: { outDir: mode === 'preview' ? 'dist-preview' : 'dist' },
+  // Na prévia, as bibliotecas de PDF viram um substituto (o arquivo único ficava grande demais para publicar).
+  resolve: mode === 'preview' ? { alias: { 'html2canvas-pro': '/src/preview/pdf-stub.ts', jspdf: '/src/preview/pdf-stub.ts' } } : {},
 }))
