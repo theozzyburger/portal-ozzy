@@ -8,9 +8,11 @@ import {
 } from '../lib/financeiro'
 import { FORMAS_PAGAMENTO, type CentroCusto, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor, type NovaContaPagar } from '../lib/types'
 import Financeiro from './Financeiro'
+import Conciliacao from './Conciliacao'
 
 const ABAS = [
   { id: '', nome: 'Contas a pagar' },
+  { id: 'conciliacao', nome: 'Conciliação bancária' },
   { id: 'despesas', nome: 'Despesas por conta' },
   { id: 'resultado', nome: 'Resultado (Lucro Fácil)' },
   { id: 'plano', nome: 'Plano de contas' },
@@ -33,6 +35,7 @@ export default function ModuloFinanceiro({ sub }: { sub?: string }) {
         ))}
       </div>
       {aba === 'resultado' ? <Financeiro />
+        : aba === 'conciliacao' ? <Conciliacao />
         : aba === 'despesas' ? <Despesas />
         : aba === 'plano' ? <PlanoContas />
         : <ContasPagar />}
@@ -206,7 +209,7 @@ function ContasPagar() {
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className="font-semibold">{reais(c.valorPago ?? c.valor)}</p>
-                        {s === 'paga' ? <Selo cor="verde">Paga {dataCurta(c.pagoEm!)}</Selo> : s !== 'depois' && <Selo cor={COR_SITUACAO[s]}>{s === 'vencida' ? 'Vencida' : s === 'hoje' ? 'Hoje' : 'Esta semana'}</Selo>}
+                        {s === 'paga' ? <Selo cor="verde">Paga {dataCurta(c.pagoEm!)}{c.conciliado ? ' · banco ✓' : ''}</Selo> : s !== 'depois' && <Selo cor={COR_SITUACAO[s]}>{s === 'vencida' ? 'Vencida' : s === 'hoje' ? 'Hoje' : 'Esta semana'}</Selo>}
                       </div>
                       {c.pagoEm ? (
                         <Botao variante="fantasma" className="px-2!" onClick={() => desfazer(c)}>Desfazer</Botao>

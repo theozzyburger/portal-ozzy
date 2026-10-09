@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
-import type { NotaFiscal, ContaPagar, ItemNota, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { NotaFiscal, ContaPagar, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -1155,6 +1155,59 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         id: r.id, centroCustoId: r.centro_custo_id, insumoId: r.insumo_id, data: r.data, tipo: r.tipo, quantidade: Number(r.quantidade),
         custoUnit: numeroOuNulo(r.custo_unit), notaItemId: r.nota_item_id, observacao: r.observacao, criadoEm: r.criado_em,
       }))
+    },
+    async extrato() {
+      const linhas: any[] = []
+      for (let de = 0; ; de += 1000) {
+        const pg = ok(await sb.from('extrato_movimentos').select('*').order('data', { ascending: false }).range(de, de + 999)) ?? []
+        linhas.push(...pg)
+        if (pg.length < 1000) break
+      }
+      return linhas.map((r): MovimentoExtrato => ({
+        id: r.id, banco: r.banco, agencia: r.agencia, conta: r.conta, fitid: r.fitid, data: r.data, valor: Number(r.valor), descricao: r.descricao,
+        documento: r.documento, tipo: r.tipo, status: r.status, contaPagarId: r.conta_pagar_id, observacao: r.observacao, importadoEm: r.importado_em,
+      }))
+    },
+    async saldosExtrato() {
+      return (ok(await sb.from('extrato_saldos').select('*').order('data', { ascending: false })) ?? []).map((r: any) => ({
+        banco: r.banco, agencia: r.agencia, conta: r.conta, data: r.data, saldo: Number(r.saldo),
+      }))
+    },
+    async regrasExtrato() {
+      return (ok(await sb.from('extrato_regras').select('*')) ?? []).map((r: any) => ({
+        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, ignorar: r.ignorar,
+      }))
+    },
+    async importarExtrato(e) {
+      const linhas = e.movimentos.map((m) => ({
+        banco: e.banco, agencia: e.agencia, conta: e.conta, fitid: m.fitid, data: m.data, valor: m.valor, descricao: m.descricao, documento: m.documento, tipo: m.tipo,
+      }))
+      let novos = 0
+      for (let i = 0; i < linhas.length; i += 500) {
+        const r = ok(await sb.from('extrato_movimentos').upsert(linhas.slice(i, i + 500), { onConflict: 'banco,agencia,conta,fitid', ignoreDuplicates: true }).select('id')) ?? []
+        novos += r.length
+      }
+      if (e.saldo) {
+        ok(await sb.from('extrato_saldos').upsert({ banco: e.banco, agencia: e.agencia, conta: e.conta, data: e.saldo.data, saldo: e.saldo.valor }))
+      }
+      return { novos, repetidos: linhas.length - novos }
+    },
+    async conciliarMovimento(movimentoId, contaPagarId) {
+      ok(await sb.rpc('conciliar_movimento', { p_mov: movimentoId, p_conta: contaPagarId }))
+    },
+    async desconciliarMovimento(movimentoId) {
+      const m = ok(await sb.from('extrato_movimentos').select('status').eq('id', movimentoId).single())
+      if (m?.status === 'ignorado') ok(await sb.from('extrato_movimentos').update({ status: 'pendente', observacao: null }).eq('id', movimentoId))
+      else ok(await sb.rpc('desconciliar_movimento', { p_mov: movimentoId }))
+    },
+    async registrarMovimento(movimentoId, r) {
+      ok(await sb.rpc('registrar_movimento', {
+        p_mov: movimentoId, p_centro: r.centroCustoId, p_conta: r.contaId, p_favorecido: r.favorecido ?? '', p_descricao: r.descricao, p_chave: r.chave,
+      }))
+    },
+    async ignorarMovimento(movimentoId, motivo, chaveSempre) {
+      ok(await sb.from('extrato_movimentos').update({ status: 'ignorado', observacao: motivo }).eq('id', movimentoId))
+      if (chaveSempre) ok(await sb.from('extrato_regras').upsert({ chave: chaveSempre, ignorar: true, favorecido: motivo, atualizado_em: new Date().toISOString() }))
     },
     async lancarMovimentoEstoque(m) {
       ok(await sb.from('estoque_movimentos').insert({

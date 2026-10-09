@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, MovimentoEstoque, ItemNota, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -777,6 +777,24 @@ const mapaFornecedorDemo = new Map<string, { insumoId: string | null; fator: num
   ['11222333000181|A100', { insumoId: 'in3', fator: 1, foraEstoque: false }],
   ['11222333000181|L900', { insumoId: null, fator: null, foraEstoque: true }],
 ])
+
+
+// Extrato bancário de EXEMPLO (valores e nomes inventados).
+const movExtrato = (id: string, diasAtras: number, valor: number, descricao: string, extra: Partial<MovimentoExtrato> = {}): MovimentoExtrato => ({
+  id, banco: '341', agencia: '0000', conta: '00000-0', fitid: id, data: addDias(hoje(), -diasAtras), valor, descricao, documento: null, tipo: valor < 0 ? 'DEBIT' : 'CREDIT',
+  status: 'pendente', contaPagarId: null, observacao: null, importadoEm: haHoras(2), ...extra,
+})
+const extratoDemo: MovimentoExtrato[] = [
+  movExtrato('ex1', 1, -9500, 'PIX ENVIADO IMOBILIARIA EXEMPLO'),
+  movExtrato('ex2', 6, -199.9, 'DA PROVEDOR EXEMPLO INTERNET'),
+  movExtrato('ex3', 2, -312.45, 'PIX ENVIADO MERCADO EXEMPLO 0710'),
+  movExtrato('ex4', 3, -89.9, 'TAR PACOTE SERVICOS 10/2026'),
+  movExtrato('ex5', 4, -5000, 'TED MESMA TITULARIDADE'),
+  movExtrato('ex6', 2, 4500, 'REDE CARTAO CREDITO'),
+  movExtrato('ex7', 5, 7800, 'IFOOD REPASSE'),
+]
+const regrasExtratoDemo: RegraExtrato[] = [{ chave: 'tar pacote servicos', centroCustoId: 'burger-psd', contaId: 'pc5.22', favorecido: 'Itaú', ignorar: false }]
+const saldosExtratoDemo: SaldoExtrato[] = [{ banco: '341', agencia: '0000', conta: '00000-0', data: addDias(hoje(), -1), saldo: 18432.1 }]
 
 const espera = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 80))
 
@@ -1992,6 +2010,87 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async excluirContaPagar(id) {
       exigeFinanceiro()
       tira(contasPagarDemo, id)
+      return espera(undefined)
+    },
+    async extrato() {
+      exigeFinanceiro()
+      return espera([...extratoDemo].sort((a, b) => b.data.localeCompare(a.data)).map((m) => ({ ...m })))
+    },
+    async saldosExtrato() {
+      exigeFinanceiro()
+      return espera([...saldosExtratoDemo])
+    },
+    async regrasExtrato() {
+      exigeFinanceiro()
+      return espera(regrasExtratoDemo.map((r) => ({ ...r })))
+    },
+    async importarExtrato(e) {
+      exigeFinanceiro()
+      let novos = 0
+      for (const m of e.movimentos) {
+        if (extratoDemo.some((x) => x.banco === e.banco && x.agencia === e.agencia && x.conta === e.conta && x.fitid === m.fitid)) continue
+        extratoDemo.push({ ...m, id: novoId('ex'), banco: e.banco, agencia: e.agencia, conta: e.conta, status: 'pendente', contaPagarId: null, observacao: null, importadoEm: agora() })
+        novos++
+      }
+      if (e.saldo) {
+        const i = saldosExtratoDemo.findIndex((s) => s.banco === e.banco && s.agencia === e.agencia && s.conta === e.conta && s.data === e.saldo!.data)
+        const linha = { banco: e.banco, agencia: e.agencia, conta: e.conta, data: e.saldo.data, saldo: e.saldo.valor }
+        if (i >= 0) saldosExtratoDemo[i] = linha
+        else saldosExtratoDemo.push(linha)
+      }
+      return espera({ novos, repetidos: e.movimentos.length - novos })
+    },
+    async conciliarMovimento(movimentoId, contaPagarId) {
+      exigeFinanceiro()
+      const m = extratoDemo.find((x) => x.id === movimentoId)
+      const c = contasPagarDemo.find((x) => x.id === contaPagarId)
+      if (!m || !c) throw new Error('Não encontrado.')
+      if (m.status === 'conciliado') throw new Error('Este movimento já foi conciliado.')
+      if (extratoDemo.some((x) => x.contaPagarId === contaPagarId)) throw new Error('Esta conta já está ligada a outro movimento do extrato.')
+      Object.assign(c, { conciliado: true, pagoEm: c.pagoEm ?? m.data, valorPago: c.valorPago ?? Math.abs(m.valor) })
+      Object.assign(m, { status: 'conciliado', contaPagarId })
+      return espera(undefined)
+    },
+    async desconciliarMovimento(movimentoId) {
+      exigeFinanceiro()
+      const m = extratoDemo.find((x) => x.id === movimentoId)
+      if (!m) return espera(undefined)
+      const c = contasPagarDemo.find((x) => x.id === m.contaPagarId)
+      if (c) c.conciliado = false
+      Object.assign(m, { status: 'pendente', contaPagarId: null, observacao: null })
+      return espera(undefined)
+    },
+    async registrarMovimento(movimentoId, r) {
+      exigeFinanceiro()
+      const m = extratoDemo.find((x) => x.id === movimentoId)
+      if (!m || m.status !== 'pendente') throw new Error('Este movimento já foi resolvido.')
+      if (m.valor >= 0) throw new Error('Só saídas viram conta a pagar.')
+      if (!r.centroCustoId) throw new Error('Escolha a loja.')
+      const id = novoId('cp')
+      contasPagarDemo.push(contaDemo(id, {
+        centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
+        competencia: m.data.slice(0, 8) + '01', vencimento: m.data, valor: -m.valor, forma: 'transferencia', pagoEm: m.data, valorPago: -m.valor, conciliado: true,
+        observacao: 'Lançada pela conciliação bancária',
+      }))
+      Object.assign(m, { status: 'conciliado', contaPagarId: id })
+      if (r.chave) {
+        const i = regrasExtratoDemo.findIndex((x) => x.chave === r.chave)
+        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, ignorar: false }
+        if (i >= 0) regrasExtratoDemo[i] = regra
+        else regrasExtratoDemo.push(regra)
+      }
+      return espera(undefined)
+    },
+    async ignorarMovimento(movimentoId, motivo, chaveSempre) {
+      exigeFinanceiro()
+      const m = extratoDemo.find((x) => x.id === movimentoId)
+      if (m) Object.assign(m, { status: 'ignorado', observacao: motivo })
+      if (chaveSempre) {
+        const i = regrasExtratoDemo.findIndex((x) => x.chave === chaveSempre)
+        const regra = { chave: chaveSempre, centroCustoId: null, contaId: null, favorecido: motivo, ignorar: true }
+        if (i >= 0) regrasExtratoDemo[i] = regra
+        else regrasExtratoDemo.push(regra)
+      }
       return espera(undefined)
     },
     async movimentosEstoque() {

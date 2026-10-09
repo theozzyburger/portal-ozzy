@@ -1199,3 +1199,44 @@ export interface MovimentoEstoque {
   observacao: string | null
   criadoEm: string
 }
+
+// Conciliação bancária (0045): movimentos do extrato OFX e a memória de classificação pelo texto.
+export interface MovimentoExtrato {
+  id: string
+  banco: string
+  agencia: string
+  conta: string
+  fitid: string
+  data: string
+  valor: number // saída é negativa
+  descricao: string
+  documento: string | null
+  tipo: string | null
+  status: 'pendente' | 'conciliado' | 'ignorado'
+  contaPagarId: string | null
+  observacao: string | null
+  importadoEm: string
+}
+export interface RegraExtrato {
+  chave: string
+  centroCustoId: string | null
+  contaId: string | null
+  favorecido: string | null
+  ignorar: boolean
+}
+export interface SaldoExtrato {
+  banco: string
+  agencia: string
+  conta: string
+  data: string
+  saldo: number
+}
+export interface ExtratoOfx {
+  banco: string
+  agencia: string
+  conta: string
+  inicio: string | null
+  fim: string | null
+  saldo: { data: string; valor: number } | null
+  movimentos: { fitid: string; data: string; valor: number; descricao: string; documento: string | null; tipo: string | null }[]
+}
