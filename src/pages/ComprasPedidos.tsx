@@ -125,6 +125,18 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
   }, [fornecedor, v.dataPedido, v.categoria, previsaoMexida])
 
   const ultimo = (insumoId: string) => precos.find((p) => p.insumoId === insumoId)
+  // Forma de pagamento: a do último pedido com este fornecedor (pedido de 09/10), se ainda estiver em branco.
+  // Troca de fornecedor substitui o que veio sozinho, nunca o que a pessoa digitou.
+  const [formaAuto, setFormaAuto] = useState('')
+  useEffect(() => {
+    if (pedido) return
+    const anterior = d.pedidos.filter((p) => p.fornecedorId === v.fornecedorId && p.formaPagamento).sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))[0]
+    const nova = anterior?.formaPagamento ?? ''
+    setV((x) => (x.formaPagamento.trim() && x.formaPagamento !== formaAuto ? x : { ...x, formaPagamento: nova }))
+    setFormaAuto(nova)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d.pedidos, pedido, v.fornecedorId])
+
   // Trocou de fornecedor: preço em branco vira o último desse fornecedor.
   useEffect(() => {
     if (!precos.length) return
