@@ -286,11 +286,12 @@ function AcharConta({ d, m, aoFechar, aoEscolher }: { d: Dados; m: MovimentoExtr
 
 function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
-  const [v, setV] = useState({ centro: '', conta: '', favorecido: '', descricao: m.descricao })
+  const [v, setV] = useState({ centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: '', favorecido: '', descricao: m.descricao })
   const [erro, setErro] = useState('')
   const grupos = gruposDoPlano(d.plano)
   async function salvar() {
     if (!v.centro) return setErro('Escolha a loja.')
+    if (!v.conta) return setErro('Escolha a conta contábil.')
     try {
       await store.registrarMovimento(m.id, { centroCustoId: v.centro, contaId: v.conta || null, favorecido: v.favorecido || null, descricao: v.descricao, chave: chaveExtrato(m.descricao) })
       aoSalvar()
@@ -314,7 +315,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
         </div>
         <Campo rotulo="Conta contábil">
           <select className={estiloEntrada} value={v.conta} onChange={(e) => setV({ ...v, conta: e.target.value })}>
-            <option value="">Classificar depois</option>
+            <option value="" disabled>Escolher</option>
             {grupos.map((g) => (
               <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
                 {g.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}

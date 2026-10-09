@@ -4,7 +4,9 @@ import { useApp } from '../lib/contexto'
 import { montarCatalogo, nomeUnidade, reais, usadoEm, type Catalogo } from '../lib/custos'
 import { dataLonga } from '../lib/datas'
 import { ir } from '../lib/rota'
-import type { Fornecedor, Insumo, PrecoInsumo, UnidadeMedida } from '../lib/types'
+import { formatarCnpj } from '../lib/nfe'
+import { gruposDoPlano } from '../lib/financeiro'
+import type { ContaContabil, Fornecedor, Insumo, PrecoInsumo, UnidadeMedida } from '../lib/types'
 
 const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
 const doNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n).replace('.', ','))
@@ -248,29 +250,37 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
 function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo[]; fornecedores: Fornecedor[]; aoMudar: () => Promise<void> }) {
   const { store, avisar } = useApp()
   const [editando, setEditando] = useState<Fornecedor | 'novo' | null>(null)
-  const [f, setF] = useState({ nome: '', contato: '', telefone: '', observacao: '' })
+  const [f, setF] = useState({ nome: '', cnpj: '', contato: '', telefone: '', observacao: '', contaPadraoId: '' })
   const [ativo, setAtivo] = useState(true)
   const [erro, setErro] = useState('')
+  const [plano, setPlano] = useState<ContaContabil[]>([])
+  useEffect(() => {
+    store.planoContas().then(setPlano, () => setPlano([]))
+  }, [store])
   const abrir = (x: Fornecedor | 'novo') => {
     setEditando(x)
     setErro('')
     setAtivo(x === 'novo' ? true : x.ativo)
-    setF(x === 'novo' ? { nome: '', contato: '', telefone: '', observacao: '' } : { nome: x.nome, contato: x.contato ?? '', telefone: x.telefone ?? '', observacao: x.observacao ?? '' })
+    setF(x === 'novo'
+      ? { nome: '', cnpj: '', contato: '', telefone: '', observacao: '', contaPadraoId: '' }
+      : { nome: x.nome, cnpj: formatarCnpj(x.cnpj), contato: x.contato ?? '', telefone: x.telefone ?? '', observacao: x.observacao ?? '', contaPadraoId: x.contaPadraoId ?? '' })
   }
   const salvar = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!f.nome.trim()) return setErro('Dê um nome ao fornecedor.')
+    const cnpj = f.cnpj.replace(/\D/g, '')
+    if (cnpj && cnpj.length !== 14 && cnpj.length !== 11) return setErro('O CNPJ precisa ter 14 números (ou 11, se for CPF).')
     try {
-      await store.salvarFornecedor({ id: editando === 'novo' ? undefined : editando!.id, nome: f.nome, contato: f.contato || null, telefone: f.telefone || null, observacao: f.observacao || null, ativo })
+      await store.salvarFornecedor({ id: editando === 'novo' ? undefined : editando!.id, nome: f.nome, contato: f.contato || null, telefone: f.telefone || null, observacao: f.observacao || null, ativo, cnpj: cnpj || null, contaPadraoId: f.contaPadraoId || null })
       setEditando(null)
       await aoMudar()
       avisar('Fornecedor salvo')
     } catch (e) {
       const m = (e as Error).message
-      setErro(/duplicate|unique/i.test(m) ? 'Já existe um fornecedor com esse nome.' : m)
+      setErro(/duplicate|unique/i.test(m) ? 'Já existe um fornecedor com esse nome ou CNPJ.' : m)
     }
   }
-  const mudar = (c: keyof typeof f) => (ev: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [c]: ev.target.value })
+  const mudar = (c: keyof typeof f) => (ev: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF({ ...f, [c]: ev.target.value })
 
   return (
     <div className="space-y-4">
@@ -288,7 +298,7 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
               <li key={x.id}>
                 <button onClick={() => abrir(x)} className="flex h-full w-full flex-col rounded-2xl bg-white p-3.5 text-left ring-1 ring-stone-200 hover:ring-carvao">
                   <span className="font-semibold">{x.nome} {!x.ativo && <Selo>Inativo</Selo>}</span>
-                  <span className="text-xs text-stone-500">{[x.contato, x.telefone, `${n} insumo${n === 1 ? '' : 's'} ativo${n === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</span>
+                  <span className="text-xs text-stone-500">{[x.cnpj ? formatarCnpj(x.cnpj) : null, x.contato, x.telefone, n ? `${n} insumo${n === 1 ? '' : 's'} ativo${n === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ')}</span>
                 </button>
               </li>
             )
@@ -299,6 +309,19 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
         <Modal titulo={editando === 'novo' ? 'Novo fornecedor' : editando.nome} aberto aoFechar={() => setEditando(null)}>
           <form onSubmit={salvar} className="space-y-4">
             <Campo rotulo="Nome"><input className={estiloEntrada} value={f.nome} onChange={mudar('nome')} required /></Campo>
+            <div className="grid grid-cols-2 gap-3">
+              <Campo rotulo="CNPJ" dica="Liga as notas fiscais a este fornecedor."><input inputMode="numeric" className={estiloEntrada} value={f.cnpj} onChange={mudar('cnpj')} /></Campo>
+              <Campo rotulo="Conta contábil de sempre">
+                <select className={estiloEntrada} value={f.contaPadraoId} onChange={mudar('contaPadraoId')}>
+                  <option value="">Nenhuma</option>
+                  {gruposDoPlano(plano).map((g) => (
+                    <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
+                      {g.contas.map((c) => <option key={c.id} value={c.id}>{c.codigo} {c.nome}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </Campo>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Campo rotulo="Contato"><input className={estiloEntrada} value={f.contato} onChange={mudar('contato')} /></Campo>
               <Campo rotulo="Telefone"><input className={estiloEntrada} value={f.telefone} onChange={mudar('telefone')} /></Campo>

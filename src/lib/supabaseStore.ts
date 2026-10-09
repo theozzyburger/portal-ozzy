@@ -820,7 +820,11 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return (ok(await sb.from('fornecedores').select('*').order('nome')) ?? []).map(paraFornecedor)
     },
     async salvarFornecedor(f) {
-      const linha = { nome: f.nome.trim(), contato: texto(f.contato), telefone: texto(f.telefone), observacao: texto(f.observacao), ativo: f.ativo }
+      const linha = {
+        nome: f.nome.trim(), contato: texto(f.contato), telefone: texto(f.telefone), observacao: texto(f.observacao), ativo: f.ativo,
+        ...(f.cnpj !== undefined ? { cnpj: f.cnpj ? soDigitos(f.cnpj) || null : null } : {}),
+        ...(f.contaPadraoId !== undefined ? { conta_padrao_id: f.contaPadraoId } : {}),
+      }
       return paraFornecedor(f.id
         ? ok(await sb.from('fornecedores').update(linha).eq('id', f.id).select().single())
         : ok(await sb.from('fornecedores').insert(linha).select().single()))

@@ -257,7 +257,6 @@ function DetalheNota({ id }: { id: string }) {
   const [erro, setErro] = useState('')
   const [centro, setCentro] = useState('')
   const [conta, setConta] = useState('')
-  const [competencia, setCompetencia] = useState('')
   const [itens, setItens] = useState<ItemEdit[]>([])
   const [parcelas, setParcelas] = useState<ParcelaEdit[]>([])
   const [atualizarPreco, setAtualizarPreco] = useState(true)
@@ -271,7 +270,6 @@ function DetalheNota({ id }: { id: string }) {
       const nota = await store.notaFiscal(id)
       setN(nota)
       setCentro(nota.centroCustoId ?? '')
-      setCompetencia(mesDe(nota.emissao))
       setItens((nota.itens ?? []).map((i) => ({ id: i.id, insumoId: i.insumoId ?? '', fator: i.fator ? String(i.fator).replace('.', ',') : '', foraEstoque: i.foraEstoque })))
       setParcelas(parcelasIniciais(nota))
       if (financeiro) setContas((await store.contasPagar()).filter((x) => x.notaId === id))
@@ -307,13 +305,14 @@ function DetalheNota({ id }: { id: string }) {
   async function lancar() {
     setAviso('')
     if (!centro) return setAviso('Escolha a loja que recebeu a nota.')
+    if (!conta) return setAviso('Escolha a conta contábil.')
     if (pendentes) return setAviso(`${pendentes} ${pendentes === 1 ? 'item está' : 'itens estão'} sem insumo. Escolha o insumo ou marque "não controla".`)
     for (const p of parcelas) if (!p.vencimento || !(lerValor(p.valor)! > 0)) return setAviso('Confira o vencimento e o valor de cada pagamento.')
     if (Math.abs(diferenca) > 0.05) return setAviso(`Os pagamentos somam ${reais(somaParcelas)} e a nota é de ${reais(n!.valorTotal)}.`)
     setSalvando(true)
     try {
       await store.lancarNota(n!.id, {
-        centroCustoId: centro, contaId: conta || null, competencia: competencia ? competencia + '-01' : null, atualizarPreco,
+        centroCustoId: centro, contaId: conta, competencia: null, atualizarPreco,
         itens: itens.map((i) => ({ id: i.id, insumoId: i.foraEstoque ? null : i.insumoId || null, fator: lerValor(i.fator), foraEstoque: i.foraEstoque })),
         parcelas: parcelas.map((p) => ({ vencimento: p.vencimento, valor: lerValor(p.valor)!, forma: p.forma, documento: p.documento || null })),
       })
@@ -374,7 +373,7 @@ function DetalheNota({ id }: { id: string }) {
 
       <Cartao className="space-y-3">
         <h2 className="font-semibold">Onde o custo entra</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Campo rotulo="Loja">
             <select className={estiloEntrada} value={centro} disabled={!aberta} onChange={(e) => setCentro(e.target.value)}>
               <option value="">Escolher</option>
@@ -383,16 +382,13 @@ function DetalheNota({ id }: { id: string }) {
           </Campo>
           <Campo rotulo="Conta contábil" dica={aberta && conta && conta === c.fornecedores.find((f) => f.id === n.fornecedorId)?.contaPadraoId ? 'A mesma da última nota deste fornecedor.' : undefined}>
             <select className={estiloEntrada} value={conta} disabled={!aberta} onChange={(e) => setConta(e.target.value)}>
-              <option value="">Classificar depois</option>
+              <option value="" disabled>Escolher</option>
               {grupos.map((g) => (
                 <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
                   {g.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}
                 </optgroup>
               ))}
             </select>
-          </Campo>
-          <Campo rotulo="Mês da despesa (DRE)">
-            <input type="month" className={estiloEntrada} value={competencia} disabled={!aberta} onChange={(e) => setCompetencia(e.target.value)} />
           </Campo>
         </div>
       </Cartao>

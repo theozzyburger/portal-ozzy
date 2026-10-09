@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
-import { addMeses, dataCurta, diaSemana, hoje, mesDe, nomeMesAno } from '../lib/datas'
+import { dataCurta, diaSemana, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { ir } from '../lib/rota'
 import {
-  dividir, gruposDoPlano, lerValor, mostrarValor, nomeCentro, nomeConta, nomeForma, r2, reais, situacao, somarMeses, type SituacaoConta,
+  lerValor, mostrarValor, nomeCentro, nomeConta, nomeForma, r2, reais, situacao, type SituacaoConta,
 } from '../lib/financeiro'
-import { FORMAS_PAGAMENTO, type CentroCusto, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor, type NovaContaPagar } from '../lib/types'
+import { FORMAS_PAGAMENTO, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor } from '../lib/types'
 import Financeiro from './Financeiro'
 import Conciliacao from './Conciliacao'
+import Insumos from './Insumos'
+import { EditarConta, ImportarLote, type Dados } from './LancarContas'
 
 const ABAS = [
   { id: '', nome: 'Contas a pagar' },
   { id: 'conciliacao', nome: 'Conciliação bancária' },
-  { id: 'despesas', nome: 'Despesas por conta' },
+  { id: 'despesas', nome: 'Despesas' },
+  { id: 'fornecedores', nome: 'Fornecedores' },
   { id: 'resultado', nome: 'Resultado (Lucro Fácil)' },
   { id: 'plano', nome: 'Plano de contas' },
 ]
@@ -38,12 +41,12 @@ export default function ModuloFinanceiro({ sub }: { sub?: string }) {
         : aba === 'conciliacao' ? <Conciliacao />
         : aba === 'despesas' ? <Despesas />
         : aba === 'plano' ? <PlanoContas />
+        : aba === 'fornecedores' ? <Insumos aba="fornecedores" />
         : <ContasPagar />}
     </div>
   )
 }
 
-interface Dados { contas: ContaPagar[]; centros: CentroCusto[]; plano: ContaContabil[]; fornecedores: Fornecedor[] }
 function useDados() {
   const { store } = useApp()
   const [d, setD] = useState<Dados | null>(null)
@@ -81,6 +84,7 @@ function ContasPagar() {
   const [mes, setMes] = useState('')
   const [busca, setBusca] = useState('')
   const [editar, setEditar] = useState<ContaPagar | 'nova' | null>(null)
+  const [lote, setLote] = useState(false)
   const [pagar, setPagar] = useState<ContaPagar | null>(null)
   const [aviso, setAviso] = useState('')
 
@@ -142,7 +146,10 @@ function ContasPagar() {
           <h1 className="text-xl font-bold">Contas a pagar</h1>
           <p className="text-sm text-stone-500">As notas lançadas entram aqui sozinhas. Só Proprietário e Administrativo veem esta tela.</p>
         </div>
-        <Botao onClick={() => setEditar('nova')}>+ Conta a pagar</Botao>
+        <div className="flex flex-wrap gap-2">
+          <Botao variante="secundario" onClick={() => setLote(true)}>Importar em lote</Botao>
+          <Botao onClick={() => setEditar('nova')}>+ Conta a pagar</Botao>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -226,6 +233,7 @@ function ContasPagar() {
       )}
 
       {editar && <EditarConta d={d} conta={editar === 'nova' ? null : editar} aoFechar={() => setEditar(null)} aoSalvar={() => { setEditar(null); carregar() }} />}
+      {lote && <ImportarLote d={d} aoFechar={() => setLote(false)} aoSalvar={() => { setLote(false); carregar() }} />}
       {pagar && <PagarConta conta={pagar} aoFechar={() => setPagar(null)} aoSalvar={() => { setPagar(null); carregar() }} />}
     </div>
   )
@@ -281,175 +289,17 @@ function PagarConta({ conta, aoFechar, aoSalvar }: { conta: ContaPagar; aoFechar
   )
 }
 
-type Repeticao = 'unica' | 'parcelada' | 'mensal'
-
-function EditarConta({ d, conta, aoFechar, aoSalvar }: { d: Dados; conta: ContaPagar | null; aoFechar: () => void; aoSalvar: () => void }) {
-  const { store } = useApp()
-  const [v, setV] = useState({
-    centroCustoId: conta?.centroCustoId ?? '',
-    fornecedorId: conta?.fornecedorId ?? '',
-    favorecido: conta?.favorecido ?? '',
-    descricao: conta?.descricao ?? '',
-    contaId: conta?.contaId ?? '',
-    valor: conta ? mostrarValor(conta.valor) : '',
-    vencimento: conta?.vencimento ?? hoje(),
-    competencia: conta ? conta.competencia.slice(0, 7) : mesDe(hoje()),
-    forma: conta?.forma ?? ('boleto' as FormaPagamento),
-    documento: conta?.documento ?? '',
-    observacao: conta?.observacao ?? '',
-    repeticao: 'unica' as Repeticao,
-    vezes: '2',
-  })
-  const [erro, setErro] = useState('')
-  const [salvando, setSalvando] = useState(false)
-  const grupos = gruposDoPlano(d.plano)
-  const vezes = Math.max(2, Math.min(60, Number(v.vezes) || 2))
-
-  // Ao escolher o fornecedor, sugere a conta contábil de sempre dele.
-  function escolherFornecedor(id: string) {
-    const f = d.fornecedores.find((x) => x.id === id)
-    setV({ ...v, fornecedorId: id, contaId: v.contaId || f?.contaPadraoId || '' })
-  }
-
-  async function salvar() {
-    const valor = lerValor(v.valor)
-    if (!v.centroCustoId) return setErro('Escolha a loja (de quem é o custo).')
-    if (!v.descricao.trim()) return setErro('Coloque uma descrição.')
-    if (!valor || valor <= 0) return setErro('Coloque o valor.')
-    if (!v.vencimento) return setErro('Coloque o vencimento.')
-    const base: NovaContaPagar = {
-      id: conta?.id, centroCustoId: v.centroCustoId, contaId: v.contaId || null, fornecedorId: v.fornecedorId || null,
-      favorecido: v.fornecedorId ? null : v.favorecido || null, descricao: v.descricao, competencia: v.competencia + '-01', vencimento: v.vencimento,
-      valor, forma: v.forma, parcela: conta?.parcela ?? null, parcelas: conta?.parcelas ?? null, documento: v.documento || null,
-      notaId: conta?.notaId ?? null, observacao: v.observacao || null,
-    }
-    let lista: NovaContaPagar[] = [base]
-    if (!conta && v.repeticao === 'parcelada') {
-      lista = dividir(valor, vezes).map((x, i) => ({ ...base, valor: x, vencimento: somarMeses(v.vencimento, i), parcela: i + 1, parcelas: vezes }))
-    } else if (!conta && v.repeticao === 'mensal') {
-      lista = Array.from({ length: vezes }, (_, i) => ({
-        ...base, vencimento: somarMeses(v.vencimento, i), competencia: addMeses(v.competencia, i) + '-01',
-      }))
-    }
-    setSalvando(true)
-    try {
-      await store.salvarContasPagar(lista)
-      aoSalvar()
-    } catch (e) {
-      setErro((e as Error).message)
-    } finally {
-      setSalvando(false)
-    }
-  }
-  async function excluir() {
-    if (!conta || !confirm('Excluir esta conta a pagar?')) return
-    try {
-      await store.excluirContaPagar(conta.id)
-      aoSalvar()
-    } catch (e) {
-      setErro((e as Error).message)
-    }
-  }
-
-  return (
-    <Modal titulo={conta ? 'Conta a pagar' : 'Nova conta a pagar'} aberto aoFechar={aoFechar}>
-      <div className="space-y-3">
-        {conta?.notaId && (
-          <p className="rounded-xl bg-stone-100 p-2 text-sm">
-            Veio de uma nota fiscal. <button className="font-semibold underline" onClick={() => ir('estoque/nota/' + conta.notaId)}>Abrir a nota</button>
-          </p>
-        )}
-        <Campo rotulo="Descrição"><input className={estiloEntrada} value={v.descricao} placeholder="Ex.: Aluguel de outubro" onChange={(e) => setV({ ...v, descricao: e.target.value })} /></Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="Loja">
-            <select className={estiloEntrada} value={v.centroCustoId} onChange={(e) => setV({ ...v, centroCustoId: e.target.value })}>
-              <option value="">Escolher</option>
-              {d.centros.map((x) => <option key={x.id} value={x.id}>{nomeCentro(x)}</option>)}
-            </select>
-          </Campo>
-          <Campo rotulo="Fornecedor">
-            <select className={estiloEntrada} value={v.fornecedorId} onChange={(e) => escolherFornecedor(e.target.value)}>
-              <option value="">Outro</option>
-              {d.fornecedores.filter((f) => f.ativo || f.id === v.fornecedorId).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-            </select>
-          </Campo>
-        </div>
-        {!v.fornecedorId && (
-          <Campo rotulo="Para quem paga"><input className={estiloEntrada} value={v.favorecido} placeholder="Ex.: imobiliária, concessionária de energia" onChange={(e) => setV({ ...v, favorecido: e.target.value })} /></Campo>
-        )}
-        <Campo rotulo="Conta contábil">
-          <select className={estiloEntrada} value={v.contaId} onChange={(e) => setV({ ...v, contaId: e.target.value })}>
-            <option value="">Classificar depois</option>
-            {grupos.map((g) => (
-              <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
-                {g.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo={!conta && v.repeticao === 'parcelada' ? 'Valor total (R$)' : 'Valor (R$)'}>
-            <input inputMode="decimal" className={estiloEntrada} value={v.valor} onChange={(e) => setV({ ...v, valor: e.target.value })} />
-          </Campo>
-          <Campo rotulo={!conta && v.repeticao !== 'unica' ? '1º vencimento' : 'Vencimento'}>
-            <input type="date" className={estiloEntrada} value={v.vencimento} onChange={(e) => setV({ ...v, vencimento: e.target.value })} />
-          </Campo>
-          <Campo rotulo="Mês da despesa (DRE)">
-            <input type="month" className={estiloEntrada} value={v.competencia} onChange={(e) => setV({ ...v, competencia: e.target.value })} />
-          </Campo>
-          <Campo rotulo="Forma">
-            <select className={estiloEntrada} value={v.forma} onChange={(e) => setV({ ...v, forma: e.target.value as FormaPagamento })}>
-              {FORMAS_PAGAMENTO.map((f) => <option key={f.valor} value={f.valor}>{f.nome}</option>)}
-            </select>
-          </Campo>
-        </div>
-        <Campo rotulo="Boleto, chave Pix ou nº do documento"><input className={estiloEntrada} value={v.documento} onChange={(e) => setV({ ...v, documento: e.target.value })} /></Campo>
-        {!conta && (
-          <div className="space-y-2 rounded-xl bg-stone-50 p-3">
-            <div className="flex flex-wrap gap-1">
-              {([['unica', 'Uma vez'], ['parcelada', 'Parcelada'], ['mensal', 'Repete todo mês']] as const).map(([id, nome]) => (
-                <button key={id} onClick={() => setV({ ...v, repeticao: id })}
-                  className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${v.repeticao === id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-600 ring-stone-300'}`}>
-                  {nome}
-                </button>
-              ))}
-            </div>
-            {v.repeticao !== 'unica' && (
-              <label className="flex items-center gap-2 text-sm">
-                {v.repeticao === 'parcelada' ? 'Em' : 'Por'}
-                <input inputMode="numeric" className={`${estiloEntrada} w-16! py-1!`} value={v.vezes} onChange={(e) => setV({ ...v, vezes: e.target.value })} />
-                {v.repeticao === 'parcelada'
-                  ? `parcelas de ${reais(dividir(lerValor(v.valor) ?? 0, vezes)[0])}, todas no mês da despesa`
-                  : `meses, ${reais(lerValor(v.valor) ?? 0)} cada (aluguel, internet, sistema…)`}
-              </label>
-            )}
-          </div>
-        )}
-        <Campo rotulo="Observação"><input className={estiloEntrada} value={v.observacao} onChange={(e) => setV({ ...v, observacao: e.target.value })} /></Campo>
-        {conta?.pagoEm && <p className="text-sm text-green-700">Paga em {dataCurta(conta.pagoEm)} ({reais(conta.valorPago ?? conta.valor)}).</p>}
-        {erro && <p className="text-sm text-red-700">{erro}</p>}
-        <div className="flex flex-wrap justify-between gap-2">
-          {conta && !conta.notaId ? <Botao variante="perigo" onClick={excluir}>Excluir</Botao> : <span />}
-          <div className="flex gap-2">
-            <Botao variante="secundario" onClick={aoFechar}>Cancelar</Botao>
-            <Botao onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
-          </div>
-        </div>
-        {conta?.notaId && <p className="text-xs text-stone-500">Para tirar uma conta que veio da nota, desfaça o lançamento da nota.</p>}
-      </div>
-    </Modal>
-  )
-}
-
-// DRE simples das despesas: por conta contábil (agrupada pela conta-mãe) e por loja, no mês da despesa ou no mês do pagamento.
+// DRE simples das despesas: por conta contábil (agrupada pela conta-mãe) ou por fornecedor, e por loja,
+// no mês do vencimento (Heitor, 09/10: a despesa é do mês em que vence) ou no mês do pagamento.
 function Despesas() {
   const { d, erro } = useDados()
-  const [base, setBase] = useState<'competencia' | 'caixa'>('competencia')
+  const [base, setBase] = useState<'vencimento' | 'caixa'>('vencimento')
+  const [por, setPor] = useState<'conta' | 'fornecedor'>('conta')
   const [mes, setMes] = useState(mesDe(hoje()))
   if (erro) return <Vazio>{erro}</Vazio>
   if (!d) return <p className="text-stone-400">Carregando…</p>
 
-  const mesDaConta = (c: ContaPagar) => (base === 'competencia' ? mesDe(c.competencia) : c.pagoEm ? mesDe(c.pagoEm) : null)
+  const mesDaConta = (c: ContaPagar) => (base === 'vencimento' ? mesDe(c.vencimento) : c.pagoEm ? mesDe(c.pagoEm) : null)
   const valorDe = (c: ContaPagar) => (base === 'caixa' ? c.valorPago ?? c.valor : c.valor)
   const meses = [...new Set([mesDe(hoje()), ...d.contas.map(mesDaConta).filter((m): m is string => !!m)])].sort().reverse()
   const doMes = d.contas.filter((c) => mesDaConta(c) === mes)
@@ -478,6 +328,13 @@ function Despesas() {
   const abaixo = blocos.filter((b) => !b.m.operacional)
   const totalOperacional = operacionais.reduce((s, b) => s + total(b.contas), 0) + total(semConta)
 
+  const totalMes = total(doMes)
+  const porFornecedor = [...doMes.reduce((m, c) => {
+    const nome = favorecidoDe(c, d.fornecedores) || 'Sem fornecedor'
+    m.set(nome, [...(m.get(nome) ?? []), c])
+    return m
+  }, new Map<string, ContaPagar[]>())].map(([nome, contas]) => ({ nome, contas })).sort((a, b) => total(b.contas) - total(a.contas))
+
   const Linha = ({ nome, l, forte = false, recuo = false }: { nome: string; l: ContaPagar[]; forte?: boolean; recuo?: boolean }) => (
     <tr className={forte ? 'bg-stone-50 font-semibold' : ''}>
       <td className={`px-3 py-1.5 ${recuo ? 'pl-6 text-stone-600' : ''}`}>{nome}</td>
@@ -489,21 +346,57 @@ function Despesas() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold">Despesas por conta</h1>
-        <p className="text-sm text-stone-500">Soma do contas a pagar por conta contábil e loja. É a parte de despesas da DRE.</p>
+        <h1 className="text-xl font-bold">Despesas</h1>
+        <p className="text-sm text-stone-500">Soma do contas a pagar por conta contábil ou fornecedor, e por loja. É a parte de despesas da DRE.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <select className={`${estiloEntrada} w-auto!`} value={mes} onChange={(e) => setMes(e.target.value)}>
           {meses.map((m) => <option key={m} value={m}>{nomeMesAno(m)}</option>)}
         </select>
-        {([['competencia', 'Mês da despesa'], ['caixa', 'Mês do pagamento']] as const).map(([id, nome]) => (
+        {([['vencimento', 'Mês do vencimento'], ['caixa', 'Mês do pagamento']] as const).map(([id, nome]) => (
           <button key={id} onClick={() => setBase(id)}
             className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${base === id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-600 ring-stone-300'}`}>
             {nome}
           </button>
         ))}
+        <span className="mx-1 self-center text-stone-300">|</span>
+        {([['conta', 'Por conta'], ['fornecedor', 'Por fornecedor']] as const).map(([id, nome]) => (
+          <button key={id} onClick={() => setPor(id)}
+            className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${por === id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-600 ring-stone-300'}`}>
+            {nome}
+          </button>
+        ))}
       </div>
-      {doMes.length === 0 ? <Vazio>Nenhuma despesa {base === 'caixa' ? 'paga' : 'lançada'} em {nomeMesAno(mes)}.</Vazio> : (
+      {doMes.length === 0 ? <Vazio>Nenhuma despesa {base === 'caixa' ? 'paga' : 'vencendo'} em {nomeMesAno(mes)}.</Vazio> : por === 'fornecedor' ? (
+        <Cartao className="overflow-x-auto p-0!">
+          <table className="w-full text-sm">
+            <thead className="bg-stone-100 text-left text-stone-500">
+              <tr>
+                <th className="px-3 py-2">Fornecedor</th>
+                {centros.length > 1 && centros.map((x) => <th key={x.id} className="px-3 py-2 text-right">{nomeCentro(x)}</th>)}
+                <th className="px-3 py-2 text-right">Total</th>
+                <th className="px-3 py-2 text-right">%</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {porFornecedor.map((g) => (
+                <tr key={g.nome}>
+                  <td className="px-3 py-1.5">{g.nome} <span className="text-xs text-stone-400">({g.contas.length})</span></td>
+                  {centros.length > 1 && centros.map((x) => <td key={x.id} className="px-3 py-1.5 text-right whitespace-nowrap">{total(g.contas, x.id) ? reais(total(g.contas, x.id)) : '—'}</td>)}
+                  <td className="px-3 py-1.5 text-right font-semibold whitespace-nowrap">{reais(total(g.contas))}</td>
+                  <td className="px-3 py-1.5 text-right text-stone-500">{(totalMes ? total(g.contas) / totalMes : 0).toLocaleString('pt-BR', { style: 'percent', maximumFractionDigits: 1 })}</td>
+                </tr>
+              ))}
+              <tr className="bg-carvao font-bold text-white">
+                <td className="px-3 py-2">Total</td>
+                {centros.length > 1 && centros.map((x) => <td key={x.id} className="px-3 py-2 text-right whitespace-nowrap">{reais(total(doMes, x.id))}</td>)}
+                <td className="px-3 py-2 text-right whitespace-nowrap">{reais(totalMes)}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </Cartao>
+      ) : (
         <Cartao className="overflow-x-auto p-0!">
           <table className="w-full text-sm">
             <thead className="bg-stone-100 text-left text-stone-500">
