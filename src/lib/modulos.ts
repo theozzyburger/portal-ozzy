@@ -28,9 +28,7 @@ export const MODULOS: Modulo[] = [
   { id: 'fichas', nome: 'Fichas técnicas', pronto: true, soGestao: true },
   {
     id: 'financeiro', nome: 'Financeiro', pronto: true, ve: vejoResultado,
-    resumo: 'Custos e resultados das duas unidades num só lugar.',
-    itens: ['CMV atualizado por produto', 'Fichas técnicas e custo de cada item', 'Faturamento e despesas por unidade'],
-    origem: 'Dados puxados do Lucro Fácil, sem tirar nada do sistema atual.',
+    resumo: 'Contas a pagar, despesas por conta contábil e loja, e o resultado do Lucro Fácil.',
   },
   {
     id: 'administrativo', soGestao: true, nome: 'Administrativo', pronto: false,
@@ -44,7 +42,7 @@ export const MODULOS: Modulo[] = [
     itens: ['Solicitação de compra por unidade', 'Cotação e aprovação por valor', 'Recebimento com conferência e fotos'],
   },
   {
-    id: 'estoque', soGestao: true, nome: 'Estoque', pronto: false,
+    id: 'estoque', soGestao: true, nome: 'Estoque', pronto: true,
     resumo: 'Entradas, saídas e perdas sob controle.',
     itens: ['Inventário semanal', 'Transferências entre Burger e Pizza', 'Registro de perdas com motivo'],
   },

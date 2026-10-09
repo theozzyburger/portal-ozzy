@@ -852,6 +852,9 @@ export interface Fornecedor {
   telefone: string | null
   observacao: string | null
   ativo: boolean
+  // Preenchidos pela importação de nota (0044).
+  cnpj?: string | null
+  contaPadraoId?: string | null
 }
 export interface Insumo {
   id: string
@@ -1064,4 +1067,135 @@ export interface MembroEquipeEvento {
   posicao: number | null
   observacao: string | null
   ordem: number
+}
+
+// ——— Financeiro e estoque (09/10) ———
+// Centro de custo: as três lojas, a Central de Produção e a The Ozzy Eventos.
+export interface CentroCusto {
+  id: string
+  nome: string
+  cnpj: string | null
+  ativo: boolean
+}
+// Conta contábil do plano de contas (mesma árvore do Lucro Fácil). pai = código da conta-mãe.
+export interface ContaContabil {
+  id: string
+  codigo: string
+  nome: string
+  paiCodigo: string | null
+  operacional: boolean
+  ordem: number
+  ativo: boolean
+}
+export type FormaPagamento = 'boleto' | 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia' | 'debito_automatico' | 'outro'
+export const FORMAS_PAGAMENTO: { valor: FormaPagamento; nome: string }[] = [
+  { valor: 'boleto', nome: 'Boleto' },
+  { valor: 'pix', nome: 'Pix' },
+  { valor: 'cartao_credito', nome: 'Cartão de crédito' },
+  { valor: 'cartao_debito', nome: 'Cartão de débito' },
+  { valor: 'transferencia', nome: 'Transferência' },
+  { valor: 'debito_automatico', nome: 'Débito automático' },
+  { valor: 'dinheiro', nome: 'Dinheiro' },
+  { valor: 'outro', nome: 'Outro' },
+]
+export interface DuplicataNota {
+  numero: string | null
+  vencimento: string
+  valor: number
+}
+export interface ItemNota {
+  id: string
+  ordem: number
+  codigo: string | null
+  ean: string | null
+  descricao: string
+  ncm: string | null
+  cfop: string | null
+  unidade: string | null
+  quantidade: number
+  valorUnit: number | null
+  valorTotal: number
+  insumoId: string | null
+  fator: number | null
+  foraEstoque: boolean
+}
+export interface NotaFiscal {
+  id: string
+  chave: string | null
+  numero: string | null
+  serie: string | null
+  emissao: string
+  fornecedorId: string | null
+  emitenteCnpj: string | null
+  emitenteNome: string | null
+  destinatarioCnpj: string | null
+  centroCustoId: string | null
+  valorProdutos: number | null
+  frete: number | null
+  desconto: number | null
+  valorTotal: number
+  // tPag da NF-e: 01 dinheiro, 03 crédito, 04 débito, 15 boleto, 17 Pix, 90 sem pagamento…
+  pagamentoXml: { tPag: string; valor: number }[]
+  duplicatas: DuplicataNota[]
+  arquivo: string | null
+  observacao: string | null
+  status: 'conferir' | 'lancada'
+  lancadaEm: string | null
+  criadoEm: string
+  itens?: ItemNota[]
+}
+// O que sai do XML da NF-e (lido no navegador) para importar.
+export interface NotaImportada {
+  chave: string
+  numero: string
+  serie: string
+  emissao: string
+  emitente: { cnpj: string; nome: string; fantasia: string | null }
+  destinatarioCnpj: string | null
+  totais: { produtos: number; frete: number; desconto: number; outras: number; total: number }
+  pagamento: { tPag: string; valor: number }[]
+  duplicatas: DuplicataNota[]
+  xml: string
+  itens: { codigo: string; ean: string | null; descricao: string; ncm: string | null; cfop: string | null; unidade: string; quantidade: number; valorUnit: number; valorTotal: number }[]
+}
+export interface LancamentoNota {
+  centroCustoId: string
+  contaId: string | null
+  competencia: string | null
+  itens: { id: string; insumoId: string | null; fator: number | null; foraEstoque: boolean }[]
+  parcelas: { vencimento: string; valor: number; forma: FormaPagamento; documento?: string | null }[]
+  atualizarPreco: boolean
+}
+export interface ContaPagar {
+  id: string
+  centroCustoId: string
+  contaId: string | null
+  fornecedorId: string | null
+  favorecido: string | null
+  descricao: string
+  competencia: string // AAAA-MM-01
+  vencimento: string
+  valor: number
+  forma: FormaPagamento
+  parcela: number | null
+  parcelas: number | null
+  documento: string | null
+  notaId: string | null
+  observacao: string | null
+  pagoEm: string | null
+  valorPago: number | null
+  conciliado: boolean
+}
+export type NovaContaPagar = Omit<ContaPagar, 'id' | 'pagoEm' | 'valorPago' | 'conciliado'> & { id?: string }
+export interface MovimentoEstoque {
+  id: string
+  centroCustoId: string
+  insumoId: string
+  data: string
+  tipo: 'entrada_nf' | 'entrada' | 'saida' | 'perda' | 'ajuste' | 'transferencia'
+  quantidade: number
+  custoUnit: number | null
+  notaItemId: string | null
+  observacao: string | null
+  criadoEm: string
 }

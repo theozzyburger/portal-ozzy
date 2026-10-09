@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, MovimentoEstoque, ItemNota, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -637,6 +637,147 @@ const salariosDemo: Salario[] = (() => {
 })()
 for (const s of salariosDemo.filter((x) => x.tipo === 'salario')) { const p = funcionarios.find((x) => x.id === s.funcionarioId); if (p) p.optaVt = s.descVt > 0 }
 
+
+// Financeiro e estoque de EXEMPLO (notas, valores e fornecedores inventados), só para a demonstração.
+const centrosDemo: CentroCusto[] = [
+  { id: 'burger-psd', nome: 'The Ozzy Burger Parque São Domingos', cnpj: '34533354000113', ativo: true },
+  { id: 'burger-va', nome: 'The Ozzy Burger Vila Anastácio', cnpj: '34533354000202', ativo: true },
+  { id: 'pizza', nome: 'The Ozzy Pizza', cnpj: '61514304000124', ativo: true },
+  { id: 'central', nome: 'Central de Produção', cnpj: null, ativo: true },
+  { id: 'eventos', nome: 'The Ozzy Eventos', cnpj: null, ativo: true },
+]
+const PLANO: [string, string, string | null, boolean, number][] = [
+  ['1', 'CMC - Custo de Mercadoria Comprada', null, true, 100],
+  ['1.1', 'Insumos', '1', true, 101],
+  ['1.2', 'Hortifruti', '1', true, 102],
+  ['1.3', 'Carnes', '1', true, 103],
+  ['1.4', 'Laticínios', '1', true, 104],
+  ['1.5', 'Bebidas', '1', true, 105],
+  ['1.6', 'Alcoólicos', '1', true, 106],
+  ['1.7', 'Produtos para Revenda', '1', true, 107],
+  ['1.8', 'Embalagem', '1', true, 108],
+  ['2', 'CMO - Custo de Mão de Obra', null, true, 200],
+  ['2.1', 'Salários e Ordenados', '2', true, 201],
+  ['2.2', 'Encargos Trabalhistas', '2', true, 202],
+  ['2.3', 'Pró-labore', '2', true, 203],
+  ['2.4', 'Freelancers e Terceirizados', '2', true, 204],
+  ['2.5', 'Benefícios', '2', true, 205],
+  ['3', 'Taxa de Entrega', null, true, 300],
+  ['4', 'Despesas e Utilidades Prediais', null, true, 400],
+  ['4.1', 'Aluguel', '4', true, 401],
+  ['4.2', 'Água', '4', true, 402],
+  ['4.3', 'Energia Elétrica', '4', true, 403],
+  ['4.4', 'Gás Encanado', '4', true, 404],
+  ['4.5', 'Internet', '4', true, 405],
+  ['4.6', 'IPTU', '4', true, 406],
+  ['4.7', 'Telefone Fixo', '4', true, 407],
+  ['4.8', 'Telefone Celular Empresarial', '4', true, 408],
+  ['4.9', 'Manutenção Predial', '4', true, 409],
+  ['4.10', 'Manutenção Computadores', '4', true, 410],
+  ['4.11', 'Seguro Predial', '4', true, 411],
+  ['4.12', 'Serviço de Limpeza', '4', true, 412],
+  ['4.13', 'Taxa Franquia', '4', true, 413],
+  ['4.14', 'Investimento Estrutura', '4', true, 414],
+  ['5', 'Administrativo Geral', null, true, 500],
+  ['5.1', 'Assessorias', '5', true, 501],
+  ['5.2', 'Brindes e Confraternizações', '5', true, 502],
+  ['5.3', 'Combustível', '5', true, 503],
+  ['5.4', 'Consultoria e Mentoria', '5', true, 504],
+  ['5.5', 'Contabilidade', '5', true, 505],
+  ['5.6', 'CRM', '5', true, 506],
+  ['5.7', 'Entregas APP', '5', true, 507],
+  ['5.8', 'ERP', '5', true, 508],
+  ['5.9', 'Estornos e Devoluções', '5', true, 509],
+  ['5.10', 'Financeiro', '5', true, 510],
+  ['5.11', 'Fretes', '5', true, 511],
+  ['5.12', 'Gestão de Entregas', '5', true, 512],
+  ['5.13', 'Gestão de Equipe', '5', true, 513],
+  ['5.14', 'IA', '5', true, 514],
+  ['5.15', 'Jurídico', '5', true, 515],
+  ['5.16', 'Marketing', '5', true, 516],
+  ['5.17', 'PDV', '5', true, 517],
+  ['5.18', 'Publicidade', '5', true, 518],
+  ['5.19', 'Sistemas', '5', true, 519],
+  ['5.20', 'Serviços Terceirizados - Vigilância e Segurança', '5', true, 520],
+  ['5.21', 'Tributos e Impostos', '5', true, 521],
+  ['5.22', 'Tarifas Bancárias', '5', true, 522],
+  ['5.23', 'Manutenção e Conservação', '5', true, 523],
+  ['6', 'Material de Consumo', null, true, 600],
+  ['6.1', 'Limpeza e Conservação', '6', true, 601],
+  ['6.2', 'Material de Escritório', '6', true, 602],
+  ['6.3', 'Utensílio de Cozinha', '6', true, 603],
+  ['7', 'Juros', null, true, 700],
+  ['8', 'Multas', null, true, 800],
+  ['9', 'Empréstimos e Financiamentos', null, false, 900],
+  ['9.1', 'Empréstimo de Capital de Giro', '9', false, 901],
+  ['9.2', 'Financiamentos', '9', false, 902],
+  ['9.3', 'Empréstimo LJ-1 Ozzy Burger', '9', false, 903],
+  ['9.4', 'Empréstimo LJ-2 Ozzy Burger', '9', false, 904],
+  ['10', 'Investimentos (Capex)', null, false, 1000],
+  ['10.1', 'Instalações Gerais', '10', false, 1001],
+  ['10.2', 'Equipamentos de Cozinha', '10', false, 1002],
+  ['10.3', 'Mobiliário', '10', false, 1003],
+  ['10.4', 'Outros Equipamentos', '10', false, 1004],
+  ['10.5', 'Mão de Obra (implantação/obra)', '10', false, 1005],
+  ['11', 'Distribuição de Resultados', null, false, 1100],
+  ['11.1', 'Distribuição de Lucros', '11', false, 1101],
+  ['11.2', 'Retirada de Sócios (pró-labore ou extra)', '11', false, 1102],
+  ['11.3', 'Antecipação de Lucros', '11', false, 1103],
+]
+const planoDemo: ContaContabil[] = PLANO.map(([codigo, nome, paiCodigo, operacional, ordem]) => ({ id: 'pc' + codigo, codigo, nome, paiCodigo, operacional, ordem, ativo: true }))
+fornecedoresDemo[0].cnpj = '11222333000181'
+const mesAtual = () => hoje().slice(0, 8) + '01'
+const itemNota = (id: string, ordem: number, codigo: string, descricao: string, unidade: string, quantidade: number, valorUnit: number, extra: Partial<ItemNota> = {}): ItemNota => ({
+  id, ordem, codigo, ean: null, descricao, ncm: null, cfop: '5102', unidade, quantidade, valorUnit, valorTotal: Math.round(quantidade * valorUnit * 100) / 100,
+  insumoId: null, fator: null, foraEstoque: false, ...extra,
+})
+const notaDemo = (id: string, numero: string, diasAtras: number, itens: ItemNota[], extra: Partial<NotaFiscal> = {}): NotaFiscal => {
+  const total = Math.round(itens.reduce((s, i) => s + i.valorTotal, 0) * 100) / 100
+  return {
+    id, chave: null, numero, serie: '1', emissao: addDias(hoje(), -diasAtras), fornecedorId: 'fo1', emitenteCnpj: '11222333000181', emitenteNome: 'Distribuidora Exemplo Ltda',
+    destinatarioCnpj: '34533354000113', centroCustoId: 'burger-psd', valorProdutos: total, frete: 0, desconto: 0, valorTotal: total, pagamentoXml: [{ tPag: '15', valor: total }],
+    duplicatas: [], arquivo: null, observacao: null, status: 'conferir', lancadaEm: null, criadoEm: haHoras(24 * diasAtras), itens, ...extra,
+  }
+}
+const notasDemo: NotaFiscal[] = [
+  notaDemo('nf1', '10234', 1, [
+    itemNota('ni1', 1, 'A100', 'QUEIJO BRANCO PECA KG', 'KG', 6, 41.5, { insumoId: 'in3', fator: 1 }),
+    itemNota('ni2', 2, 'A200', 'CREME DE LEITE 1KG CX C/12', 'CX', 2, 210),
+    itemNota('ni3', 3, 'A300', 'REFRIGERANTE LATA 350ML FD C/12', 'FD', 4, 37.2),
+    itemNota('ni4', 4, 'L900', 'DETERGENTE 5L', 'UN', 2, 19.9, { foraEstoque: true }),
+  ], { duplicatas: [] }),
+  notaDemo('nf2', '10198', 9, [
+    itemNota('ni5', 1, 'A100', 'QUEIJO BRANCO PECA KG', 'KG', 5, 40, { insumoId: 'in3', fator: 1 }),
+    itemNota('ni6', 2, 'A400', 'PRESUNTO CRU KG', 'KG', 2, 148, { insumoId: 'in2', fator: 1 }),
+  ], { status: 'lancada', lancadaEm: haHoras(24 * 8) }),
+]
+notasDemo[0].duplicatas = [
+  { numero: '001', vencimento: addDias(hoje(), 13), valor: Math.round(notasDemo[0].valorTotal / 2 * 100) / 100 },
+  { numero: '002', vencimento: addDias(hoje(), 27), valor: Math.round((notasDemo[0].valorTotal - Math.round(notasDemo[0].valorTotal / 2 * 100) / 100) * 100) / 100 },
+]
+const contaDemo = (id: string, extra: Partial<ContaPagar> & Pick<ContaPagar, 'descricao' | 'vencimento' | 'valor'>): ContaPagar => ({
+  id, centroCustoId: 'burger-psd', contaId: null, fornecedorId: null, favorecido: null, competencia: mesAtual(), forma: 'boleto', parcela: null, parcelas: null,
+  documento: null, notaId: null, observacao: null, pagoEm: null, valorPago: null, conciliado: false, ...extra,
+})
+const contasPagarDemo: ContaPagar[] = [
+  contaDemo('cp1', { descricao: 'NF 10198 · Distribuidora Exemplo', vencimento: addDias(hoje(), 5), valor: 251, contaId: 'pc1.1', fornecedorId: 'fo1', notaId: 'nf2', parcela: 1, parcelas: 2 }),
+  contaDemo('cp2', { descricao: 'NF 10198 · Distribuidora Exemplo', vencimento: addDias(hoje(), 19), valor: 245, contaId: 'pc1.1', fornecedorId: 'fo1', notaId: 'nf2', parcela: 2, parcelas: 2 }),
+  contaDemo('cp3', { descricao: 'Aluguel do mês (exemplo)', vencimento: addDias(hoje(), -2), valor: 9500, contaId: 'pc4.1', favorecido: 'Imobiliária Exemplo', forma: 'pix' }),
+  contaDemo('cp4', { descricao: 'Energia elétrica (exemplo)', vencimento: hoje(), valor: 2380.4, contaId: 'pc4.3', favorecido: 'Distribuidora de energia', forma: 'debito_automatico', centroCustoId: 'burger-va' }),
+  contaDemo('cp5', { descricao: 'Internet (exemplo)', vencimento: addDias(hoje(), -6), valor: 199.9, contaId: 'pc4.5', favorecido: 'Provedor Exemplo', pagoEm: addDias(hoje(), -6), valorPago: 199.9 }),
+  contaDemo('cp6', { descricao: 'Hortifruti da semana (exemplo)', vencimento: addDias(hoje(), 2), valor: 640, contaId: 'pc1.2', fornecedorId: 'fo2', forma: 'pix', centroCustoId: 'pizza' }),
+  contaDemo('cp7', { descricao: 'Contabilidade (exemplo)', vencimento: addDias(hoje(), 11), valor: 1800, contaId: 'pc5.5', favorecido: 'Escritório contábil exemplo', centroCustoId: 'central' }),
+]
+const movimentosDemo: MovimentoEstoque[] = [
+  { id: 'mv1', centroCustoId: 'burger-psd', insumoId: 'in3', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 5, custoUnit: 40, notaItemId: 'ni5', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
+  { id: 'mv2', centroCustoId: 'burger-psd', insumoId: 'in2', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 2, custoUnit: 148, notaItemId: 'ni6', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
+  { id: 'mv3', centroCustoId: 'burger-psd', insumoId: 'in3', data: addDias(hoje(), -3), tipo: 'saida', quantidade: -1.5, custoUnit: null, notaItemId: null, observacao: 'Uso na produção (exemplo)', criadoEm: haHoras(24 * 3) },
+]
+const mapaFornecedorDemo = new Map<string, { insumoId: string | null; fator: number | null; foraEstoque: boolean }>([
+  ['11222333000181|A100', { insumoId: 'in3', fator: 1, foraEstoque: false }],
+  ['11222333000181|L900', { insumoId: null, fator: null, foraEstoque: true }],
+])
+
 const espera = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 80))
 
 export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Funcionario>; perfisDemo(): Funcionario[] } {
@@ -648,6 +789,11 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
   const exigeGestao = () => {
     const u = exigeEu()
     if (!podeGerenciar(u.nivel)) throw new Error('Seu nível de acesso não permite esta ação.')
+    return u
+  }
+  const exigeFinanceiro = () => {
+    const u = exigeEu()
+    if (!vejoResultado(u.nivel)) throw new Error('Só o administrativo e o proprietário veem as contas a pagar.')
     return u
   }
   const exigePainel = () => {
@@ -1698,6 +1844,164 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         n++
       }
       return espera(n)
+    },
+
+    // Financeiro e estoque.
+    async centrosCusto() {
+      exigeGestao()
+      return espera(centrosDemo.map((c) => ({ ...c })))
+    },
+    async planoContas() {
+      exigeGestao()
+      return espera([...planoDemo].sort((a, b) => a.ordem - b.ordem))
+    },
+    async salvarContaContabil(c) {
+      exigeFinanceiro()
+      if (planoDemo.some((x) => x.codigo === c.codigo.trim() && x.id !== c.id)) throw new Error('Já existe uma conta com este código.')
+      const i = planoDemo.findIndex((x) => x.id === c.id)
+      const nova = { ...c, codigo: c.codigo.trim(), nome: c.nome.trim(), id: c.id ?? novoId('pc') }
+      if (i >= 0) planoDemo[i] = nova
+      else planoDemo.push(nova)
+      return espera(undefined)
+    },
+    async notasFiscais() {
+      exigeGestao()
+      return espera(notasDemo.map(({ itens: _, ...n }) => ({ ...n })).sort((a, b) => b.emissao.localeCompare(a.emissao)))
+    },
+    async notaFiscal(id) {
+      exigeGestao()
+      const n = notasDemo.find((x) => x.id === id)
+      if (!n) throw new Error('Nota não encontrada.')
+      return espera({ ...n, itens: (n.itens ?? []).map((i) => ({ ...i })) })
+    },
+    async importarNota(x) {
+      exigeGestao()
+      if (notasDemo.some((n) => n.chave === x.chave)) throw new Error(`Esta nota já foi importada (nº ${x.numero}).`)
+      const cnpj = soDigitos(x.emitente.cnpj)
+      let f = fornecedoresDemo.find((y) => y.cnpj === cnpj)
+      if (!f) {
+        f = { id: novoId('fo'), nome: x.emitente.fantasia?.trim() || x.emitente.nome.trim(), contato: null, telefone: null, observacao: x.emitente.nome, ativo: true, cnpj, contaPadraoId: null }
+        fornecedoresDemo.push(f)
+      }
+      const id = novoId('nf')
+      notasDemo.push({
+        id, chave: x.chave, numero: x.numero, serie: x.serie, emissao: x.emissao, fornecedorId: f.id, emitenteCnpj: cnpj, emitenteNome: x.emitente.nome,
+        destinatarioCnpj: x.destinatarioCnpj, centroCustoId: centrosDemo.find((c) => c.cnpj && c.cnpj === x.destinatarioCnpj)?.id ?? null,
+        valorProdutos: x.totais.produtos, frete: x.totais.frete, desconto: x.totais.desconto, valorTotal: x.totais.total, pagamentoXml: x.pagamento,
+        duplicatas: x.duplicatas, arquivo: null, observacao: null, status: 'conferir', lancadaEm: null, criadoEm: agora(),
+        itens: x.itens.map((i, k) => {
+          const m = mapaFornecedorDemo.get(`${cnpj}|${i.codigo}`)
+          return { ...i, id: novoId('ni'), ordem: k + 1, insumoId: m?.insumoId ?? null, fator: m?.fator ?? null, foraEstoque: m?.foraEstoque ?? false }
+        }),
+      })
+      return espera(id)
+    },
+    async criarNotaManual(x) {
+      exigeGestao()
+      const f = fornecedoresDemo.find((y) => y.id === x.fornecedorId)
+      const id = novoId('nf')
+      notasDemo.push({
+        id, chave: null, numero: x.numero?.trim() || null, serie: null, emissao: x.emissao, fornecedorId: x.fornecedorId, emitenteCnpj: f?.cnpj ?? null,
+        emitenteNome: x.emitenteNome?.trim() || f?.nome || null, destinatarioCnpj: null, centroCustoId: x.centroCustoId, valorProdutos: null, frete: null,
+        desconto: null, valorTotal: x.valorTotal, pagamentoXml: [], duplicatas: [], arquivo: x.arquivo ? URL.createObjectURL(x.arquivo) : null,
+        observacao: x.observacao?.trim() || null, status: 'conferir', lancadaEm: null, criadoEm: agora(), itens: [],
+      })
+      return espera(id)
+    },
+    async linkArquivoNota(caminho) {
+      return espera(caminho)
+    },
+    async lancarNota(id, l) {
+      exigeGestao()
+      const n = notasDemo.find((x) => x.id === id)
+      if (!n) throw new Error('Nota não encontrada.')
+      if (n.status === 'lancada') throw new Error('Esta nota já foi lançada.')
+      if (!centrosDemo.some((c) => c.id === l.centroCustoId)) throw new Error('Escolha a loja da nota.')
+      if (!l.parcelas.length) throw new Error('Coloque pelo menos um pagamento.')
+      const soma = l.parcelas.reduce((s, p) => s + p.valor, 0)
+      if (Math.abs(soma - n.valorTotal) > 0.05) {
+        const br = (v: number) => v.toFixed(2).replace('.', ',')
+        throw new Error(`Os pagamentos somam ${br(soma)} e a nota é de ${br(n.valorTotal)}. Confira as parcelas.`)
+      }
+      n.centroCustoId = l.centroCustoId
+      for (const it of l.itens) {
+        const x = n.itens?.find((y) => y.id === it.id)
+        if (!x) continue
+        Object.assign(x, { insumoId: it.insumoId, fator: it.fator, foraEstoque: it.foraEstoque })
+        if (n.emitenteCnpj && x.codigo) mapaFornecedorDemo.set(`${n.emitenteCnpj}|${x.codigo}`, { insumoId: x.insumoId, fator: x.fator, foraEstoque: x.foraEstoque })
+        if (x.insumoId && !x.foraEstoque) {
+          const qtd = x.quantidade * (x.fator ?? 1)
+          movimentosDemo.push({
+            id: novoId('mv'), centroCustoId: l.centroCustoId, insumoId: x.insumoId, data: n.emissao, tipo: 'entrada_nf', quantidade: qtd,
+            custoUnit: qtd > 0 ? x.valorTotal / qtd : null, notaItemId: x.id, observacao: `NF ${n.numero ?? ''} · ${n.emitenteNome ?? ''}`, criadoEm: agora(),
+          })
+          const ins = insumosDemo.find((y) => y.id === x.insumoId)
+          if (l.atualizarPreco && ins && qtd > 0) Object.assign(ins, { preco: Math.round((x.valorTotal / qtd) * 10000) / 10000, precoEm: agora() })
+        }
+      }
+      const forn = fornecedoresDemo.find((f) => f.id === n.fornecedorId)
+      l.parcelas.forEach((p, k) => {
+        contasPagarDemo.push(contaDemo(novoId('cp'), {
+          centroCustoId: l.centroCustoId, contaId: l.contaId, fornecedorId: n.fornecedorId, favorecido: n.fornecedorId ? null : n.emitenteNome,
+          descricao: `NF ${n.numero ?? 's/n'} · ${forn?.nome ?? n.emitenteNome ?? 'fornecedor'}`, competencia: (l.competencia ?? n.emissao).slice(0, 8) + '01',
+          vencimento: p.vencimento, valor: p.valor, forma: p.forma, parcela: l.parcelas.length > 1 ? k + 1 : null, parcelas: l.parcelas.length > 1 ? l.parcelas.length : null,
+          documento: p.documento ?? null, notaId: n.id,
+        }))
+      })
+      if (forn && l.contaId) forn.contaPadraoId = l.contaId
+      Object.assign(n, { status: 'lancada', lancadaEm: agora() })
+      return espera(undefined)
+    },
+    async estornarNota(id) {
+      exigeGestao()
+      if (contasPagarDemo.some((c) => c.notaId === id && c.pagoEm)) throw new Error('Esta nota já tem pagamento registrado. Desfaça o pagamento antes.')
+      const itens = new Set((notasDemo.find((x) => x.id === id)?.itens ?? []).map((i) => i.id))
+      for (let i = contasPagarDemo.length - 1; i >= 0; i--) if (contasPagarDemo[i].notaId === id) contasPagarDemo.splice(i, 1)
+      for (let i = movimentosDemo.length - 1; i >= 0; i--) if (movimentosDemo[i].notaItemId && itens.has(movimentosDemo[i].notaItemId!)) movimentosDemo.splice(i, 1)
+      Object.assign(notasDemo.find((x) => x.id === id)!, { status: 'conferir', lancadaEm: null })
+      return espera(undefined)
+    },
+    async excluirNota(id) {
+      exigeGestao()
+      const n = notasDemo.find((x) => x.id === id)
+      if (n?.status === 'conferir') tira(notasDemo, id)
+      return espera(undefined)
+    },
+    async contasPagar() {
+      exigeFinanceiro()
+      return espera(contasPagarDemo.map((c) => ({ ...c })).sort((a, b) => a.vencimento.localeCompare(b.vencimento)))
+    },
+    async salvarContasPagar(contas) {
+      exigeFinanceiro()
+      for (const c of contas) {
+        if (!c.descricao.trim()) throw new Error('Coloque a descrição.')
+        if (!(c.valor > 0)) throw new Error('O valor precisa ser maior que zero.')
+        const { id, ...dados } = c
+        const i = id ? contasPagarDemo.findIndex((x) => x.id === id) : -1
+        if (i >= 0) Object.assign(contasPagarDemo[i], { ...dados, descricao: c.descricao.trim() })
+        else contasPagarDemo.push(contaDemo(novoId('cp'), { ...dados, descricao: c.descricao.trim() }))
+      }
+      return espera(undefined)
+    },
+    async pagarConta(id, p) {
+      exigeFinanceiro()
+      const c = contasPagarDemo.find((x) => x.id === id)
+      if (c) Object.assign(c, p ? { pagoEm: p.pagoEm, valorPago: p.valorPago, forma: p.forma } : { pagoEm: null, valorPago: null, conciliado: false })
+      return espera(undefined)
+    },
+    async excluirContaPagar(id) {
+      exigeFinanceiro()
+      tira(contasPagarDemo, id)
+      return espera(undefined)
+    },
+    async movimentosEstoque() {
+      exigeGestao()
+      return espera([...movimentosDemo].sort((a, b) => b.data.localeCompare(a.data)))
+    },
+    async lancarMovimentoEstoque(m) {
+      exigeGestao()
+      movimentosDemo.push({ ...m, id: novoId('mv'), custoUnit: m.custoUnit ?? null, notaItemId: null, observacao: m.observacao?.trim() || null, criadoEm: agora() })
+      return espera(undefined)
     },
   }
 }

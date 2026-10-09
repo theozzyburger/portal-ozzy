@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
-import type { MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { NotaFiscal, ContaPagar, ItemNota, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -1063,6 +1063,105 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         p_cpf: e.cpf, p_celular: e.celular, p_nome: e.nome ? nomeProprio(e.nome) : '', p_pix: e.pix, p_evento: e.eventoId, p_funcao: e.funcao, p_dias: e.dias, p_local: e.local,
       }))
     },
+
+    // Financeiro e estoque (0044).
+    async centrosCusto() {
+      return (ok(await sb.from('centros_custo').select('*').order('ordem')) ?? []).map((r: any) => ({ id: r.id, nome: r.nome, cnpj: r.cnpj, ativo: r.ativo }))
+    },
+    async planoContas() {
+      return (ok(await sb.from('plano_contas').select('*').order('ordem')) ?? []).map((r: any) => ({
+        id: r.id, codigo: r.codigo, nome: r.nome, paiCodigo: r.pai_codigo, operacional: r.operacional, ordem: r.ordem, ativo: r.ativo,
+      }))
+    },
+    async salvarContaContabil(c) {
+      const linha = { codigo: c.codigo.trim(), nome: c.nome.trim(), pai_codigo: c.paiCodigo, operacional: c.operacional, ordem: c.ordem, ativo: c.ativo }
+      if (c.id) ok(await sb.from('plano_contas').update(linha).eq('id', c.id))
+      else ok(await sb.from('plano_contas').insert(linha))
+    },
+    async notasFiscais() {
+      return (ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em').order('emissao', { ascending: false })) ?? []).map(paraNota)
+    },
+    async notaFiscal(id) {
+      return paraNota(ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, nota_itens(*)').eq('id', id).single()))
+    },
+    async importarNota(n) {
+      return ok(await sb.rpc('importar_nota', {
+        p: {
+          chave: n.chave, numero: n.numero, serie: n.serie, emissao: n.emissao, emitente: n.emitente, destinatario_cnpj: n.destinatarioCnpj,
+          totais: n.totais, pagamento: n.pagamento, duplicatas: n.duplicatas, xml: n.xml,
+          itens: n.itens.map((i) => ({
+            codigo: i.codigo, ean: i.ean, descricao: i.descricao, ncm: i.ncm, cfop: i.cfop, unidade: i.unidade,
+            quantidade: i.quantidade, valor_unit: i.valorUnit, valor_total: i.valorTotal,
+          })),
+        },
+      }))
+    },
+    async criarNotaManual(n) {
+      let arquivo: string | null = null
+      if (n.arquivo) {
+        arquivo = `notas/${n.emissao.slice(0, 7)}/${crypto.randomUUID()}-${n.arquivo.name.replace(/[^\w.-]/g, '_')}`
+        ok(await sb.storage.from('documentos').upload(arquivo, n.arquivo))
+      }
+      const r = ok(await sb.from('notas_fiscais').insert({
+        numero: texto(n.numero), emissao: n.emissao, fornecedor_id: n.fornecedorId, emitente_nome: texto(n.emitenteNome),
+        centro_custo_id: n.centroCustoId, valor_total: n.valorTotal, observacao: texto(n.observacao), arquivo,
+      }).select('id').single())
+      return r!.id
+    },
+    async linkArquivoNota(caminho) {
+      const { data } = await sb.storage.from('documentos').createSignedUrl(caminho, 300)
+      return data?.signedUrl ?? ''
+    },
+    async lancarNota(id, l) {
+      ok(await sb.rpc('lancar_nota', {
+        p_nota: id, p_centro: l.centroCustoId, p_conta: l.contaId, p_competencia: l.competencia,
+        p_itens: l.itens.map((i) => ({ id: i.id, insumo_id: i.insumoId, fator: i.fator, fora_estoque: i.foraEstoque })),
+        p_parcelas: l.parcelas.map((p) => ({ vencimento: p.vencimento, valor: p.valor, forma: p.forma, documento: p.documento ?? null })),
+        p_atualizar_preco: l.atualizarPreco,
+      }))
+    },
+    async estornarNota(id) {
+      ok(await sb.rpc('estornar_nota', { p_nota: id }))
+    },
+    async excluirNota(id) {
+      ok(await sb.from('notas_fiscais').delete().eq('id', id).eq('status', 'conferir'))
+    },
+    async contasPagar() {
+      return (ok(await sb.from('contas_pagar').select('*').order('vencimento')) ?? []).map(paraContaPagar)
+    },
+    async salvarContasPagar(contas) {
+      const linhas = contas.map((c) => ({
+        ...(c.id ? { id: c.id } : {}),
+        centro_custo_id: c.centroCustoId, conta_id: c.contaId, fornecedor_id: c.fornecedorId, favorecido: texto(c.favorecido), descricao: c.descricao.trim(),
+        competencia: c.competencia, vencimento: c.vencimento, valor: c.valor, forma: c.forma, parcela: c.parcela, parcelas: c.parcelas,
+        documento: texto(c.documento), nota_id: c.notaId, observacao: texto(c.observacao),
+      }))
+      const novas = linhas.filter((l) => !('id' in l))
+      const editadas = linhas.filter((l) => 'id' in l)
+      if (novas.length) ok(await sb.from('contas_pagar').insert(novas))
+      for (const l of editadas) ok(await sb.from('contas_pagar').update(l).eq('id', (l as { id: string }).id))
+    },
+    async pagarConta(id, p) {
+      const u = exigeEu()
+      ok(await sb.from('contas_pagar').update(p
+        ? { pago_em: p.pagoEm, valor_pago: p.valorPago, forma: p.forma, pago_por: u.id }
+        : { pago_em: null, valor_pago: null, pago_por: null, conciliado: false }).eq('id', id))
+    },
+    async excluirContaPagar(id) {
+      ok(await sb.from('contas_pagar').delete().eq('id', id))
+    },
+    async movimentosEstoque() {
+      return (ok(await sb.from('estoque_movimentos').select('*').order('data', { ascending: false })) ?? []).map((r: any) => ({
+        id: r.id, centroCustoId: r.centro_custo_id, insumoId: r.insumo_id, data: r.data, tipo: r.tipo, quantidade: Number(r.quantidade),
+        custoUnit: numeroOuNulo(r.custo_unit), notaItemId: r.nota_item_id, observacao: r.observacao, criadoEm: r.criado_em,
+      }))
+    },
+    async lancarMovimentoEstoque(m) {
+      ok(await sb.from('estoque_movimentos').insert({
+        centro_custo_id: m.centroCustoId, insumo_id: m.insumoId, data: m.data, tipo: m.tipo, quantidade: m.quantidade,
+        custo_unit: m.custoUnit ?? null, observacao: texto(m.observacao),
+      }))
+    },
   }
 }
 
@@ -1076,7 +1175,29 @@ const paraDiariaEvento = (r: any): DiariaFreelaEvento => ({
   noLocal: r.no_local, enviadoEm: r.enviado_em, pagoEm: r.pago_em,
 })
 
-const paraFornecedor = (r: any): Fornecedor => ({ id: r.id, nome: r.nome, contato: r.contato, telefone: r.telefone, observacao: r.observacao, ativo: r.ativo })
+const paraFornecedor = (r: any): Fornecedor => ({
+  id: r.id, nome: r.nome, contato: r.contato, telefone: r.telefone, observacao: r.observacao, ativo: r.ativo, cnpj: r.cnpj ?? null, contaPadraoId: r.conta_padrao_id ?? null,
+})
+const paraNota = (r: any): NotaFiscal => ({
+  id: r.id, chave: r.chave, numero: r.numero, serie: r.serie, emissao: r.emissao, fornecedorId: r.fornecedor_id, emitenteCnpj: r.emitente_cnpj,
+  emitenteNome: r.emitente_nome, destinatarioCnpj: r.destinatario_cnpj, centroCustoId: r.centro_custo_id, valorProdutos: numeroOuNulo(r.valor_produtos),
+  frete: numeroOuNulo(r.frete), desconto: numeroOuNulo(r.desconto), valorTotal: Number(r.valor_total),
+  pagamentoXml: (r.pagamento_xml ?? []).map((x: any) => ({ tPag: String(x.tPag ?? ''), valor: Number(x.valor ?? 0) })),
+  duplicatas: (r.duplicatas ?? []).map((d: any) => ({ numero: d.numero ?? null, vencimento: d.vencimento, valor: Number(d.valor) })),
+  arquivo: r.arquivo, observacao: r.observacao, status: r.status, lancadaEm: r.lancada_em, criadoEm: r.criado_em,
+  itens: r.nota_itens
+    ? (r.nota_itens as any[]).sort((a, b) => a.ordem - b.ordem).map((i): ItemNota => ({
+        id: i.id, ordem: i.ordem, codigo: i.codigo, ean: i.ean, descricao: i.descricao, ncm: i.ncm, cfop: i.cfop, unidade: i.unidade,
+        quantidade: Number(i.quantidade), valorUnit: numeroOuNulo(i.valor_unit), valorTotal: Number(i.valor_total), insumoId: i.insumo_id,
+        fator: numeroOuNulo(i.fator), foraEstoque: i.fora_estoque,
+      }))
+    : undefined,
+})
+const paraContaPagar = (r: any): ContaPagar => ({
+  id: r.id, centroCustoId: r.centro_custo_id, contaId: r.conta_id, fornecedorId: r.fornecedor_id, favorecido: r.favorecido, descricao: r.descricao,
+  competencia: r.competencia, vencimento: r.vencimento, valor: Number(r.valor), forma: r.forma, parcela: r.parcela, parcelas: r.parcelas,
+  documento: r.documento, notaId: r.nota_id, observacao: r.observacao, pagoEm: r.pago_em, valorPago: numeroOuNulo(r.valor_pago), conciliado: r.conciliado,
+})
 const paraInsumo = (r: any): Insumo => ({
   id: r.id, nome: r.nome, categoria: r.categoria, unidade: r.unidade, embalagem: r.embalagem, embalagemQtd: numeroOuNulo(r.embalagem_qtd),
   preco: numeroOuNulo(r.preco), precoEm: r.preco_em, fornecedorId: r.fornecedor_id, observacao: r.observacao, ativo: r.ativo,

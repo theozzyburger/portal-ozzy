@@ -1,4 +1,4 @@
-import type { MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, FormaPagamento, MovimentoEstoque, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -292,6 +292,24 @@ export interface Store {
   definirLocalEvento(eventoId: string, lat: number, lng: number): Promise<void>
   marcarForaDaMedia(eventoId: string, fora: boolean): Promise<void>
   equipeEvento(eventoId: string): Promise<MembroEquipeEvento[]>
+  // Financeiro e estoque (09/10)
+  centrosCusto(): Promise<CentroCusto[]>
+  planoContas(): Promise<ContaContabil[]>
+  salvarContaContabil(c: Omit<ContaContabil, 'id'> & { id?: string }): Promise<void>
+  notasFiscais(): Promise<NotaFiscal[]>
+  notaFiscal(id: string): Promise<NotaFiscal>
+  importarNota(n: NotaImportada): Promise<string>
+  criarNotaManual(n: { numero: string | null; emissao: string; fornecedorId: string | null; emitenteNome: string | null; centroCustoId: string | null; valorTotal: number; observacao: string | null; arquivo?: File | null }): Promise<string>
+  linkArquivoNota(caminho: string): Promise<string>
+  lancarNota(id: string, l: LancamentoNota): Promise<void>
+  estornarNota(id: string): Promise<void>
+  excluirNota(id: string): Promise<void>
+  contasPagar(): Promise<ContaPagar[]>
+  salvarContasPagar(contas: NovaContaPagar[]): Promise<void>
+  pagarConta(id: string, p: { pagoEm: string; valorPago: number; forma: FormaPagamento } | null): Promise<void>
+  excluirContaPagar(id: string): Promise<void>
+  movimentosEstoque(): Promise<MovimentoEstoque[]>
+  lancarMovimentoEstoque(m: Omit<MovimentoEstoque, 'id' | 'criadoEm' | 'notaItemId' | 'custoUnit'> & { custoUnit?: number | null }): Promise<void>
   salvarMembroEquipe(m: Omit<MembroEquipeEvento, 'id'> & { id?: string }): Promise<MembroEquipeEvento>
   excluirMembroEquipe(id: string): Promise<void>
   salvarLayoutBarracas(eventoId: string, layout: Record<string, Record<string, string>>): Promise<void>
