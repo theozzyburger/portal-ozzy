@@ -3,7 +3,7 @@ import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, t
 import { chaveDe, daChave } from './types'
 import { hoje } from './datas'
 import { comFolgasDoTurno } from './pessoal'
-import type { NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -1276,9 +1276,36 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         banco: r.banco, agencia: r.agencia, conta: r.conta, data: r.data, saldo: Number(r.saldo),
       }))
     },
+    async motoboys() {
+      return (ok(await sb.from('motoboys').select('*').order('nome')) ?? []).map(paraMotoboy)
+    },
+    async salvarMotoboy(m) {
+      const u = exigeEu()
+      const linha = {
+        nome: nomeProprio(m.nome), unidade_id: m.unidadeId || null, pix: texto(m.pix), telefone: m.telefone ? soDigitos(m.telefone) || null : null,
+        cpf: m.cpf ? soDigitos(m.cpf) || null : null, observacao: texto(m.observacao), ativo: m.ativo,
+      }
+      if (!linha.nome) throw new Error('Diga o nome.')
+      const r = m.id
+        ? ok(await sb.from('motoboys').update(linha).eq('id', m.id).select().single())
+        : ok(await sb.from('motoboys').insert({ ...linha, criado_por: u.id }).select().single())
+      return paraMotoboy(r)
+    },
+    async semanasMotoboys(de, ate) {
+      return (ok(await sb.rpc('semanas_motoboys', { p_de: de, p_ate: ate })) ?? []).map((r: any) => ({
+        id: r.id, motoboyId: r.motoboy_id, unidadeId: r.unidade_id, pagamento: r.pagamento, diarias: Number(r.diarias), entregas: Number(r.entregas),
+        extras: (r.extras ?? []).map((e: any) => ({ descricao: e.descricao ?? '', valor: Number(e.valor) })), total: Number(r.total), pagoEm: r.pago_em, conciliado: r.conciliado,
+      }))
+    },
+    async salvarSemanaMotoboys(pagamento, unidadeId, linhas) {
+      ok(await sb.rpc('salvar_motoboys_semana', {
+        p_pagamento: pagamento, p_unidade: unidadeId,
+        p_linhas: linhas.map((l) => ({ motoboy_id: l.motoboyId, diarias: l.diarias, entregas: l.entregas, extras: l.extras, ja_pago: l.jaPago })),
+      }))
+    },
     async regrasExtrato() {
       return (ok(await sb.from('extrato_regras').select('*')) ?? []).map((r: any) => ({
-        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, fornecedorId: r.fornecedor_id ?? null, funcionarioId: r.funcionario_id ?? null, ignorar: r.ignorar,
+        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, fornecedorId: r.fornecedor_id ?? null, funcionarioId: r.funcionario_id ?? null, motoboyId: r.motoboy_id ?? null, ignorar: r.ignorar,
       }))
     },
     async importarExtrato(e) {
@@ -1306,7 +1333,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async registrarMovimento(movimentoId, r) {
       ok(await sb.rpc('registrar_movimento', {
         p_mov: movimentoId, p_centro: r.centroCustoId, p_conta: r.contaId, p_favorecido: r.favorecido ?? '', p_descricao: r.descricao, p_chave: r.chave, p_fornecedor: r.fornecedorId ?? null,
-        p_funcionario: r.funcionarioId ?? null,
+        p_funcionario: r.funcionarioId ?? null, p_motoboy: r.motoboyId ?? null,
       }))
     },
     async pagamentosFuncionario(fid) {
@@ -1356,8 +1383,11 @@ const paraNota = (r: any): NotaFiscal => ({
       }))
     : undefined,
 })
+const paraMotoboy = (r: any): Motoboy => ({
+  id: r.id, nome: r.nome, unidadeId: r.unidade_id, pix: r.pix, telefone: r.telefone, cpf: r.cpf, observacao: r.observacao, ativo: r.ativo,
+})
 const paraContaPagar = (r: any): ContaPagar => ({
-  id: r.id, centroCustoId: r.centro_custo_id, contaId: r.conta_id, fornecedorId: r.fornecedor_id, funcionarioId: r.funcionario_id ?? null, favorecido: r.favorecido, descricao: r.descricao,
+  id: r.id, centroCustoId: r.centro_custo_id, contaId: r.conta_id, fornecedorId: r.fornecedor_id, funcionarioId: r.funcionario_id ?? null, motoboyId: r.motoboy_id ?? null, favorecido: r.favorecido, descricao: r.descricao,
   competencia: r.competencia, vencimento: r.vencimento, valor: Number(r.valor), forma: r.forma, parcela: r.parcela, parcelas: r.parcelas,
   documento: r.documento, notaId: r.nota_id, observacao: r.observacao, pagoEm: r.pago_em, valorPago: numeroOuNulo(r.valor_pago), conciliado: r.conciliado,
   recorrenteId: r.recorrente_id ?? null, origem: r.origem ?? null, lote: r.lote ?? null, extratoMovimentoId: r.extrato_movimento_id ?? null,

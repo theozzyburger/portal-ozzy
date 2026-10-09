@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
-import { type GrupoLote, LIMITE_DIARIA, aprendidosDe, candidatas, chaveNomeExtrato, fornecedorParecido, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
+import { type GrupoLote, type TipoQuem, LIMITE_DIARIA, aprendidosDe, candidatas, quemParece, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx, partesExtrato } from '../lib/ofx'
 
@@ -14,11 +14,11 @@ import type { NotaFiscal, FormaPagamento } from '../lib/types'
 import { FORMAS_PAGAMENTO } from '../lib/types'
 import { addMeses, mesDe } from '../lib/datas'
 import { ir } from '../lib/rota'
-import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
+import type { Funcionario, Motoboy, CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
 
 interface Dados {
   movs: MovimentoExtrato[]; contas: ContaPagar[]; centros: CentroCusto[]; plano: ContaContabil[]; fornecedores: Fornecedor[]
-  regras: RegraExtrato[]; saldos: SaldoExtrato[]; notas: NotaFiscal[]
+  regras: RegraExtrato[]; saldos: SaldoExtrato[]; notas: NotaFiscal[]; motoboys: Motoboy[]
 }
 
 const FILTROS = [
@@ -48,8 +48,8 @@ export default function Conciliacao() {
   const arquivo = useRef<HTMLInputElement>(null)
 
   const carregar = useCallback(
-    () => Promise.all([store.extrato(), store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores(), store.regrasExtrato(), store.saldosExtrato(), store.notasFiscais()])
-      .then(([movs, contas, centros, plano, fornecedores, regras, saldos, notas]) => setD({ movs, contas, centros, plano, fornecedores, regras, saldos, notas }), (e) => setErro(e.message)),
+    () => Promise.all([store.extrato(), store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores(), store.regrasExtrato(), store.saldosExtrato(), store.notasFiscais(), store.motoboys()])
+      .then(([movs, contas, centros, plano, fornecedores, regras, saldos, notas, motoboys]) => setD({ movs, contas, centros, plano, fornecedores, regras, saldos, notas, motoboys }), (e) => setErro(e.message)),
     [store],
   )
   useEffect(() => {
@@ -292,7 +292,7 @@ export default function Conciliacao() {
                           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50 px-2 py-1 text-xs">
                             <span>Da última vez: {nomeCentro(d.centros.find((x) => x.id === regra.centroCustoId))} · {nomeConta(d.plano, regra.contaId)}{regra.favorecido ? ` · ${regra.favorecido}` : ''}</span>
                             <Botao className="px-2.5! py-1! text-xs!" onClick={() => acao(() => store.registrarMovimento(m.id, {
-                              centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, fornecedorId: regra.fornecedorId ?? null, funcionarioId: regra.funcionarioId ?? null, descricao: m.descricao, chave: chaveExtrato(m.descricao),
+                              centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, fornecedorId: regra.fornecedorId ?? null, funcionarioId: regra.funcionarioId ?? null, motoboyId: regra.motoboyId ?? null, descricao: m.descricao, chave: chaveExtrato(m.descricao),
                             }))}>Lançar assim</Botao>
                           </div>
                         ) : (
@@ -337,6 +337,15 @@ export default function Conciliacao() {
   )
 }
 
+// As três listas onde procurar quem recebeu (fornecedor, funcionário, motoboy), com CPF/CNPJ.
+function listasQuem(d: Dados, equipe: Funcionario[]) {
+  return {
+    fornecedores: d.fornecedores,
+    pessoas: equipe.map((p) => ({ id: p.id, nome: p.nome, cnpj: p.cpf ?? null, ativo: true })),
+    motoboys: d.motoboys.map((x) => ({ id: x.id, nome: x.nome, cnpj: x.cpf, ativo: true })),
+  }
+}
+
 function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
   d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoEscolher: (c: ContaPagar) => void; aoEscolherLote: (ids: string[], contaDiferenca: string | null) => void
 }) {
@@ -347,8 +356,10 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
   const perto = candidatas(m, d.contas, d.fornecedores, usadas)
   const lotes = lotesPara(m, gruposLote(d.contas, usadas))
   const nome = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
-  const parecido = fornecedorParecido(m.descricao, d.fornecedores, aprendidosDe(d.movs, d.contas).fornecedores)
-  const dele = parecido ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && c.fornecedorId === parecido.id) : []
+  const { equipe } = useApp()
+  const parecido = quemParece(m.descricao, listasQuem(d, equipe), aprendidosDe(d.movs, d.contas))
+  const campo = { fornecedor: 'fornecedorId', funcionario: 'funcionarioId', motoboy: 'motoboyId' } as const
+  const dele = parecido ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && c[campo[parecido.tipo]] === parecido.id) : []
   const todas = busca
     ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && `${c.descricao} ${nome(c)}`.toLowerCase().includes(busca.toLowerCase()))
     : perto.map((x) => x.conta)
@@ -412,22 +423,19 @@ type Comprovante = 'nao' | 'nota' | 'recibo'
 function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
   const valor = Math.abs(m.valor)
-  // Já começa com o fornecedor que parece ser o do extrato (e a conta de sempre dele).
+  // Já começa com quem parece ser o do extrato, procurando em fornecedores, equipe e motoboys juntos.
   const aprendidos = useMemo(() => aprendidosDe(d.movs, d.contas), [d.movs, d.contas])
-  const pessoaUsada = aprendidos.pessoas.get(chaveNomeExtrato(m.descricao))
-  const parecido = useMemo(
-    () => (pessoaUsada ? null : fornecedorParecido(m.descricao, d.fornecedores, aprendidos.fornecedores)),
-    [m.descricao, d.fornecedores, aprendidos, pessoaUsada],
-  )
-  // Ou com o funcionário, quando o Pix foi para alguém da equipe (salário, vale, reembolso).
   const { equipe } = useApp()
   const pessoas = useMemo(() => [...equipe].sort((a, b) => Number(b.status === 'ativo') - Number(a.status === 'ativo') || a.nome.localeCompare(b.nome)), [equipe])
-  const pessoaParecida = useMemo(
-    () => (parecido ? null : fornecedorParecido(m.descricao, pessoas.map((p) => ({ id: p.id, nome: p.nome, cnpj: p.cpf ?? null, ativo: true })), aprendidos.pessoas)),
-    [m.descricao, pessoas, parecido, aprendidos],
-  )
-  const [quem, setQuem] = useState<'fornecedor' | 'funcionario'>(pessoaParecida ? 'funcionario' : 'fornecedor')
+  const sugerido = useMemo(() => quemParece(m.descricao, listasQuem(d, equipe), aprendidos), [m.descricao, d, equipe, aprendidos])
+  const parecido = sugerido?.tipo === 'fornecedor' ? d.fornecedores.find((f) => f.id === sugerido.id) ?? null : null
+  const pessoaParecida = sugerido?.tipo === 'funcionario' ? sugerido : null
+  const motoParecido = sugerido?.tipo === 'motoboy' ? d.motoboys.find((x) => x.id === sugerido.id) ?? null : null
+  const [quem, setQuem] = useState<TipoQuem>(sugerido?.tipo ?? 'fornecedor')
   const [funcionario, setFuncionario] = useState(pessoaParecida?.id ?? '')
+  const [motoboy, setMotoboy] = useState(motoParecido?.id ?? '')
+  const motoboysLista = useMemo(() => [...d.motoboys].sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome)), [d.motoboys])
+  const contaMotoboys = d.plano.find((c) => c.codigo === '3.1')?.id ?? ''
   // Regra da casa (Heitor, 09/10): salário cai dia 5 e adiantamento dia 20; freela recebe na segunda, valores baixos.
   const diaMes = Number(m.data.slice(8, 10))
   const segunda = new Date(m.data + 'T12:00:00').getDay() === 1
@@ -438,14 +446,23 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
     return p ? sugestaoPessoal(p, valor, d.plano, d.centros) : null
   }
   const inicialPessoa = pessoaParecida ? sugPessoa(pessoaParecida.id) : null
+  const centroMoto = (id: string) => {
+    const u = d.motoboys.find((x) => x.id === id)?.unidadeId
+    return u && d.centros.some((x) => x.id === u) ? u : ''
+  }
   const [v, setV] = useState({
-    centro: inicialPessoa?.centro || (d.centros.some((x) => x.id === 'central') ? 'central' : ''),
-    conta: inicialPessoa?.conta || (parecido?.contaPadraoId ?? ''), fornecedor: parecido?.nome ?? '', descricao: m.descricao,
+    centro: inicialPessoa?.centro || (motoParecido ? centroMoto(motoParecido.id) : '') || (d.centros.some((x) => x.id === 'central') ? 'central' : ''),
+    conta: inicialPessoa?.conta || (motoParecido ? contaMotoboys : '') || (parecido?.contaPadraoId ?? ''), fornecedor: parecido?.nome ?? '', descricao: m.descricao,
   })
   function escolherFuncionario(id: string) {
     setFuncionario(id)
     const s = sugPessoa(id)
     if (s) setV((x) => ({ ...x, conta: s.conta || x.conta, centro: s.centro || x.centro }))
+  }
+  // Motoboy: conta 3.1 Motoboys e a loja do cadastro.
+  function escolherMotoboy(id: string) {
+    setMotoboy(id)
+    setV((x) => ({ ...x, conta: contaMotoboys || x.conta, centro: centroMoto(id) || x.centro }))
   }
   const [comp, setComp] = useState<Comprovante>('nao')
   const [numero, setNumero] = useState('')
@@ -477,6 +494,20 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
 
   async function salvar() {
     setErro('')
+    if (quem === 'motoboy') {
+      const mb = d.motoboys.find((x) => x.id === motoboy)
+      if (!mb) return setErro('Escolha o motoboy.')
+      if (!v.centro) return setErro('Escolha a loja.')
+      if (!v.conta) return setErro('Escolha a conta contábil.')
+      setSalvando(true)
+      try {
+        await store.registrarMovimento(m.id, { centroCustoId: v.centro, contaId: v.conta, favorecido: mb.nome, motoboyId: mb.id, descricao: v.descricao, chave: chaveExtrato(m.descricao) })
+        return aoSalvar()
+      } catch (e) {
+        setErro((e as Error).message)
+        return setSalvando(false)
+      }
+    }
     if (quem === 'funcionario') {
       const p = equipe.find((x) => x.id === funcionario)
       if (!p) return setErro('Escolha o funcionário.')
@@ -532,8 +563,8 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
         <div className="space-y-1">
           <p className="text-sm font-medium text-stone-700">Para quem foi?</p>
           <div className="flex flex-wrap gap-2">
-            {([['fornecedor', 'Fornecedor'], ['funcionario', 'Funcionário']] as const).map(([id, nome]) => (
-              <button key={id} onClick={() => { setQuem(id); if (id === 'funcionario') setComp('nao') }}
+            {([['fornecedor', 'Fornecedor'], ['funcionario', 'Funcionário'], ['motoboy', 'Motoboy']] as const).map(([id, nome]) => (
+              <button key={id} onClick={() => { setQuem(id); if (id !== 'fornecedor') setComp('nao') }}
                 className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${quem === id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-600 ring-stone-300'}`}>
                 {nome}
               </button>
@@ -573,7 +604,19 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
           </div>
         ) : (
           <>
-            {quem === 'funcionario' ? (
+            {quem === 'motoboy' ? (
+              <>
+                <Campo rotulo="Motoboy">
+                  <select className={estiloEntrada} value={motoboy} onChange={(e) => escolherMotoboy(e.target.value)} aria-label="Motoboy">
+                    <option value="">Escolher</option>
+                    {motoboysLista.map((x) => <option key={x.id} value={x.id}>{x.nome}{!x.ativo ? ' (inativo)' : ''}</option>)}
+                  </select>
+                </Campo>
+                {motoParecido && motoboy === motoParecido.id && <p className="text-xs text-stone-500">{sugerido?.aprendido ? 'Foi o usado da última vez para este nome.' : 'Sugerido pelo texto do extrato.'} Se não for, é só trocar.</p>}
+                {d.motoboys.length === 0 && <p className="text-xs text-stone-500">Nenhum motoboy cadastrado ainda: cadastre no menu Motoboys.</p>}
+                <p className="text-xs text-stone-500">Se a semana dele foi lançada, o pagamento já aparece em "Achar conta" (ou no lote da segunda).</p>
+              </>
+            ) : quem === 'funcionario' ? (
               <>
                 <Campo rotulo="Funcionário">
                   <select className={estiloEntrada} value={funcionario} onChange={(e) => escolherFuncionario(e.target.value)} aria-label="Funcionário">
@@ -581,7 +624,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
                     {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.status !== 'ativo' ? ' (desligado)' : ''}</option>)}
                   </select>
                 </Campo>
-                {pessoaParecida && funcionario === pessoaParecida.id && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
+                {pessoaParecida && funcionario === pessoaParecida.id && <p className="text-xs text-stone-500">{pessoaParecida.aprendido ? 'Foi o usado da última vez para este nome.' : 'Sugerido pelo texto do extrato.'} Se não for, é só trocar.</p>}
                 {pareceSer && funcionario && (
                   <p className="text-xs text-stone-600">
                     Pela data e valor, parece <b>{pareceSer === 'Diária' ? 'diária de freela' : pareceSer === 'Salário' ? 'salário do dia 5' : 'adiantamento do dia 20'}</b>: a conta contábil e a loja já vieram {pareceSer === 'Diária' ? 'como freelancer' : 'como salário'} do setor da pessoa.{' '}
@@ -598,7 +641,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
                 </Campo>
                 {parecido && v.fornecedor === parecido.nome && (
                   <p className="text-xs text-stone-500">
-                    {aprendidos.fornecedores.get(chaveNomeExtrato(m.descricao)) === parecido.id ? 'Foi o usado da última vez para este nome.' : 'Sugerido pelo texto do extrato.'} Se não for, é só trocar: da próxima vez ele lembra.
+                    {sugerido?.aprendido ? 'Foi o usado da última vez para este nome.' : 'Sugerido pelo texto do extrato.'} Se não for, é só trocar: da próxima vez ele lembra.
                   </p>
                 )}
                 {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (

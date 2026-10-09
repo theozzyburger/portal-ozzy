@@ -432,6 +432,32 @@ export interface ResultadoMes {
 }
 
 // Freelancers: cadastro e diárias. Semana de segunda a domingo, paga na segunda seguinte.
+// Motoboys (0056): não são da equipe, recebem toda segunda pela semana lançada no domingo.
+export interface Motoboy {
+  id: string
+  nome: string
+  unidadeId: string | null
+  pix: string | null
+  telefone: string | null
+  cpf: string | null
+  observacao: string | null
+  ativo: boolean
+}
+export interface ExtraMotoboy { descricao: string; valor: number }
+export interface SemanaMotoboy {
+  id: string
+  motoboyId: string
+  unidadeId: string
+  pagamento: string // a segunda do pagamento
+  diarias: number
+  entregas: number
+  extras: ExtraMotoboy[]
+  total: number
+  pagoEm: string | null
+  conciliado: boolean
+}
+export interface LinhaSemanaMotoboy { motoboyId: string; diarias: number; entregas: number; extras: ExtraMotoboy[]; jaPago: boolean }
+
 export interface Freelancer {
   id: string
   nome: string
@@ -1203,6 +1229,8 @@ export interface ContaPagar {
   fornecedorId: string | null
   // Pagamento para um funcionário (salário, vale, reembolso): aparece no perfil dele.
   funcionarioId?: string | null
+  // Pagamento da semana de um motoboy (0056).
+  motoboyId?: string | null
   favorecido: string | null
   descricao: string
   competencia: string // AAAA-MM-01
@@ -1280,6 +1308,7 @@ export interface RegraExtrato {
   favorecido: string | null
   fornecedorId?: string | null
   funcionarioId?: string | null
+  motoboyId?: string | null
   ignorar: boolean
 }
 export interface SaldoExtrato {

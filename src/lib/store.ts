@@ -1,5 +1,5 @@
 import type { ItemNota, ItemRecibo } from './types'
-import type { PagamentoPessoa, CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, NovoMovimentoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { Motoboy, SemanaMotoboy, LinhaSemanaMotoboy, PagamentoPessoa, CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, NovoMovimentoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -212,6 +212,11 @@ export interface Store {
   resultados(): Promise<{ linhas: ResultadoMes[]; atualizadoEm: string | null }>
 
   // Freelancers (só a gestão). semana = segunda-feira que abre a semana.
+  // Motoboys (0056, só gestão): cadastro e a semana de cada loja, que vira conta a pagar na segunda.
+  motoboys(): Promise<Motoboy[]>
+  salvarMotoboy(m: Omit<Motoboy, 'id'> & { id?: string }): Promise<Motoboy>
+  semanasMotoboys(de: string, ate: string): Promise<SemanaMotoboy[]>
+  salvarSemanaMotoboys(pagamento: string, unidadeId: string, linhas: LinhaSemanaMotoboy[]): Promise<void>
   freelancers(): Promise<Freelancer[]>
   salvarFreelancer(f: Omit<Freelancer, 'id'> & { id?: string }): Promise<Freelancer>
   // Leva junto diárias e envios; recusa se já houver pagamento marcado.
@@ -335,7 +340,7 @@ export interface Store {
   conciliarLote(movimentoId: string, contaIds: string[], contaDiferencaId: string | null): Promise<void>
   conciliarMovimento(movimentoId: string, contaPagarId: string): Promise<void>
   desconciliarMovimento(movimentoId: string): Promise<void>
-  registrarMovimento(movimentoId: string, r: { centroCustoId: string; contaId: string | null; favorecido: string | null; fornecedorId?: string | null; funcionarioId?: string | null; descricao: string; chave: string }): Promise<void>
+  registrarMovimento(movimentoId: string, r: { centroCustoId: string; contaId: string | null; favorecido: string | null; fornecedorId?: string | null; funcionarioId?: string | null; motoboyId?: string | null; descricao: string; chave: string }): Promise<void>
   pagamentosFuncionario(funcionarioId: string): Promise<PagamentoPessoa[]>
   ignorarMovimento(movimentoId: string, motivo: string, chaveSempre: string | null): Promise<void>
   lancarMovimentoEstoque(m: Omit<MovimentoEstoque, 'id' | 'criadoEm' | 'notaItemId' | 'custoUnit'> & { custoUnit?: number | null }): Promise<void>

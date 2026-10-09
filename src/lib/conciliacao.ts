@@ -67,6 +67,7 @@ export function nomeLote(lote: string) {
   if (tipo === 'sal') return `${b === 'adiantamento' ? 'Adiantamentos' : 'Salários'} de ${a}`
   if (tipo === 'freela') return `Diárias de freelancers da semana de ${a.split('-').reverse().join('/')}`
   if (tipo === 'freelaev') return 'Diárias de freelancers do evento'
+  if (tipo === 'moto') return `Motoboys pagos em ${a.split('-').reverse().join('/')}`
   return lote
 }
 
@@ -101,22 +102,25 @@ const palavrasNome = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !SEM_PESO.has(w))
 export const chaveNomeExtrato = (descricao: string) => palavrasNome(partesExtrato(descricao).nome).join(' ')
 
-// Nome no extrato → fornecedor que foi escolhido da última vez (das saídas já conciliadas).
-// Vale também para funcionário (quem recebeu o Pix da última vez com esse nome).
+// Nome no extrato → quem foi escolhido da última vez (das saídas já conciliadas): fornecedor, funcionário ou motoboy.
 export function aprendidosDe(movs: MovimentoExtrato[], contas: ContaPagar[]) {
   const porId = new Map(contas.map((c) => [c.id, c]))
   const fornecedores = new Map<string, string>()
   const pessoas = new Map<string, string>()
+  const motoboys = new Map<string, string>()
   for (const m of [...movs].sort((a, b) => a.data.localeCompare(b.data))) {
     if (m.status !== 'conciliado' || !m.contaPagarId) continue
     const c = porId.get(m.contaPagarId)
     const k = chaveNomeExtrato(m.descricao)
     if (!c || !k) continue
-    if (c.fornecedorId) { fornecedores.set(k, c.fornecedorId); pessoas.delete(k) }
-    else if (c.funcionarioId) { pessoas.set(k, c.funcionarioId); fornecedores.delete(k) }
+    const [mapa, id] = c.fornecedorId ? [fornecedores, c.fornecedorId] : c.funcionarioId ? [pessoas, c.funcionarioId] : c.motoboyId ? [motoboys, c.motoboyId] : [null, null]
+    if (!mapa || !id) continue
+    for (const x of [fornecedores, pessoas, motoboys]) x.delete(k)
+    mapa.set(k, id)
   }
-  return { fornecedores, pessoas }
+  return { fornecedores, pessoas, motoboys }
 }
+export type Aprendidos = ReturnType<typeof aprendidosDe>
 
 const notaNome = (ext: string[], nome: string | null | undefined) => {
   const fw = palavrasNome(nome ?? '')
@@ -127,21 +131,22 @@ const notaNome = (ext: string[], nome: string | null | undefined) => {
   return fw.filter(bate).length / Math.max(fw.length, Math.min(ext.length, 3))
 }
 
-export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'cnpj' | 'ativo' | 'razaoSocial'>>(
-  descricao: string, fornecedores: F[], aprendidos?: Map<string, string>,
-): F | null {
+type Parecivel = { id: string; nome: string; cnpj?: string | null; ativo: boolean; razaoSocial?: string | null }
+
+// Nota de 0 a 3: 3 = usado da última vez para este nome, 2 = CPF/CNPJ igual, até 1 = nome parecido.
+function parecidoComNota<F extends Parecivel>(descricao: string, itens: F[], aprendidos?: Map<string, string>): { item: F; nota: number } | null {
   const { nome, documento } = partesExtrato(descricao)
-  const ativos = fornecedores.filter((f) => f.ativo)
+  const ativos = itens.filter((f) => f.ativo)
   const ext = palavrasNome(nome)
   const usado = aprendidos?.get(ext.join(' '))
   if (usado) {
     const f = ativos.find((x) => x.id === usado)
-    if (f) return f
+    if (f) return { item: f, nota: 3 }
   }
   const doc = documento?.replace(/\D/g, '')
   if (doc && doc.length >= 11) {
     const f = ativos.find((x) => x.cnpj?.replace(/\D/g, '') === doc)
-    if (f) return f
+    if (f) return { item: f, nota: 2 }
   }
   if (!ext.length) return null
   let melhor: F | null = null
@@ -151,7 +156,31 @@ export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'c
     const n = Math.max(notaNome(ext, f.nome) + 0.01, notaNome(ext, f.razaoSocial))
     if (n > nota) { nota = n; melhor = f }
   }
-  return nota >= 0.5 ? melhor : null
+  return melhor && nota >= 0.5 ? { item: melhor, nota } : null
+}
+
+export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'cnpj' | 'ativo' | 'razaoSocial'>>(
+  descricao: string, fornecedores: F[], aprendidos?: Map<string, string>,
+): F | null {
+  return parecidoComNota(descricao, fornecedores, aprendidos)?.item ?? null
+}
+
+// Procura nas três listas juntas (Heitor, 09/10: "Ana Paula" é funcionária, não fornecedor) e fica com a nota maior.
+// No empate ganha a pessoa (motoboy ou funcionário): nome de gente no extrato quase sempre é Pix para alguém da casa.
+export type TipoQuem = 'fornecedor' | 'funcionario' | 'motoboy'
+export function quemParece(
+  descricao: string,
+  listas: { fornecedores: Parecivel[]; pessoas: Parecivel[]; motoboys: Parecivel[] },
+  aprendidos: Aprendidos,
+): { tipo: TipoQuem; id: string; nome: string; aprendido: boolean } | null {
+  const opcoes = [
+    { tipo: 'motoboy' as const, r: parecidoComNota(descricao, listas.motoboys, aprendidos.motoboys) },
+    { tipo: 'funcionario' as const, r: parecidoComNota(descricao, listas.pessoas, aprendidos.pessoas) },
+    { tipo: 'fornecedor' as const, r: parecidoComNota(descricao, listas.fornecedores, aprendidos.fornecedores) },
+  ]
+  let melhor: (typeof opcoes)[number] | null = null
+  for (const o of opcoes) if (o.r && (!melhor || o.r.nota > melhor.r!.nota + 0.011)) melhor = o
+  return melhor?.r ? { tipo: melhor.tipo, id: melhor.r.item.id, nome: melhor.r.item.nome, aprendido: melhor.r.nota === 3 } : null
 }
 
 // Pagamento para funcionário (Heitor, 09/10): valor baixo (até R$ 400) é diária de freela; acima disso é salário,

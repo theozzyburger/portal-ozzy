@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -391,6 +391,15 @@ const arquivosDemo = new Map<string, string>()
 
 // Valores reais de setembro/2026, da planilha.
 // Freelancers de exemplo (nomes, CPFs e Pix fictícios), com diárias nesta semana e na anterior.
+const dataCurtaDemo = (d: string) => d.slice(8, 10) + '/' + d.slice(5, 7)
+// Motoboys de EXEMPLO (nomes e Pix inventados).
+const motoboysDemo: Motoboy[] = [
+  { id: 'mb1', nome: 'Mateus Exemplo Rocha', unidadeId: 'burger-psd', pix: '11955554444', telefone: '11955554444', cpf: null, observacao: null, ativo: true },
+  { id: 'mb2', nome: 'Renan Exemplo Dias', unidadeId: 'burger-psd', pix: 'renan@email.com', telefone: null, cpf: null, observacao: 'Supervisiona os motoboys', ativo: true },
+  { id: 'mb3', nome: 'Tiago Exemplo Lima', unidadeId: 'burger-va', pix: '11944443333', telefone: '11944443333', cpf: null, observacao: null, ativo: true },
+]
+const semanasMotoboyDemo: SemanaMotoboy[] = []
+
 const freelas: Freelancer[] = [
   { id: 'fl1', nome: 'Rafael Mendes Teixeira', cpf: '52998224725', pix: '11988887777', celular: '11988887777', ativo: true, funcionarioId: null },
   { id: 'fl2', nome: 'Bruna Carvalho Lopes', cpf: '11144477735', pix: 'bruna.lopes@email.com', celular: null, ativo: true, funcionarioId: null },
@@ -852,6 +861,8 @@ const extratoDemo: MovimentoExtrato[] = [
   movExtrato('ex7', 5, 7800, 'IFOOD REPASSE'),
   movExtrato('ex8', 3, -405.83, 'FATURA CARTAO ITAU'),
   movExtrato('ex9', 1, -1550, 'SISPAG PIX LOTE 000123'),
+  movExtrato('ex10', 1, -415, 'PIX ENVIADO RENAN EXEMPLO DIAS'),
+  movExtrato('ex11', 2, -180, 'PIX ENVIADO CIBELI ALVES'),
 ]
 const regrasExtratoDemo: RegraExtrato[] = [{ chave: 'tar pacote servicos', centroCustoId: 'burger-psd', contaId: 'pc5.22', favorecido: 'Itaú', ignorar: false }]
 const saldosExtratoDemo: SaldoExtrato[] = [{ banco: '341', agencia: '0000', conta: '00000-0', data: addDias(hoje(), -1), saldo: 18432.1 }]
@@ -1453,6 +1464,56 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const p = porId(fid)
       p.foto = `${fid}/${Date.now()}.jpg`
       p.fotoUrl = URL.createObjectURL(imagem)
+    },
+    async motoboys() {
+      exigeGestao()
+      return espera([...motoboysDemo].sort((a, b) => a.nome.localeCompare(b.nome)))
+    },
+    async salvarMotoboy(m) {
+      exigeGestao()
+      if (!m.nome.trim()) throw new Error('Diga o nome.')
+      const novo: Motoboy = { ...m, id: m.id ?? novoId('mb'), nome: nomeProprio(m.nome), telefone: m.telefone ? soDigitos(m.telefone) || null : null, cpf: m.cpf ? soDigitos(m.cpf) || null : null, pix: m.pix?.trim() || null, observacao: m.observacao?.trim() || null }
+      const i = motoboysDemo.findIndex((x) => x.id === novo.id)
+      if (i >= 0) motoboysDemo[i] = novo
+      else motoboysDemo.push(novo)
+      return espera(novo)
+    },
+    async semanasMotoboys(de, ate) {
+      exigeGestao()
+      return espera(semanasMotoboyDemo.filter((s) => s.pagamento >= de && s.pagamento <= ate).map((s) => {
+        const c = contasPagarDemo.find((x) => x.origem === `moto:${s.motoboyId}:${s.pagamento}:${s.unidadeId}`)
+        return { ...s, pagoEm: c?.pagoEm ?? null, conciliado: c?.conciliado ?? false }
+      }))
+    },
+    async salvarSemanaMotoboys(pagamento, unidadeId, linhas) {
+      exigeGestao()
+      for (const l of linhas) {
+        const mb = motoboysDemo.find((x) => x.id === l.motoboyId)
+        if (!mb) throw new Error('Motoboy não encontrado.')
+        const origem = `moto:${mb.id}:${pagamento}:${unidadeId}`
+        const ci = contasPagarDemo.findIndex((x) => x.origem === origem)
+        if (ci >= 0 && contasPagarDemo[ci].conciliado) continue
+        const extras = l.extras.filter((e) => e.valor).map((e) => ({ descricao: e.descricao.trim(), valor: Math.round(e.valor * 100) / 100 }))
+        const total = Math.round((l.diarias + l.entregas + extras.reduce((t, e) => t + e.valor, 0)) * 100) / 100
+        const si = semanasMotoboyDemo.findIndex((x) => x.motoboyId === mb.id && x.unidadeId === unidadeId && x.pagamento === pagamento)
+        if (total <= 0) {
+          if (si >= 0) semanasMotoboyDemo.splice(si, 1)
+          if (ci >= 0) contasPagarDemo.splice(ci, 1)
+          continue
+        }
+        const semana: SemanaMotoboy = { id: si >= 0 ? semanasMotoboyDemo[si].id : novoId('ms'), motoboyId: mb.id, unidadeId, pagamento, diarias: l.diarias, entregas: l.entregas, extras, total, pagoEm: null, conciliado: false }
+        if (si >= 0) semanasMotoboyDemo[si] = semana
+        else semanasMotoboyDemo.push(semana)
+        const conta = contaDemo(ci >= 0 ? contasPagarDemo[ci].id : novoId('cp'), {
+          centroCustoId: unidadeId, contaId: 'pc3.1', motoboyId: mb.id, favorecido: mb.nome,
+          descricao: `Motoboy ${dataCurtaDemo(addDias(pagamento, -7))} a ${dataCurtaDemo(addDias(pagamento, -1))} · ${mb.nome}`,
+          competencia: addDias(pagamento, -1).slice(0, 8) + '01', vencimento: pagamento, valor: total, forma: 'pix', origem, lote: 'moto:' + pagamento,
+          observacao: 'Lançada pela semana dos motoboys', pagoEm: l.jaPago ? (ci >= 0 && contasPagarDemo[ci].pagoEm) || (pagamento < hoje() ? pagamento : hoje()) : null, valorPago: l.jaPago ? total : null,
+        })
+        if (ci >= 0) contasPagarDemo[ci] = conta
+        else contasPagarDemo.push(conta)
+      }
+      return espera(undefined)
     },
     async freelancers() {
       exigeGestao()
@@ -2242,14 +2303,14 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!r.centroCustoId) throw new Error('Escolha a loja.')
       const id = novoId('cp')
       contasPagarDemo.push(contaDemo(id, {
-        centroCustoId: r.centroCustoId, contaId: r.contaId, fornecedorId: r.fornecedorId ?? null, funcionarioId: r.funcionarioId ?? null, favorecido: r.fornecedorId ? null : r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
+        centroCustoId: r.centroCustoId, contaId: r.contaId, fornecedorId: r.fornecedorId ?? null, funcionarioId: r.funcionarioId ?? null, motoboyId: r.motoboyId ?? null, favorecido: r.fornecedorId ? null : r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
         competencia: m.data.slice(0, 8) + '01', vencimento: m.data, valor: -m.valor, forma: 'transferencia', pagoEm: m.data, valorPago: -m.valor, conciliado: true,
         observacao: 'Lançada pela conciliação bancária',
       }))
       Object.assign(m, { status: 'conciliado', contaPagarId: id })
       if (r.chave) {
         const i = regrasExtratoDemo.findIndex((x) => x.chave === r.chave)
-        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, fornecedorId: r.fornecedorId ?? null, funcionarioId: r.funcionarioId ?? null, ignorar: false }
+        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, fornecedorId: r.fornecedorId ?? null, funcionarioId: r.funcionarioId ?? null, motoboyId: r.motoboyId ?? null, ignorar: false }
         if (i >= 0) regrasExtratoDemo[i] = regra
         else regrasExtratoDemo.push(regra)
       }
