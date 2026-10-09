@@ -10,12 +10,12 @@ import { FORMAS_PAGAMENTO, type CentroCusto, type ContaContabil, type ContaPagar
 export interface Dados { contas: ContaPagar[]; centros: CentroCusto[]; plano: ContaContabil[]; fornecedores: Fornecedor[] }
 
 // Loja padrão de toda conta nova (Heitor, 09/10): Central de Produção.
-const lojaPadrao = (centros: CentroCusto[]) => (centros.some((c) => c.id === 'central') ? 'central' : centros[0]?.id ?? '')
+export const lojaPadrao = (centros: CentroCusto[]) => (centros.some((c) => c.id === 'central') ? 'central' : centros[0]?.id ?? '')
 const competenciaDe = (vencimento: string) => mesDe(vencimento) + '-01'
 const simples = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
 
 // Fornecedor pelo nome digitado (ou CNPJ). Se não existe, cadastra na hora.
-async function garantirFornecedor(store: Store, lista: Fornecedor[], texto: string, cnpj?: string | null): Promise<Fornecedor> {
+export async function garantirFornecedor(store: Store, lista: Fornecedor[], texto: string, cnpj?: string | null): Promise<Fornecedor> {
   const t = simples(texto)
   const dig = soDigitos(cnpj ?? '') || (/^[\d./-]+$/.test(texto.trim()) ? soDigitos(texto) : '')
   const achado = (dig && lista.find((f) => f.cnpj && soDigitos(f.cnpj) === dig)) || lista.find((f) => simples(f.nome) === t)
@@ -27,7 +27,7 @@ async function garantirFornecedor(store: Store, lista: Fornecedor[], texto: stri
 }
 
 // Conta contábil: nome primeiro para dar para achar digitando no select ("alu" → Aluguel).
-function OpcoesConta({ plano }: { plano: ContaContabil[] }) {
+export function OpcoesConta({ plano }: { plano: ContaContabil[] }) {
   const lanc = contasLancaveis(plano).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   return <>{lanc.map((x) => <option key={x.id} value={x.id}>{x.nome} · {x.codigo}</option>)}</>
 }

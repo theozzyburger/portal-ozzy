@@ -1,8 +1,8 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
-import { addDias, hoje, inicioDaSemana } from './datas'
+import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
 import { addMesesData } from './vencimentos'
@@ -646,85 +646,118 @@ const centrosDemo: CentroCusto[] = [
   { id: 'central', nome: 'Central de Produção', cnpj: null, ativo: true },
   { id: 'eventos', nome: 'The Ozzy Eventos', cnpj: null, ativo: true },
 ]
-const PLANO: [string, string, string | null, boolean, number][] = [
-  ['1', 'CMC - Custo de Mercadoria Comprada', null, true, 100],
-  ['1.1', 'Insumos', '1', true, 101],
-  ['1.2', 'Hortifruti', '1', true, 102],
-  ['1.3', 'Carnes', '1', true, 103],
-  ['1.4', 'Laticínios', '1', true, 104],
-  ['1.5', 'Bebidas', '1', true, 105],
-  ['1.6', 'Alcoólicos', '1', true, 106],
-  ['1.7', 'Produtos para Revenda', '1', true, 107],
-  ['1.8', 'Embalagem', '1', true, 108],
-  ['2', 'CMO - Custo de Mão de Obra', null, true, 200],
-  ['2.1', 'Salários e Ordenados', '2', true, 201],
-  ['2.2', 'Encargos Trabalhistas', '2', true, 202],
-  ['2.3', 'Pró-labore', '2', true, 203],
-  ['2.4', 'Freelancers e Terceirizados', '2', true, 204],
-  ['2.5', 'Benefícios', '2', true, 205],
-  ['3', 'Taxa de Entrega', null, true, 300],
-  ['4', 'Despesas e Utilidades Prediais', null, true, 400],
-  ['4.1', 'Aluguel', '4', true, 401],
-  ['4.2', 'Água', '4', true, 402],
-  ['4.3', 'Energia Elétrica', '4', true, 403],
-  ['4.4', 'Gás Encanado', '4', true, 404],
-  ['4.5', 'Internet', '4', true, 405],
-  ['4.6', 'IPTU', '4', true, 406],
-  ['4.7', 'Telefone Fixo', '4', true, 407],
-  ['4.8', 'Telefone Celular Empresarial', '4', true, 408],
-  ['4.9', 'Manutenção Predial', '4', true, 409],
-  ['4.10', 'Manutenção Computadores', '4', true, 410],
-  ['4.11', 'Seguro Predial', '4', true, 411],
-  ['4.12', 'Serviço de Limpeza', '4', true, 412],
-  ['4.13', 'Taxa Franquia', '4', true, 413],
-  ['4.14', 'Investimento Estrutura', '4', true, 414],
-  ['5', 'Administrativo Geral', null, true, 500],
-  ['5.1', 'Assessorias', '5', true, 501],
-  ['5.2', 'Brindes e Confraternizações', '5', true, 502],
-  ['5.3', 'Combustível', '5', true, 503],
-  ['5.4', 'Consultoria e Mentoria', '5', true, 504],
-  ['5.5', 'Contabilidade', '5', true, 505],
-  ['5.6', 'CRM', '5', true, 506],
-  ['5.7', 'Entregas APP', '5', true, 507],
-  ['5.8', 'ERP', '5', true, 508],
-  ['5.9', 'Estornos e Devoluções', '5', true, 509],
-  ['5.10', 'Financeiro', '5', true, 510],
-  ['5.11', 'Fretes', '5', true, 511],
-  ['5.12', 'Gestão de Entregas', '5', true, 512],
-  ['5.13', 'Gestão de Equipe', '5', true, 513],
-  ['5.14', 'IA', '5', true, 514],
-  ['5.15', 'Jurídico', '5', true, 515],
-  ['5.16', 'Marketing', '5', true, 516],
-  ['5.17', 'PDV', '5', true, 517],
-  ['5.18', 'Publicidade', '5', true, 518],
-  ['5.19', 'Sistemas', '5', true, 519],
-  ['5.20', 'Serviços Terceirizados - Vigilância e Segurança', '5', true, 520],
-  ['5.21', 'Tributos e Impostos', '5', true, 521],
-  ['5.22', 'Tarifas Bancárias', '5', true, 522],
-  ['5.23', 'Manutenção e Conservação', '5', true, 523],
-  ['6', 'Material de Consumo', null, true, 600],
-  ['6.1', 'Limpeza e Conservação', '6', true, 601],
-  ['6.2', 'Material de Escritório', '6', true, 602],
-  ['6.3', 'Utensílio de Cozinha', '6', true, 603],
-  ['7', 'Juros', null, true, 700],
-  ['8', 'Multas', null, true, 800],
-  ['9', 'Empréstimos e Financiamentos', null, false, 900],
-  ['9.1', 'Empréstimo de Capital de Giro', '9', false, 901],
-  ['9.2', 'Financiamentos', '9', false, 902],
-  ['9.3', 'Empréstimo LJ-1 Ozzy Burger', '9', false, 903],
-  ['9.4', 'Empréstimo LJ-2 Ozzy Burger', '9', false, 904],
-  ['10', 'Investimentos (Capex)', null, false, 1000],
-  ['10.1', 'Instalações Gerais', '10', false, 1001],
-  ['10.2', 'Equipamentos de Cozinha', '10', false, 1002],
-  ['10.3', 'Mobiliário', '10', false, 1003],
-  ['10.4', 'Outros Equipamentos', '10', false, 1004],
-  ['10.5', 'Mão de Obra (implantação/obra)', '10', false, 1005],
-  ['11', 'Distribuição de Resultados', null, false, 1100],
-  ['11.1', 'Distribuição de Lucros', '11', false, 1101],
-  ['11.2', 'Retirada de Sócios (pró-labore ou extra)', '11', false, 1102],
-  ['11.3', 'Antecipação de Lucros', '11', false, 1103],
+const PLANO: [string, string, string | null, boolean, number, boolean][] = [
+  ['1', 'CMC - Custo de Mercadoria Comprada', null, true, 100, true],
+  ['1.1', 'Mercado', '1', true, 101, true],
+  ['1.2', 'Hortifruti', '1', true, 102, true],
+  ['1.3', 'Proteínas e Ovos', '1', true, 103, true],
+  ['1.4', 'Laticínios', '1', true, 104, true],
+  ['1.5', 'Bebidas', '1', true, 105, true],
+  ['1.6', 'Alcoólicos', '1', true, 106, false],
+  ['1.7', 'Produtos para Revenda', '1', true, 107, false],
+  ['1.8', 'Embalagens', '1', true, 108, true],
+  ['1.9', 'Temperos', '1', true, 109, true],
+  ['1.10', 'Pão', '1', true, 110, true],
+  ['1.11', 'Doces e Confeitaria', '1', true, 111, true],
+  ['1.12', 'Picles', '1', true, 112, true],
+  ['1.13', 'Farinhas, Fermentos e Massas', '1', true, 113, true],
+  ['1.14', 'Grãos, Cereais e Derivados', '1', true, 114, true],
+  ['1.15', 'Molhos e Condimentos', '1', true, 115, true],
+  ['1.16', 'Batata-frita', '1', true, 116, true],
+  ['1.17', 'Compras Emergenciais', '1', true, 117, true],
+  ['1.18', 'Compras Não Registradas', '1', true, 118, true],
+  ['2', 'CMO - Custo de Mão de Obra', null, true, 200, true],
+  ['2.1', 'Salários Geral', '2', true, 201, true],
+  ['2.2', 'INSS', '2', true, 202, true],
+  ['2.3', 'Pró-labore', '2', true, 203, true],
+  ['2.4', 'Freelancers Cozinha', '2', true, 204, true],
+  ['2.5', 'Refeição / Cesta', '2', true, 205, true],
+  ['2.6', 'Salários Cozinha', '2', true, 206, true],
+  ['2.7', 'Salários Atendimento', '2', true, 207, true],
+  ['2.8', 'Salários Produção', '2', true, 208, true],
+  ['2.9', 'Salários Adm', '2', true, 209, true],
+  ['2.10', 'Freelancers Atendimento', '2', true, 210, true],
+  ['2.11', 'Freelancers Produção', '2', true, 211, true],
+  ['2.12', 'Freelancers Evento', '2', true, 212, true],
+  ['2.13', 'FGTS', '2', true, 213, true],
+  ['2.14', 'Rescisão', '2', true, 214, true],
+  ['2.15', 'Ações Trabalhistas', '2', true, 215, true],
+  ['2.16', 'Custo Admissional', '2', true, 216, true],
+  ['2.17', 'Vale-transporte', '2', true, 217, true],
+  ['2.18', 'Convênio Médico', '2', true, 218, true],
+  ['2.19', 'Bonificações', '2', true, 219, true],
+  ['2.20', 'Uniformes', '2', true, 220, true],
+  ['3', 'Taxa de Entrega', null, true, 300, true],
+  ['3.1', 'Motoboys', '3', true, 301, true],
+  ['4', 'Despesas e Utilidades Prediais', null, true, 400, true],
+  ['4.1', 'Aluguel', '4', true, 401, true],
+  ['4.2', 'Água e Esgoto', '4', true, 402, true],
+  ['4.3', 'Energia Elétrica', '4', true, 403, true],
+  ['4.4', 'Gás', '4', true, 404, true],
+  ['4.5', 'Telefone e Internet', '4', true, 405, true],
+  ['4.6', 'IPTU', '4', true, 406, false],
+  ['4.7', 'Telefone Fixo', '4', true, 407, false],
+  ['4.8', 'Telefone Celular Empresarial', '4', true, 408, false],
+  ['4.9', 'Manutenção e Conservação', '4', true, 409, true],
+  ['4.10', 'Manutenção Computadores', '4', true, 410, false],
+  ['4.11', 'Seguro Predial', '4', true, 411, false],
+  ['4.12', 'Serviço de Limpeza', '4', true, 412, false],
+  ['4.13', 'Taxa Franquia', '4', true, 413, false],
+  ['4.14', 'Investimento Estrutura', '4', true, 414, false],
+  ['4.15', 'Reformas', '4', true, 415, true],
+  ['4.16', 'Melhorias', '4', true, 416, true],
+  ['5', 'Administrativo Geral', null, true, 500, true],
+  ['5.1', 'Assessorias', '5', true, 501, false],
+  ['5.2', 'Brindes e Confraternizações', '5', true, 502, false],
+  ['5.3', 'Transportes', '5', true, 503, true],
+  ['5.4', 'Consultoria', '5', true, 504, true],
+  ['5.5', 'Contador', '5', true, 505, true],
+  ['5.6', 'CRM', '5', true, 506, false],
+  ['5.7', 'Entregas APP', '5', true, 507, false],
+  ['5.8', 'ERP', '5', true, 508, false],
+  ['5.9', 'Estorno Clientes', '5', true, 509, true],
+  ['5.10', 'Financeiro', '5', true, 510, false],
+  ['5.11', 'Fretes', '5', true, 511, false],
+  ['5.12', 'Gestão de Entregas', '5', true, 512, false],
+  ['5.13', 'Gestão de Equipe', '5', true, 513, false],
+  ['5.14', 'IA', '5', true, 514, false],
+  ['5.15', 'Jurídico', '5', true, 515, true],
+  ['5.16', 'Material Gráfico, Divulgação e Marketing', '5', true, 516, true],
+  ['5.17', 'PDV', '5', true, 517, false],
+  ['5.18', 'Publicidade', '5', true, 518, false],
+  ['5.19', 'Sistema', '5', true, 519, true],
+  ['5.20', 'Segurança', '5', true, 520, true],
+  ['5.21', 'Impostos', '5', true, 521, true],
+  ['5.22', 'Taxas Bancárias', '5', true, 522, true],
+  ['5.23', 'Manutenção e Conservação', '5', true, 523, false],
+  ['5.24', 'Nutricionista', '5', true, 524, true],
+  ['5.25', 'Taxas Amex', '5', true, 525, true],
+  ['5.26', 'Associações e Entidades de Classe', '5', true, 526, true],
+  ['5.27', 'Adesivos', '5', true, 527, true],
+  ['6', 'Material de Consumo', null, true, 600, true],
+  ['6.1', 'Produtos de Limpeza', '6', true, 601, true],
+  ['6.2', 'Material de Escritório', '6', true, 602, true],
+  ['6.3', 'Utensílios e Descartáveis', '6', true, 603, true],
+  ['6.4', 'Compra de Equipamentos e Utensílios', '6', true, 604, true],
+  ['7', 'Juros', null, true, 700, true],
+  ['8', 'Multas', null, true, 800, true],
+  ['9', 'Empréstimos e Financiamentos', null, false, 900, true],
+  ['9.1', 'Dívidas e Empréstimos', '9', false, 901, true],
+  ['9.2', 'Financiamentos', '9', false, 902, true],
+  ['9.3', 'Empréstimo LJ-1 Ozzy Burger', '9', false, 903, true],
+  ['9.4', 'Empréstimo LJ-2 Ozzy Burger', '9', false, 904, true],
+  ['10', 'Investimentos (Capex)', null, false, 1000, true],
+  ['10.1', 'Instalações Gerais', '10', false, 1001, true],
+  ['10.2', 'Equipamentos de Cozinha', '10', false, 1002, true],
+  ['10.3', 'Mobiliário', '10', false, 1003, true],
+  ['10.4', 'Outros Equipamentos', '10', false, 1004, true],
+  ['10.5', 'Mão de Obra (implantação/obra)', '10', false, 1005, true],
+  ['11', 'Distribuição de Resultados', null, false, 1100, true],
+  ['11.1', 'Distribuição de Lucros', '11', false, 1101, true],
+  ['11.2', 'Retirada de Sócios (pró-labore ou extra)', '11', false, 1102, true],
+  ['11.3', 'Antecipação de Lucros', '11', false, 1103, true],
 ]
-const planoDemo: ContaContabil[] = PLANO.map(([codigo, nome, paiCodigo, operacional, ordem]) => ({ id: 'pc' + codigo, codigo, nome, paiCodigo, operacional, ordem, ativo: true }))
+const planoDemo: ContaContabil[] = PLANO.map(([codigo, nome, paiCodigo, operacional, ordem, ativo]) => ({ id: 'pc' + codigo, codigo, nome, paiCodigo, operacional, ordem, ativo }))
 fornecedoresDemo[0].cnpj = '11222333000181'
 const mesAtual = () => hoje().slice(0, 8) + '01'
 const itemNota = (id: string, ordem: number, codigo: string, descricao: string, unidade: string, quantidade: number, valorUnit: number, extra: Partial<ItemNota> = {}): ItemNota => ({
@@ -757,7 +790,10 @@ notasDemo[0].duplicatas = [
 ]
 const contaDemo = (id: string, extra: Partial<ContaPagar> & Pick<ContaPagar, 'descricao' | 'vencimento' | 'valor'>): ContaPagar => ({
   id, centroCustoId: 'burger-psd', contaId: null, fornecedorId: null, favorecido: null, competencia: mesAtual(), forma: 'boleto', parcela: null, parcelas: null,
-  documento: null, notaId: null, observacao: null, pagoEm: null, valorPago: null, conciliado: false, ...extra,
+  documento: null, notaId: null, observacao: null, pagoEm: null, valorPago: null, conciliado: false, recorrenteId: null, origem: null, lote: null,
+  extratoMovimentoId: null, ...extra,
+  // Cartão: tudo que vence no mesmo dia é a mesma fatura (igual ao gatilho do banco).
+  ...((extra.forma === 'cartao_credito') ? { lote: 'cartao:' + extra.vencimento } : {}),
 })
 const contasPagarDemo: ContaPagar[] = [
   contaDemo('cp1', { descricao: 'NF 10198 · Distribuidora Exemplo', vencimento: addDias(hoje(), 5), valor: 251, contaId: 'pc1.1', fornecedorId: 'fo1', notaId: 'nf2', parcela: 1, parcelas: 2 }),
@@ -767,6 +803,16 @@ const contasPagarDemo: ContaPagar[] = [
   contaDemo('cp5', { descricao: 'Internet (exemplo)', vencimento: addDias(hoje(), -6), valor: 199.9, contaId: 'pc4.5', favorecido: 'Provedor Exemplo', pagoEm: addDias(hoje(), -6), valorPago: 199.9 }),
   contaDemo('cp6', { descricao: 'Hortifruti da semana (exemplo)', vencimento: addDias(hoje(), 2), valor: 640, contaId: 'pc1.2', fornecedorId: 'fo2', forma: 'pix', centroCustoId: 'pizza' }),
   contaDemo('cp7', { descricao: 'Contabilidade (exemplo)', vencimento: addDias(hoje(), 11), valor: 1800, contaId: 'pc5.5', favorecido: 'Escritório contábil exemplo', centroCustoId: 'central' }),
+  contaDemo('cp8', { descricao: 'Freezer (exemplo, parcela)', vencimento: addDias(hoje(), -3), valor: 174.9, contaId: 'pc6.4', favorecido: 'Loja de exemplo', forma: 'cartao_credito', centroCustoId: 'central' }),
+  contaDemo('cp9', { descricao: 'Sistema de cardápio (exemplo)', vencimento: addDias(hoje(), -3), valor: 224.93, contaId: 'pc5.19', favorecido: 'Sistema exemplo', forma: 'cartao_credito', centroCustoId: 'burger-psd' }),
+  contaDemo('cp10', { descricao: 'Adiantamento · Pessoa A (exemplo)', vencimento: addDias(hoje(), -1), valor: 800, contaId: 'pc2.6', favorecido: 'Pessoa A', forma: 'pix', origem: 'sal:a', lote: 'sal:exemplo:adiantamento', observacao: 'Lançada pelo DP (salários liberados)' }),
+  contaDemo('cp11', { descricao: 'Adiantamento · Pessoa B (exemplo)', vencimento: addDias(hoje(), -1), valor: 750, contaId: 'pc2.7', favorecido: 'Pessoa B', forma: 'pix', origem: 'sal:b', lote: 'sal:exemplo:adiantamento', observacao: 'Lançada pelo DP (salários liberados)' }),
+]
+const recorrentesDemo: ContaRecorrente[] = [
+  { id: 'rc1', descricao: 'Aluguel da loja (exemplo)', fornecedorId: null, fornecedorNome: 'IMOBILIARIA EXEMPLO', centroCustoId: 'burger-psd', contaId: 'pc4.1', valor: 3600, variavel: false, dia: 5, forma: 'pix', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'ativa', observacao: null },
+  { id: 'rc2', descricao: 'Plataforma de checklist (exemplo)', fornecedorId: null, fornecedorNome: 'SISTEMA EXEMPLO', centroCustoId: 'central', contaId: 'pc5.19', valor: 583.33, variavel: false, dia: 15, forma: 'cartao_credito', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'a_confirmar', observacao: 'Se for parcelado, diga em que mês termina.' },
+  { id: 'rc3', descricao: 'Energia (exemplo)', fornecedorId: null, fornecedorNome: 'DISTRIBUIDORA DE ENERGIA', centroCustoId: 'central', contaId: 'pc4.3', valor: 2800, variavel: true, dia: 23, forma: 'boleto', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'a_confirmar', observacao: 'Valor muda; média jul–set 2.831,52' },
+  { id: 'rc4', descricao: 'Nutricionista (exemplo)', fornecedorId: null, fornecedorNome: 'NUTRI EXEMPLO', centroCustoId: 'burger-psd', contaId: 'pc5.24', valor: 420, variavel: false, dia: 10, forma: 'boleto', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'a_confirmar', observacao: null },
 ]
 const movimentosDemo: MovimentoEstoque[] = [
   { id: 'mv1', centroCustoId: 'burger-psd', insumoId: 'in3', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 5, custoUnit: 40, notaItemId: 'ni5', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
@@ -792,10 +838,16 @@ const extratoDemo: MovimentoExtrato[] = [
   movExtrato('ex5', 4, -5000, 'TED MESMA TITULARIDADE'),
   movExtrato('ex6', 2, 4500, 'REDE CARTAO CREDITO'),
   movExtrato('ex7', 5, 7800, 'IFOOD REPASSE'),
+  movExtrato('ex8', 3, -405.83, 'FATURA CARTAO ITAU'),
+  movExtrato('ex9', 1, -1550, 'SISPAG PIX LOTE 000123'),
 ]
 const regrasExtratoDemo: RegraExtrato[] = [{ chave: 'tar pacote servicos', centroCustoId: 'burger-psd', contaId: 'pc5.22', favorecido: 'Itaú', ignorar: false }]
 const saldosExtratoDemo: SaldoExtrato[] = [{ banco: '341', agencia: '0000', conta: '00000-0', data: addDias(hoje(), -1), saldo: 18432.1 }]
 
+const diaDoMesDemo = (mes: string, dia: number) => {
+  const [a, m] = mes.split('-').map(Number)
+  return `${mes}-${String(Math.min(dia, new Date(Date.UTC(a, m, 0)).getUTCDate())).padStart(2, '0')}`
+}
 const espera = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 80))
 
 export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Funcionario>; perfisDemo(): Funcionario[] } {
@@ -2040,6 +2092,67 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       }
       return espera({ novos, repetidos: e.movimentos.length - novos })
     },
+    async contasRecorrentes() {
+      exigeFinanceiro()
+      return espera(structuredClone(recorrentesDemo).sort((a, b) => a.dia - b.dia))
+    },
+    async salvarRecorrente(r) {
+      exigeFinanceiro()
+      if (!r.descricao.trim()) throw new Error('Coloque a descrição.')
+      if (!(r.valor > 0)) throw new Error('O valor precisa ser maior que zero.')
+      const i = recorrentesDemo.findIndex((x) => x.id === r.id)
+      const salva: ContaRecorrente = { ...r, descricao: r.descricao.trim(), id: r.id ?? novoId('rc') }
+      if (i >= 0) recorrentesDemo[i] = salva
+      else recorrentesDemo.push(salva)
+      for (const c of contasPagarDemo.filter((x) => x.recorrenteId === salva.id && !x.pagoEm && !x.conciliado && x.vencimento >= hoje())) {
+        const mes = c.vencimento.slice(0, 7)
+        if (salva.situacao !== 'ativa' || (salva.fim && mes > salva.fim)) contasPagarDemo.splice(contasPagarDemo.indexOf(c), 1)
+        else Object.assign(c, { descricao: salva.descricao, valor: salva.valor, contaId: salva.contaId, centroCustoId: salva.centroCustoId, forma: salva.forma,
+          fornecedorId: salva.fornecedorId, favorecido: salva.fornecedorId ? null : salva.fornecedorNome, vencimento: diaDoMesDemo(mes, salva.dia) })
+      }
+      return espera(structuredClone(salva))
+    },
+    async excluirRecorrente(id) {
+      exigeFinanceiro()
+      for (const c of contasPagarDemo.filter((x) => x.recorrenteId === id && !x.pagoEm)) contasPagarDemo.splice(contasPagarDemo.indexOf(c), 1)
+      const i = recorrentesDemo.findIndex((x) => x.id === id)
+      if (i >= 0) recorrentesDemo.splice(i, 1)
+      return espera(undefined)
+    },
+    async atualizarContasAutomaticas(ateMes) {
+      exigeFinanceiro()
+      for (const r of recorrentesDemo.filter((x) => x.situacao === 'ativa')) {
+        for (let m = r.inicio > mesAtual().slice(0, 7) ? r.inicio : mesAtual().slice(0, 7); m <= ateMes && (!r.fim || m <= r.fim); m = addMeses(m, 1)) {
+          const origem = `rec:${r.id}:${m}`
+          if (contasPagarDemo.some((c) => c.origem === origem)) continue
+          contasPagarDemo.push(contaDemo(novoId('cp'), {
+            descricao: r.descricao, vencimento: diaDoMesDemo(m, r.dia), valor: r.valor, contaId: r.contaId, centroCustoId: r.centroCustoId, forma: r.forma,
+            fornecedorId: r.fornecedorId, favorecido: r.fornecedorId ? null : r.fornecedorNome, competencia: m + '-01', recorrenteId: r.id, origem,
+            observacao: r.variavel ? 'Valor previsto (muda todo mês)' : null,
+          }))
+        }
+      }
+      return espera(undefined)
+    },
+    async conciliarLote(movimentoId, contaIds, contaDiferencaId) {
+      exigeFinanceiro()
+      const m = extratoDemo.find((x) => x.id === movimentoId)
+      if (!m || m.status !== 'pendente') throw new Error('Este movimento já foi resolvido.')
+      const contas = contasPagarDemo.filter((c) => contaIds.includes(c.id))
+      if (!contas.length) throw new Error('Escolha as contas.')
+      if (contas.some((c) => c.conciliado)) throw new Error('Alguma dessas contas já foi conciliada.')
+      const soma = contas.reduce((t, c) => t + (c.valorPago ?? c.valor), 0)
+      const dif = Math.round((Math.abs(m.valor) - soma) * 100) / 100
+      if (dif < 0) throw new Error('As contas somam mais que o débito do banco. Tire alguma conta da seleção.')
+      if (dif > 0 && !contaDiferencaId) throw new Error('Escolha onde lançar a diferença.')
+      for (const c of contas) Object.assign(c, { conciliado: true, extratoMovimentoId: m.id, pagoEm: c.pagoEm ?? m.data, valorPago: c.valorPago ?? c.valor })
+      if (dif > 0) contasPagarDemo.push(contaDemo(novoId('cp'), {
+        descricao: 'Diferença · ' + m.descricao, vencimento: m.data, valor: dif, contaId: contaDiferencaId, centroCustoId: contas[0].centroCustoId,
+        forma: 'transferencia', pagoEm: m.data, valorPago: dif, conciliado: true, extratoMovimentoId: m.id, observacao: 'Diferença lançada na conciliação',
+      }))
+      Object.assign(m, { status: 'conciliado' })
+      return espera(undefined)
+    },
     async conciliarMovimento(movimentoId, contaPagarId) {
       exigeFinanceiro()
       const m = extratoDemo.find((x) => x.id === movimentoId)
@@ -2057,6 +2170,10 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!m) return espera(undefined)
       const c = contasPagarDemo.find((x) => x.id === m.contaPagarId)
       if (c) c.conciliado = false
+      for (const x of contasPagarDemo.filter((y) => y.extratoMovimentoId === m.id)) {
+        if (x.observacao === 'Diferença lançada na conciliação') contasPagarDemo.splice(contasPagarDemo.indexOf(x), 1)
+        else Object.assign(x, { conciliado: false, extratoMovimentoId: null })
+      }
       Object.assign(m, { status: 'pendente', contaPagarId: null, observacao: null })
       return espera(undefined)
     },

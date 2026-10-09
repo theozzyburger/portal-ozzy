@@ -1185,8 +1185,31 @@ export interface ContaPagar {
   pagoEm: string | null
   valorPago: number | null
   conciliado: boolean
+  // De onde veio (0047): recorrente, salário, diárias. Lote = contas que saem num débito só (fatura do cartão, Pix em lote).
+  recorrenteId?: string | null
+  origem?: string | null
+  lote?: string | null
+  extratoMovimentoId?: string | null
 }
 export type NovaContaPagar = Omit<ContaPagar, 'id' | 'pagoEm' | 'valorPago' | 'conciliado'> & { id?: string }
+export type SituacaoRecorrente = 'a_confirmar' | 'ativa' | 'pausada' | 'encerrada'
+// Conta que se repete todo mês (aluguel, sistema…). Ativa = lança a conta de cada mês sozinha.
+export interface ContaRecorrente {
+  id: string
+  descricao: string
+  fornecedorId: string | null
+  fornecedorNome: string | null
+  centroCustoId: string
+  contaId: string | null
+  valor: number
+  variavel: boolean
+  dia: number
+  forma: FormaPagamento
+  inicio: string // AAAA-MM
+  fim: string | null
+  situacao: SituacaoRecorrente
+  observacao: string | null
+}
 export interface MovimentoEstoque {
   id: string
   centroCustoId: string

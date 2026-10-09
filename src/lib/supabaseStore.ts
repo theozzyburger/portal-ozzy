@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
-import type { NotaFiscal, ContaPagar, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import { hoje } from './datas'
+import type { NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -1131,7 +1132,55 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('notas_fiscais').delete().eq('id', id).eq('status', 'conferir'))
     },
     async contasPagar() {
-      return (ok(await sb.from('contas_pagar').select('*').order('vencimento')) ?? []).map(paraContaPagar)
+      const linhas: any[] = []
+      for (let de = 0; ; de += 1000) {
+        const pg = ok(await sb.from('contas_pagar').select('*').order('vencimento').order('id').range(de, de + 999)) ?? []
+        linhas.push(...pg)
+        if (pg.length < 1000) break
+      }
+      return linhas.map(paraContaPagar)
+    },
+    async contasRecorrentes() {
+      return (ok(await sb.from('contas_recorrentes').select('*').order('dia').order('descricao')) ?? []).map(paraRecorrente)
+    },
+    async salvarRecorrente(r) {
+      const linha = {
+        descricao: r.descricao.trim(), fornecedor_id: r.fornecedorId, fornecedor_nome: texto(r.fornecedorNome), centro_custo_id: r.centroCustoId,
+        conta_id: r.contaId, valor: r.valor, variavel: r.variavel, dia: r.dia, forma: r.forma, inicio: r.inicio, fim: r.fim || null,
+        situacao: r.situacao, observacao: texto(r.observacao),
+      }
+      const salva = paraRecorrente(r.id
+        ? ok(await sb.from('contas_recorrentes').update(linha).eq('id', r.id).select().single())
+        : ok(await sb.from('contas_recorrentes').insert(linha).select().single()))
+      // As contas que ela já lançou e ainda não foram pagas acompanham a mudança (ou saem, se parou).
+      if (r.id) {
+        const abertas = (ok(await sb.from('contas_pagar').select('id, vencimento, competencia').eq('recorrente_id', r.id).is('pago_em', null)
+          .eq('conciliado', false).gte('vencimento', hoje())) ?? []) as { id: string; vencimento: string; competencia: string }[]
+        for (const c of abertas) {
+          const mes = c.vencimento.slice(0, 7)
+          if (salva.situacao !== 'ativa' || (salva.fim && mes > salva.fim) || mes < salva.inicio) {
+            ok(await sb.from('contas_pagar').delete().eq('id', c.id))
+            continue
+          }
+          const venc = diaDoMes(mes, salva.dia)
+          ok(await sb.from('contas_pagar').update({
+            descricao: salva.descricao, fornecedor_id: salva.fornecedorId, favorecido: salva.fornecedorId ? null : salva.fornecedorNome,
+            centro_custo_id: salva.centroCustoId, conta_id: salva.contaId, valor: salva.valor, forma: salva.forma, vencimento: venc,
+          }).eq('id', c.id))
+        }
+      }
+      return salva
+    },
+    async excluirRecorrente(id) {
+      ok(await sb.from('contas_pagar').delete().eq('recorrente_id', id).is('pago_em', null).eq('conciliado', false))
+      ok(await sb.from('contas_recorrentes').delete().eq('id', id))
+    },
+    async atualizarContasAutomaticas(ateMes) {
+      ok(await sb.rpc('gerar_contas_recorrentes', { p_ate: ateMes }))
+      ok(await sb.rpc('sincronizar_pessoal'))
+    },
+    async conciliarLote(movimentoId, contaIds, contaDiferencaId) {
+      ok(await sb.rpc('conciliar_lote', { p_mov: movimentoId, p_contas: contaIds, p_conta_diferenca: contaDiferencaId }))
     },
     async salvarContasPagar(contas) {
       const linhas = contas.map((c) => ({
@@ -1254,7 +1303,19 @@ const paraContaPagar = (r: any): ContaPagar => ({
   id: r.id, centroCustoId: r.centro_custo_id, contaId: r.conta_id, fornecedorId: r.fornecedor_id, favorecido: r.favorecido, descricao: r.descricao,
   competencia: r.competencia, vencimento: r.vencimento, valor: Number(r.valor), forma: r.forma, parcela: r.parcela, parcelas: r.parcelas,
   documento: r.documento, notaId: r.nota_id, observacao: r.observacao, pagoEm: r.pago_em, valorPago: numeroOuNulo(r.valor_pago), conciliado: r.conciliado,
+  recorrenteId: r.recorrente_id ?? null, origem: r.origem ?? null, lote: r.lote ?? null, extratoMovimentoId: r.extrato_movimento_id ?? null,
 })
+const paraRecorrente = (r: any): ContaRecorrente => ({
+  id: r.id, descricao: r.descricao, fornecedorId: r.fornecedor_id, fornecedorNome: r.fornecedor_nome, centroCustoId: r.centro_custo_id,
+  contaId: r.conta_id, valor: Number(r.valor), variavel: r.variavel, dia: r.dia, forma: r.forma, inicio: r.inicio, fim: r.fim,
+  situacao: r.situacao, observacao: r.observacao,
+})
+// Dia do mês sem passar do último (31 em fevereiro vira 28/29).
+const diaDoMes = (mes: string, dia: number) => {
+  const [a, m] = mes.split('-').map(Number)
+  const ultimo = new Date(Date.UTC(a, m, 0)).getUTCDate()
+  return `${mes}-${String(Math.min(dia, ultimo)).padStart(2, '0')}`
+}
 const paraInsumo = (r: any): Insumo => ({
   id: r.id, nome: r.nome, categoria: r.categoria, unidade: r.unidade, embalagem: r.embalagem, embalagemQtd: numeroOuNulo(r.embalagem_qtd),
   preco: numeroOuNulo(r.preco), precoEm: r.preco_em, fornecedorId: r.fornecedor_id, observacao: r.observacao, ativo: r.ativo,

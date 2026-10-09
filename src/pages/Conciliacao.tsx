@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
-import { candidatas, sugestoes } from '../lib/conciliacao'
+import { type GrupoLote, candidatas, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { gruposDoPlano, nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx } from '../lib/ofx'
 import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
@@ -46,6 +46,11 @@ export default function Conciliacao() {
   }, [carregar])
 
   const sug = useMemo(() => (d ? sugestoes(d.movs, d.contas, d.fornecedores) : new Map<string, ContaPagar>()), [d])
+  const sugLote = useMemo(() => {
+    if (!d) return new Map<string, GrupoLote>()
+    const livres = d.movs.filter((m) => !sug.has(m.id))
+    return sugestoesLote(livres, d.contas, new Set([...sug.values()].map((c) => c.id)))
+  }, [d, sug])
 
   async function importar(files: FileList | null) {
     if (!files?.length) return
@@ -83,7 +88,7 @@ export default function Conciliacao() {
   const daConta = (m: MovimentoExtrato) => !contaBanco || `${m.banco}|${m.agencia}|${m.conta}` === contaBanco
   const movs = d.movs.filter(daConta)
   const pendentes = movs.filter((m) => m.status === 'pendente' && m.valor < 0)
-  const comSugestao = pendentes.filter((m) => sug.has(m.id))
+  const comSugestao = pendentes.filter((m) => sug.has(m.id) || sugLote.has(m.id))
   const regraDe = (m: MovimentoExtrato) => d.regras.find((r) => r.chave === chaveExtrato(m.descricao))
   const lista = movs.filter((m) =>
     filtro === 'pendentes' ? m.status === 'pendente' && m.valor < 0
@@ -98,7 +103,9 @@ export default function Conciliacao() {
     if (!confirm(`Confirmar as ${comSugestao.length} sugestões? Cada saída fica ligada à conta indicada, que vira paga e conciliada.`)) return
     for (const m of comSugestao) {
       try {
-        await store.conciliarMovimento(m.id, sug.get(m.id)!.id)
+        const g = sugLote.get(m.id)
+        if (g) await store.conciliarLote(m.id, g.contas.map((c) => c.id), null)
+        else await store.conciliarMovimento(m.id, sug.get(m.id)!.id)
       } catch (e) {
         setAviso((e as Error).message)
       }
@@ -141,7 +148,7 @@ export default function Conciliacao() {
             <Cartao onClick={() => setFiltro('pendentes')}>
               <p className="text-sm text-stone-500">Com sugestão pronta</p>
               <p className="text-lg font-bold">{comSugestao.length}</p>
-              <p className="text-xs text-stone-400">mesmo valor e data perto</p>
+              <p className="text-xs text-stone-400">mesmo valor e data perto{sugLote.size ? ` · ${sugLote.size} em lote` : ''}</p>
             </Cartao>
             <Cartao onClick={() => setFiltro('conciliados')}>
               <p className="text-sm text-stone-500">Conciliados</p>
@@ -174,6 +181,8 @@ export default function Conciliacao() {
             <div className="space-y-2">
               {lista.map((m) => {
                 const s = sug.get(m.id)
+                const sl = sugLote.get(m.id)
+                const doLote = d.contas.filter((c) => c.extratoMovimentoId === m.id)
                 const regra = m.status === 'pendente' ? regraDe(m) : undefined
                 const ligada = m.contaPagarId ? contaPorId.get(m.contaPagarId) : undefined
                 return (
@@ -188,7 +197,14 @@ export default function Conciliacao() {
 
                     {m.status === 'conciliado' && (
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span><Selo cor="verde">Conciliado</Selo> {ligada ? `${ligada.descricao} · ${nomeCentro(d.centros.find((x) => x.id === ligada.centroCustoId))} · ${nomeConta(d.plano, ligada.contaId)}` : ''}</span>
+                        <span><Selo cor="verde">Conciliado</Selo> {ligada ? `${ligada.descricao} · ${nomeCentro(d.centros.find((x) => x.id === ligada.centroCustoId))} · ${nomeConta(d.plano, ligada.contaId)}` : ''}
+                          {!ligada && doLote.length > 0 && <>
+                            {` ${doLote.length} contas juntas`}
+                            <details className="mt-1"><summary className="cursor-pointer text-stone-500">Ver as contas</summary>
+                              <ul className="mt-1 space-y-0.5">{doLote.map((c) => <li key={c.id}>{[c.descricao, favorecido(c), reais(c.valorPago ?? c.valor)].filter(Boolean).join(' · ')}</li>)}</ul>
+                            </details>
+                          </>}
+                        </span>
                         <button className="font-semibold underline" onClick={() => acao(() => store.desconciliarMovimento(m.id))}>Desfazer</button>
                       </div>
                     )}
@@ -200,7 +216,20 @@ export default function Conciliacao() {
                     )}
                     {m.status === 'pendente' && m.valor < 0 && (
                       <>
-                        {s ? (
+                        {sl ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-green-50 p-2 text-sm">
+                            <span>
+                              É <b>{nomeLote(sl.lote)}</b>: {sl.contas.length} contas que somam {reais(sl.total)}
+                              <details><summary className="cursor-pointer text-stone-500">Ver as contas</summary>
+                                <ul className="mt-1 space-y-0.5">{sl.contas.map((c) => <li key={c.id}>{[c.descricao, favorecido(c), reais(c.valorPago ?? c.valor)].filter(Boolean).join(' · ')}</li>)}</ul>
+                              </details>
+                            </span>
+                            <span className="flex gap-2">
+                              <Botao className="py-1.5!" onClick={() => acao(() => store.conciliarLote(m.id, sl.contas.map((c) => c.id), null))}>Confirmar</Botao>
+                              <Botao variante="fantasma" className="py-1.5!" onClick={() => setAchar(m)}>Outra</Botao>
+                            </span>
+                          </div>
+                        ) : s ? (
                           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-green-50 p-2 text-sm">
                             <span>
                               É <b>{s.descricao}</b>{s.parcelas ? ` (${s.parcela}/${s.parcelas})` : ''} · {favorecido(s)} · vence {dataCurta(s.vencimento)}{s.pagoEm ? ` · paga ${dataCurta(s.pagoEm)}` : ''}
@@ -243,17 +272,24 @@ export default function Conciliacao() {
         </>
       )}
 
-      {achar && <AcharConta d={d} m={achar} aoFechar={() => setAchar(null)} aoEscolher={(c) => { setAchar(null); acao(() => store.conciliarMovimento(achar.id, c.id)) }} />}
+      {achar && <AcharConta d={d} m={achar} aoFechar={() => setAchar(null)} aoEscolher={(c) => { setAchar(null); acao(() => store.conciliarMovimento(achar.id, c.id)) }}
+        aoEscolherLote={(ids, dif) => { setAchar(null); acao(() => store.conciliarLote(achar.id, ids, dif)) }} />}
       {lancar && <LancarDespesa d={d} m={lancar} aoFechar={() => setLancar(null)} aoSalvar={() => { setLancar(null); carregar() }} />}
       {ignorar && <Ignorar m={ignorar} aoFechar={() => setIgnorar(null)} aoSalvar={() => { setIgnorar(null); carregar() }} />}
     </div>
   )
 }
 
-function AcharConta({ d, m, aoFechar, aoEscolher }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoEscolher: (c: ContaPagar) => void }) {
+function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
+  d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoEscolher: (c: ContaPagar) => void; aoEscolherLote: (ids: string[], contaDiferenca: string | null) => void
+}) {
   const [busca, setBusca] = useState('')
+  const taxas = d.plano.find((c) => c.codigo === '5.22') ?? d.plano.find((c) => /taxas? banc/i.test(c.nome))
+  const [contaDif, setContaDif] = useState(taxas?.id ?? '')
   const usadas = new Set(d.movs.map((x) => x.contaPagarId).filter((x): x is string => !!x))
   const perto = candidatas(m, d.contas, d.fornecedores, usadas)
+  const lotes = lotesPara(m, gruposLote(d.contas, usadas))
+  const grupos = gruposDoPlano(d.plano)
   const nome = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
   const todas = busca
     ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && `${c.descricao} ${nome(c)}`.toLowerCase().includes(busca.toLowerCase()))
@@ -263,6 +299,32 @@ function AcharConta({ d, m, aoFechar, aoEscolher }: { d: Dados; m: MovimentoExtr
       <div className="space-y-3">
         <p className="text-sm">{m.descricao} · {dataCurta(m.data)} · <b>{reais(m.valor)}</b></p>
         <input className={estiloEntrada} placeholder="Buscar por descrição ou fornecedor" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        {!busca && lotes.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Pagamentos em lote</p>
+            {lotes.map(({ grupo: g, diferenca }) => (
+              <div key={g.lote} className="space-y-2 rounded-xl bg-stone-50 p-2 text-sm">
+                <p><b>{nomeLote(g.lote)}</b>: {g.contas.length} contas, {reais(g.total)}{diferenca > 0 ? <> · <span className="text-amber-700">faltam {reais(diferenca)}</span></> : ' · bate certinho'}</p>
+                {diferenca > 0 && (
+                  <Campo rotulo="Lançar a diferença em (juros, tarifa, item que faltou)">
+                    <select className={estiloEntrada} value={contaDif} onChange={(e) => setContaDif(e.target.value)}>
+                      <option value="" disabled>Escolher</option>
+                      {grupos.map((gr) => (
+                        <optgroup key={gr.mae.id} label={`${gr.mae.codigo} ${gr.mae.nome}`}>
+                          {gr.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </Campo>
+                )}
+                <Botao className="py-1.5!" disabled={diferenca > 0 && !contaDif} onClick={() => aoEscolherLote(g.contas.map((c) => c.id), diferenca > 0 ? contaDif : null)}>
+                  Conciliar o lote
+                </Botao>
+              </div>
+            ))}
+            <p className="text-sm font-semibold">Ou uma conta só</p>
+          </div>
+        )}
         {!busca && <p className="text-xs text-stone-500">Mostrando as contas com valor parecido (até 10% de diferença, por juros ou desconto) e data perto.</p>}
         {todas.length === 0 ? <Vazio>Nenhuma conta parecida em aberto. Use "Lançar como despesa".</Vazio> : (
           <ul className="max-h-80 divide-y divide-stone-100 overflow-y-auto">

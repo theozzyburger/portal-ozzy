@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
-import { dataCurta, diaSemana, hoje, mesDe, nomeMesAno } from '../lib/datas'
+import { addMeses, dataCurta, diaSemana, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { ir } from '../lib/rota'
 import {
   lerValor, mostrarValor, nomeCentro, nomeConta, nomeForma, r2, reais, situacao, type SituacaoConta,
@@ -10,10 +10,12 @@ import { FORMAS_PAGAMENTO, type ContaContabil, type ContaPagar, type FormaPagame
 import Financeiro from './Financeiro'
 import Conciliacao from './Conciliacao'
 import Insumos from './Insumos'
+import Recorrentes from './Recorrentes'
 import { EditarConta, ImportarLote, type Dados } from './LancarContas'
 
 const ABAS = [
   { id: '', nome: 'Contas a pagar' },
+  { id: 'recorrentes', nome: 'Recorrentes' },
   { id: 'conciliacao', nome: 'Conciliação bancária' },
   { id: 'despesas', nome: 'Despesas' },
   { id: 'fornecedores', nome: 'Fornecedores' },
@@ -39,6 +41,7 @@ export default function ModuloFinanceiro({ sub }: { sub?: string }) {
       </div>
       {aba === 'resultado' ? <Financeiro />
         : aba === 'conciliacao' ? <Conciliacao />
+        : aba === 'recorrentes' ? <Recorrentes />
         : aba === 'despesas' ? <Despesas />
         : aba === 'plano' ? <PlanoContas />
         : aba === 'fornecedores' ? <Insumos aba="fornecedores" />
@@ -51,17 +54,23 @@ function useDados() {
   const { store } = useApp()
   const [d, setD] = useState<Dados | null>(null)
   const [erro, setErro] = useState('')
+  const atualizou = useRef(false)
   const carregar = useCallback(
-    () => Promise.all([store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores()]).then(
-      ([contas, centros, plano, fornecedores]) => setD({ contas, centros, plano, fornecedores }),
-      (e) => setErro(e.message),
-    ),
+    // Na primeira vez, lança o que vem sozinho (recorrentes até o mês que vem, salários liberados, diárias de freelancer).
+    async () => (atualizou.current ? undefined : ((atualizou.current = true), store.atualizarContasAutomaticas(addMeses(mesDe(hoje()), 1)).catch(() => {}))),
     [store],
   )
+  const ler = useCallback(
+    () => carregar().then(() => Promise.all([store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores()]).then(
+      ([contas, centros, plano, fornecedores]) => setD({ contas, centros, plano, fornecedores }),
+      (e) => setErro(e.message),
+    )),
+    [store, carregar],
+  )
   useEffect(() => {
-    carregar()
-  }, [carregar])
-  return { d, erro, carregar }
+    ler()
+  }, [ler])
+  return { d, erro, carregar: ler }
 }
 
 const favorecidoDe = (c: ContaPagar, fornecedores: Fornecedor[]) => fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
@@ -211,7 +220,12 @@ function ContasPagar() {
                       <p className="text-sm text-stone-500">
                         {[favorecidoDe(c, d.fornecedores), nomeCentro(d.centros.find((x) => x.id === c.centroCustoId)), nomeForma(c.forma)].filter(Boolean).join(' · ')}
                       </p>
-                      <p className={`text-xs ${c.contaId ? 'text-stone-400' : 'font-semibold text-amber-700'}`}>{nomeConta(d.plano, c.contaId)}</p>
+                      <p className={`text-xs ${c.contaId ? 'text-stone-400' : 'font-semibold text-amber-700'}`}>
+                        {nomeConta(d.plano, c.contaId)}
+                        {c.recorrenteId && <span className="ml-2 font-semibold text-stone-500">↻ recorrente</span>}
+                        {c.origem && !c.recorrenteId && <span className="ml-2 font-semibold text-stone-500">vem do DP</span>}
+                        {c.lote?.startsWith('cartao:') && <span className="ml-2 font-semibold text-stone-500">fatura do cartão</span>}
+                      </p>
                     </button>
                     <div className="flex items-center gap-2">
                       <div className="text-right">

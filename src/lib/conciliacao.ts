@@ -43,3 +43,52 @@ export function sugestoes(movs: MovimentoExtrato[], contas: ContaPagar[], fornec
   }
   return porMov
 }
+
+// Lotes (fatura do cartão, Pix em lote dos salários, diárias): várias contas saem num débito só.
+export interface GrupoLote { lote: string; contas: ContaPagar[]; total: number; vencimento: string }
+
+export function gruposLote(contas: ContaPagar[], usadas: Set<string> = new Set()) {
+  const mapa = new Map<string, ContaPagar[]>()
+  for (const c of contas) {
+    if (!c.lote || c.conciliado || usadas.has(c.id)) continue
+    mapa.set(c.lote, [...(mapa.get(c.lote) ?? []), c])
+  }
+  return [...mapa.entries()].map(([lote, cs]): GrupoLote => ({
+    lote,
+    contas: cs,
+    total: Math.round(cs.reduce((s, c) => s + (c.valorPago ?? c.valor), 0) * 100) / 100,
+    vencimento: cs.map((c) => c.vencimento).sort()[0],
+  }))
+}
+
+export function nomeLote(lote: string) {
+  const [tipo, a, b] = lote.split(':')
+  if (tipo === 'cartao') return `Fatura do cartão de ${a.split('-').reverse().join('/')}`
+  if (tipo === 'sal') return `${b === 'adiantamento' ? 'Adiantamentos' : 'Salários'} de ${a}`
+  if (tipo === 'freela') return `Diárias de freelancers da semana de ${a.split('-').reverse().join('/')}`
+  if (tipo === 'freelaev') return 'Diárias de freelancers do evento'
+  return lote
+}
+
+// Lotes perto do valor do débito: exato (diferença zero) ou até 5% a menos (sobra vira diferença: juros, tarifa).
+export function lotesPara(m: MovimentoExtrato, grupos: GrupoLote[]) {
+  if (m.valor >= 0) return []
+  const valor = -m.valor
+  return grupos
+    .map((g) => ({ grupo: g, diferenca: Math.round((valor - g.total) * 100) / 100, distancia: Math.abs(dias(m.data, g.vencimento)) }))
+    .filter((x) => x.diferenca >= 0 && x.diferenca <= valor * 0.05 && x.distancia <= 10)
+    .sort((a, b) => a.diferenca - b.diferenca || a.distancia - b.distancia)
+}
+
+// Sugestões de lote: só soma exata.
+export function sugestoesLote(movs: MovimentoExtrato[], contas: ContaPagar[], jaSugeridas: Set<string>) {
+  const grupos = gruposLote(contas, jaSugeridas)
+  const porMov = new Map<string, GrupoLote>()
+  const tomados = new Set<string>()
+  for (const m of movs) {
+    if (m.status !== 'pendente') continue
+    const x = lotesPara(m, grupos).find((l) => l.diferenca === 0 && !tomados.has(l.grupo.lote))
+    if (x) { porMov.set(m.id, x.grupo); tomados.add(x.grupo.lote) }
+  }
+  return porMov
+}
