@@ -320,7 +320,8 @@ function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string, link
   const msg = [
     'Olá, tudo bem?',
     '',
-    `Me chamo ${responsavel.split(' ')[0]} e faço parte da administração da The Ozzy Burger.`,
+    // Heitor (09/10): sem "me chamo", porque pode ser alguém da casa só renovando o exame.
+    `Aqui é o ${responsavel.split(' ')[0]}, da administração da The Ozzy Burger.`,
     '',
     `Segue a carta de encaminhamento para o exame ${nomeExame}. A clínica funciona das 08h às 11h. É necessário levar uma amostra de fezes e o RG.`,
     '',
