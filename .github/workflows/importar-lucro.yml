@@ -10,7 +10,7 @@ on:
 jobs:
   importar:
     runs-on: ubuntu-latest
-    container: postgres:17
+    container: public.ecr.aws/docker/library/postgres:17  # espelho da imagem oficial (o Docker Hub falhou em 09/10)
     steps:
       - uses: actions/checkout@v4
         with:
