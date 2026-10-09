@@ -46,7 +46,8 @@ export function ProvedorApp({ store, eu, children }: { store: Store; eu: Funcion
     <Ctx.Provider value={valor}>
       {children}
       {aviso && (
-        <div className="fixed inset-x-0 bottom-24 z-[60] flex justify-center px-4 sm:bottom-8">
+        // Acima das telas cheias (impressão da guia, z-60), senão o aviso de erro fica escondido atrás delas.
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[80] flex justify-center px-4 sm:bottom-8">
           <div className="rounded-xl bg-carvao px-4 py-3 text-sm font-medium text-white shadow-lg">{aviso}</div>
         </div>
       )}

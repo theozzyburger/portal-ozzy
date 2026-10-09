@@ -358,6 +358,13 @@ function FolhaGuia({
   const { store, avisar } = useApp()
   const [enviando, setEnviando] = useState(false)
   const [linkPronto, setLinkPronto] = useState<string | null>(null)
+  const [erro, setErro] = useState('')
+  const mensagemErro = (e: unknown) => {
+    const m = (e as Error)?.message ?? String(e)
+    return /dynamically imported module|Importing a module script failed|error loading dynamically/i.test(m)
+      ? 'O portal foi atualizado. Aperte F5 (ou feche e abra de novo) e tente outra vez.'
+      : `Não consegui gerar a guia: ${m}`
+  }
   const temCelular = pessoa.celular.replace(/\D/g, '').length >= 10
   const nomePdf = `Encaminhamento exame - ${pessoa.nome}.pdf`
   const gerarPdf = () => folhaParaPdf(document.querySelector<HTMLElement>('.folha-impressao .folha')!, nomePdf)
@@ -368,6 +375,8 @@ function FolhaGuia({
   const mandarLink = async () => {
     const janela = window.open('', '_blank')
     setEnviando(true)
+    setErro('')
+    setLinkPronto(null)
     try {
       const arquivo = await gerarPdf()
       await store.enviarDocumento({
@@ -377,11 +386,12 @@ function FolhaGuia({
       const url = await store.publicarGuia(pessoa.id, arquivo)
       const link = linkWhatsApp(pessoa, tipo, responsavel, url)!
       if (janela) janela.location.href = link
-      else setLinkPronto(link)
+      // Sempre deixa o link na tela também: celular e app instalado às vezes não abrem a aba nova.
+      setLinkPronto(link)
       avisar('Guia salva no cadastro e mensagem aberta no WhatsApp')
     } catch (e) {
       janela?.close()
-      avisar((e as Error).message)
+      setErro(mensagemErro(e))
     } finally {
       setEnviando(false)
     }
@@ -393,7 +403,7 @@ function FolhaGuia({
       const texto = decodeURIComponent(linkWhatsApp(pessoa, tipo, responsavel)!.split('text=')[1])
       await navigator.share({ files: [arquivo], text: texto })
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') avisar((e as Error).message)
+      if ((e as Error).name !== 'AbortError') setErro(mensagemErro(e))
     } finally {
       setEnviando(false)
     }
@@ -421,9 +431,11 @@ function FolhaGuia({
         </>
       }
     >
+      {erro && <p className="nao-imprimir mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-800 ring-1 ring-red-300">{erro}</p>}
       {linkPronto && (
-        <p className="nao-imprimir mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-300">
-          O navegador bloqueou a nova aba. <a href={linkPronto} target="_blank" rel="noreferrer" className="font-semibold underline">Abrir o WhatsApp</a>
+        <p className="nao-imprimir mb-4 rounded-xl bg-green-50 p-3 text-sm text-green-900 ring-1 ring-green-300">
+          Guia pronta. Se o WhatsApp não abriu sozinho,{' '}
+          <a href={linkPronto} target="_blank" rel="noreferrer" className="font-semibold underline">toque aqui para abrir a conversa</a>.
         </p>
       )}
       <div className="text-[11px] leading-tight">
