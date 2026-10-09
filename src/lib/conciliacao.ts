@@ -1,5 +1,5 @@
 import type { ContaPagar, Fornecedor, MovimentoExtrato } from './types'
-import { chaveExtrato } from './ofx'
+import { chaveExtrato, partesExtrato } from './ofx'
 
 const dias = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000)
 const palavras = (s: string) => new Set(chaveExtrato(s).split(' ').filter((p) => p.length >= 4))
@@ -91,4 +91,34 @@ export function sugestoesLote(movs: MovimentoExtrato[], contas: ContaPagar[], ja
     if (x) { porMov.set(m.id, x.grupo); tomados.add(x.grupo.lote) }
   }
   return porMov
+}
+
+// Fornecedor que parece ser o do extrato (Heitor, 09/10): primeiro pelo CPF/CNPJ do texto, depois pelo nome
+// ("PIX ENVIADO MERCADO SAO JOSE" acha "Mercado São José Ltda").
+const SEM_PESO = new Set(['ltda', 'me', 'epp', 'eireli', 'sa', 'cia', 'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'comercio', 'servicos', 'industria', 'pix', 'enviado'])
+const palavrasNome = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !SEM_PESO.has(w))
+export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'cnpj' | 'ativo'>>(descricao: string, fornecedores: F[]): F | null {
+  const { nome, documento } = partesExtrato(descricao)
+  const ativos = fornecedores.filter((f) => f.ativo)
+  const doc = documento?.replace(/\D/g, '')
+  if (doc && doc.length >= 11) {
+    const f = ativos.find((x) => x.cnpj?.replace(/\D/g, '') === doc)
+    if (f) return f
+  }
+  const ext = palavrasNome(nome)
+  if (!ext.length) return null
+  let melhor: F | null = null
+  let nota = 0
+  for (const f of ativos) {
+    const fw = palavrasNome(f.nome)
+    if (!fw.length) continue
+    // Palavra igual ou começo de palavra (extrato corta nomes: "SUPERMERC" → "supermercado").
+    const bate = (w: string) => ext.some((e) => e === w || (e.length >= 4 && w.startsWith(e)) || (w.length >= 4 && e.startsWith(w)))
+    // A primeira palavra do fornecedor tem que estar no extrato ("Distribuidora Exemplo" não vale para "IMOBILIARIA EXEMPLO").
+    if (!bate(fw[0])) continue
+    const n = fw.filter(bate).length / Math.max(fw.length, Math.min(ext.length, 3))
+    if (n > nota) { nota = n; melhor = f }
+  }
+  return nota >= 0.5 ? melhor : null
 }

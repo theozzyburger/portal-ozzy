@@ -71,3 +71,38 @@ export const chaveExtrato = (descricao: string) =>
     .replace(/\b[a-z]\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+
+// Separa o tipo da operação do nome de quem recebeu (Heitor, 09/10): "PIX ENVIADO MERCADO X" → tipo "Pix enviado",
+// nome "MERCADO X". Na tela o nome fica em destaque e o tipo vira uma etiqueta pequena.
+const TIPOS_EXTRATO: [RegExp, string][] = [
+  [/^SISPAG\s+PIX\b/i, 'Pix em lote'],
+  [/^SISPAG\b/i, 'SISPAG'],
+  [/^PIX\s+(ENVIADO|ENV|TRANSF|TRANSFERENCIA)\b/i, 'Pix enviado'],
+  [/^PIX\s+(RECEBIDO|REC)\b/i, 'Pix recebido'],
+  [/^PIX\s+QRS?\b/i, 'Pix QR Code'],
+  [/^PIX\b/i, 'Pix'],
+  [/^(INT\s+)?(PAG(TO)?|PAGAMENTO)\s+(DE\s+)?(BOLETO|TIT(ULO)?S?)\b/i, 'Boleto'],
+  [/^BOLETO(\s+PAGO)?\b/i, 'Boleto'],
+  [/^(TED|DOC)\b(\s+(ENVIADA?|ENV|RECEBIDA?|REC))?/i, 'TED/DOC'],
+  [/^(DA|DEB(ITO)?\s+AUT(OMATICO)?)\b/i, 'Débito automático'],
+  [/^(TAR|TARIFA)\b/i, 'Tarifa'],
+  [/^(CARTAO|FATURA)\b/i, 'Cartão'],
+  [/^(SAQUE)\b/i, 'Saque'],
+]
+// CPF ou CNPJ no meio do texto (com ou sem pontos, às vezes mascarado com *): vai para outra etiqueta.
+const DOC_RE = /(?<![\w*])(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}|[\d*]{3}\.[\d*]{3}\.[\d*]{3}-[\d*]{2}|\d{14}|\d{11})(?![\w*])/
+export function partesExtrato(descricao: string): { tipo: string | null; nome: string; documento: string | null } {
+  let d = descricao.trim()
+  const doc = d.match(DOC_RE)
+  const documento = doc ? doc[0] : null
+  if (doc) d = (d.slice(0, doc.index) + ' ' + d.slice(doc.index! + doc[0].length)).replace(/\s*·\s*·\s*/g, ' · ').replace(/\s+/g, ' ').replace(/^[\s·]+|[\s·]+$/g, '').trim()
+  for (const [re, tipo] of TIPOS_EXTRATO) {
+    const m = d.match(re)
+    if (m) {
+      // Tira datas e códigos soltos do fim ("MERCADO X 09/10 123456" → "MERCADO X").
+      const nome = d.slice(m[0].length).replace(/^[\s·:\-]+/, '').replace(/(\s+(\d{2}\/\d{2}|\d{4,}))+\s*$/, '').trim()
+      return { tipo, nome: nome || d, documento }
+    }
+  }
+  return { tipo: null, nome: d, documento }
+}

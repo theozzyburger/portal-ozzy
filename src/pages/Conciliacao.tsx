@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
-import { type GrupoLote, candidatas, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
+import { type GrupoLote, candidatas, fornecedorParecido, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
-import { chaveExtrato, lerArquivoOfx } from '../lib/ofx'
+import { chaveExtrato, lerArquivoOfx, partesExtrato } from '../lib/ofx'
+
+const simplesBusca = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 import { garantirFornecedor } from './LancarContas'
 import { EditarRecorrente } from './Recorrentes'
 import EscolherConta from '../components/EscolherConta'
@@ -36,6 +38,7 @@ export default function Conciliacao() {
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('pendentes')
+  const [busca, setBusca] = useState('')
   const [contaBanco, setContaBanco] = useState('')
   const [lendo, setLendo] = useState(false)
   const [achar, setAchar] = useState<MovimentoExtrato | null>(null)
@@ -98,14 +101,26 @@ export default function Conciliacao() {
   const pendentes = movs.filter((m) => m.status === 'pendente' && m.valor < 0)
   const comSugestao = pendentes.filter((m) => sug.has(m.id) || sugLote.has(m.id))
   const regraDe = (m: MovimentoExtrato) => d.regras.find((r) => r.chave === chaveExtrato(m.descricao))
+  const favorecido = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
+  // Busca (Heitor, 09/10): pelo texto do extrato, valor ("312,45"), data ("09/10") ou a conta ligada.
+  const termos = simplesBusca(busca).split(/\s+/).filter(Boolean)
+  const textoBusca = (m: MovimentoExtrato) => {
+    const c = m.contaPagarId ? d.contas.find((x) => x.id === m.contaPagarId) : undefined
+    const lote = d.contas.filter((x) => x.extratoMovimentoId === m.id)
+    return simplesBusca([
+      m.descricao, reais(m.valor), reais(Math.abs(m.valor)), Math.abs(m.valor).toFixed(2).replace('.', ','), dataCurta(m.data), m.documento ?? '',
+      ...[c, ...lote].filter(Boolean).flatMap((x) => [x!.descricao, favorecido(x!)]),
+    ].join(' '))
+  }
   const lista = movs.filter((m) =>
-    filtro === 'pendentes' ? m.status === 'pendente' && m.valor < 0
+    (termos.length
+      ? termos.every((t) => textoBusca(m).includes(t)) && (filtro === 'entradas' ? m.valor > 0 : filtro === 'conciliados' ? m.status === 'conciliado' : filtro === 'ignorados' ? m.status === 'ignorado' : m.valor < 0)
+      : filtro === 'pendentes' ? m.status === 'pendente' && m.valor < 0
       : filtro === 'entradas' ? m.status === 'pendente' && m.valor > 0
       : filtro === 'conciliados' ? m.status === 'conciliado'
-      : m.status === 'ignorado')
+      : m.status === 'ignorado'))
   const contaPorId = new Map(d.contas.map((c) => [c.id, c]))
   const notaDe = (m: MovimentoExtrato) => d.notas.find((n) => n.extratoMovimentoId === m.id && n.status === 'conferir')
-  const favorecido = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
   const saldo = [...d.saldos].sort((a, b) => b.data.localeCompare(a.data)).find((s) => !contaBanco || `${s.banco}|${s.agencia}|${s.conta}` === contaBanco)
 
   async function confirmarTodas() {
@@ -182,6 +197,9 @@ export default function Conciliacao() {
               </button>
             ))}
           </div>
+          <input className={estiloEntrada} type="search" value={busca} onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, valor (ex.: 312,45), data (09/10) ou título" aria-label="Buscar no extrato" />
+          {busca.trim() && <p className="text-xs text-stone-500">{lista.length} resultado{lista.length === 1 ? '' : 's'} em {FILTROS.find((f) => f.id === filtro)!.nome.toLowerCase()}, de qualquer situação.</p>}
           {filtro === 'entradas' && (
             <p className="text-sm text-stone-500">As entradas (cartões, iFood, Pix de clientes) vão ser conferidas com as vendas quando ligarmos a Eclética. Por enquanto, dá para ignorar as que não interessam.</p>
           )}
@@ -198,7 +216,16 @@ export default function Conciliacao() {
                   <Cartao key={m.id} className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-semibold break-words">{m.descricao || 'Sem descrição'}</p>
+                        {(() => {
+                          const { tipo, nome, documento } = partesExtrato(m.descricao || 'Sem descrição')
+                          return (
+                            <p className="break-words">
+                              <span className="font-semibold">{nome}</span>
+                              {tipo && <span className="ml-2 inline-block rounded-md bg-stone-100 px-1.5 py-0.5 align-middle text-[11px] font-medium text-stone-500" title={m.descricao}>{tipo}</span>}
+                              {documento && <span className="ml-1 inline-block rounded-md bg-stone-100 px-1.5 py-0.5 align-middle text-[11px] text-stone-400">{documento.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF'} {documento}</span>}
+                            </p>
+                          )
+                        })()}
                         <p className="text-sm text-stone-500">{diaSemana(m.data)}, {dataCurta(m.data)}{m.documento ? ` · doc. ${m.documento}` : ''}</p>
                       </div>
                       <p className={`shrink-0 font-bold ${m.valor < 0 ? '' : 'text-green-700'}`}>{reais(m.valor)}</p>
@@ -320,6 +347,8 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
   const perto = candidatas(m, d.contas, d.fornecedores, usadas)
   const lotes = lotesPara(m, gruposLote(d.contas, usadas))
   const nome = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
+  const parecido = fornecedorParecido(m.descricao, d.fornecedores)
+  const dele = parecido ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && c.fornecedorId === parecido.id) : []
   const todas = busca
     ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && `${c.descricao} ${nome(c)}`.toLowerCase().includes(busca.toLowerCase()))
     : perto.map((x) => x.conta)
@@ -328,6 +357,14 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
       <div className="space-y-3">
         <p className="text-sm">{m.descricao} · {dataCurta(m.data)} · <b>{reais(m.valor)}</b></p>
         <input className={estiloEntrada} placeholder="Buscar por descrição ou fornecedor" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        {parecido && !busca && (
+          <p className="rounded-xl bg-ozzy-100 p-2 text-sm">
+            Parece ser <b>{parecido.nome}</b>.{' '}
+            {dele.length > 0
+              ? <button className="font-semibold underline" onClick={() => setBusca(parecido.nome)}>Ver as {dele.length} conta{dele.length > 1 ? 's' : ''} em aberto dele</button>
+              : 'Não tem conta em aberto dele: use "Lançar como despesa".'}
+          </p>
+        )}
         {!busca && lotes.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm font-semibold">Pagamentos em lote</p>
@@ -375,7 +412,11 @@ type Comprovante = 'nao' | 'nota' | 'recibo'
 function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
   const valor = Math.abs(m.valor)
-  const [v, setV] = useState({ centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: '', fornecedor: '', descricao: m.descricao })
+  // Já começa com o fornecedor que parece ser o do extrato (e a conta de sempre dele).
+  const parecido = useMemo(() => fornecedorParecido(m.descricao, d.fornecedores), [m.descricao, d.fornecedores])
+  const [v, setV] = useState({
+    centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: parecido?.contaPadraoId ?? '', fornecedor: parecido?.nome ?? '', descricao: m.descricao,
+  })
   const [comp, setComp] = useState<Comprovante>('nao')
   const [numero, setNumero] = useState('')
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -481,6 +522,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
               <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
               <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
             </Campo>
+            {parecido && v.fornecedor === parecido.nome && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
             {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
               <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
             )}
