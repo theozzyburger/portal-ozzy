@@ -1277,7 +1277,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async regrasExtrato() {
       return (ok(await sb.from('extrato_regras').select('*')) ?? []).map((r: any) => ({
-        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, fornecedorId: r.fornecedor_id ?? null, ignorar: r.ignorar,
+        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, fornecedorId: r.fornecedor_id ?? null, funcionarioId: r.funcionario_id ?? null, ignorar: r.ignorar,
       }))
     },
     async importarExtrato(e) {
@@ -1305,6 +1305,12 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async registrarMovimento(movimentoId, r) {
       ok(await sb.rpc('registrar_movimento', {
         p_mov: movimentoId, p_centro: r.centroCustoId, p_conta: r.contaId, p_favorecido: r.favorecido ?? '', p_descricao: r.descricao, p_chave: r.chave, p_fornecedor: r.fornecedorId ?? null,
+        p_funcionario: r.funcionarioId ?? null,
+      }))
+    },
+    async pagamentosFuncionario(fid) {
+      return (ok(await sb.rpc('pagamentos_funcionario', { p_func: fid })) ?? []).map((r: any) => ({
+        id: r.id, descricao: r.descricao, vencimento: r.vencimento, pagoEm: r.pago_em, valor: Number(r.valor), forma: r.forma, conta: r.conta, conciliado: r.conciliado,
       }))
     },
     async ignorarMovimento(movimentoId, motivo, chaveSempre) {
@@ -1350,7 +1356,7 @@ const paraNota = (r: any): NotaFiscal => ({
     : undefined,
 })
 const paraContaPagar = (r: any): ContaPagar => ({
-  id: r.id, centroCustoId: r.centro_custo_id, contaId: r.conta_id, fornecedorId: r.fornecedor_id, favorecido: r.favorecido, descricao: r.descricao,
+  id: r.id, centroCustoId: r.centro_custo_id, contaId: r.conta_id, fornecedorId: r.fornecedor_id, funcionarioId: r.funcionario_id ?? null, favorecido: r.favorecido, descricao: r.descricao,
   competencia: r.competencia, vencimento: r.vencimento, valor: Number(r.valor), forma: r.forma, parcela: r.parcela, parcelas: r.parcelas,
   documento: r.documento, notaId: r.nota_id, observacao: r.observacao, pagoEm: r.pago_em, valorPago: numeroOuNulo(r.valor_pago), conciliado: r.conciliado,
   recorrenteId: r.recorrente_id ?? null, origem: r.origem ?? null, lote: r.lote ?? null, extratoMovimentoId: r.extrato_movimento_id ?? null,

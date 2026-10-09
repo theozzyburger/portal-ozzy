@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
+import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addMeses, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { lerValor, mostrarValor, nomeCentro, nomeConta, nomeForma, reais } from '../lib/financeiro'
@@ -56,33 +56,32 @@ export default function Recorrentes() {
   }
 
   const linha = (r: ContaRecorrente) => (
-    <Cartao key={r.id} className="flex flex-wrap items-center justify-between gap-2">
+    <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
       <button className="min-w-0 flex-1 text-left" onClick={() => setEditar(r)}>
-        <p className="font-semibold break-words">{r.descricao}</p>
-        <p className="text-sm text-stone-500">
+        <p className="truncate text-sm font-semibold">{r.descricao}</p>
+        <p className="truncate text-xs text-stone-500">
           {[r.fornecedorNome, nomeCentro(d.centros.find((x) => x.id === r.centroCustoId)), nomeForma(r.forma), `todo dia ${r.dia}`].filter(Boolean).join(' · ')}
-        </p>
-        <p className="text-xs text-stone-400">
-          {nomeConta(d.plano, r.contaId)}
+          {' · '}{nomeConta(d.plano, r.contaId)}
           {r.fim ? ` · até ${nomeMesAno(r.fim)}` : ''}
           {r.observacao ? ` · ${r.observacao}` : ''}
         </p>
       </button>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <div className="text-right">
-          <p className="font-semibold">{reais(r.valor)}</p>
+          <p className="text-sm font-semibold">{reais(r.valor)}</p>
           {r.variavel && <Selo cor="azul">Valor muda</Selo>}
           {r.situacao !== 'a_confirmar' && r.situacao !== 'ativa' && <Selo>{NOME_SITUACAO[r.situacao]}</Selo>}
         </div>
         {r.situacao === 'a_confirmar' && (
           <>
-            <Botao className="py-1.5!" onClick={() => setEditar({ ...r, situacao: 'ativa', inicio: r.inicio > proximoMes(r.dia) ? r.inicio : proximoMes(r.dia) })}>Confirmar</Botao>
-            <Botao variante="fantasma" className="px-2! py-1.5!" onClick={() => naoE(r)}>Não é</Botao>
+            <Botao className="px-2.5! py-1! text-xs!" onClick={() => setEditar({ ...r, situacao: 'ativa', inicio: r.inicio > proximoMes(r.dia) ? r.inicio : proximoMes(r.dia) })}>Confirmar</Botao>
+            <Botao variante="fantasma" className="px-2! py-1! text-xs!" onClick={() => naoE(r)}>Não é</Botao>
           </>
         )}
       </div>
-    </Cartao>
+    </div>
   )
+  const caixa = (xs: ContaRecorrente[]) => <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200">{xs.map(linha)}</div>
 
   return (
     <div className="space-y-4">
@@ -101,17 +100,17 @@ export default function Recorrentes() {
           <p className="text-sm text-stone-500">
             Achei estes no que foi pago de julho a setembro. Confira o dia do vencimento e o valor, e confirme. Se não for recorrente, clique em "Não é". Os de cartão vencem com a fatura (dia 15).
           </p>
-          {aConfirmar.map(linha)}
+          {caixa(aConfirmar)}
         </section>
       )}
       <section className="space-y-2">
         <h2 className="font-semibold">Ativos ({ativas.length}) · {reais(totalMes)} por mês</h2>
-        {ativas.length ? ativas.map(linha) : <Vazio>Nenhum ativo ainda. Confirme os da lista acima.</Vazio>}
+        {ativas.length ? caixa(ativas) : <Vazio>Nenhum ativo ainda. Confirme os da lista acima.</Vazio>}
       </section>
       {paradas.length > 0 && (
         <details>
           <summary className="cursor-pointer font-semibold">Pausados e encerrados ({paradas.length})</summary>
-          <div className="mt-2 space-y-2">{paradas.map(linha)}</div>
+          <div className="mt-2">{caixa(paradas)}</div>
         </details>
       )}
 

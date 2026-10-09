@@ -7,7 +7,7 @@ import { possoAlterar, podeGerenciar, podeVerDocumentosDe, podeVerEquipe, isento
 import { ir } from '../lib/rota'
 import {
   NATUREZAS, TIPOS_DESLIGAMENTO, TIPOS_DOCUMENTO, TIPOS_OCORRENCIA, ehSaude, nomeNivel, nomeTipoDocumento, nomeTipoOcorrencia,
-  type Desligamento, type TipoDesligamento, type VinculoAnterior, type Documento, type Funcionario, type Ocorrencia, type Salario, type TipoDocumento, type TipoOcorrencia,
+  type Desligamento, type TipoDesligamento, type VinculoAnterior, type Documento, type Funcionario, type Ocorrencia, type Salario, type PagamentoPessoa, type TipoDocumento, type TipoOcorrencia,
 } from '../lib/types'
 import { addMesesData, corSituacao, exigenciasDe, iconeSituacao, situacaoDoc, textoSituacao } from '../lib/vencimentos'
 import Uniformes from './Uniformes'
@@ -285,7 +285,10 @@ export default function Perfil({ funcionarioId }: { funcionarioId: string }) {
       {aba === 'ferias' ? (
         <FeriasPessoa pessoa={pessoa} podeRegistrar={gestao} />
       ) : aba === 'salario' ? (
-        <MeusSalarios funcionarioId={funcionarioId} />
+        <>
+          {podeGerenciar(eu.nivel) && <PagamentosPessoa funcionarioId={funcionarioId} />}
+          <MeusSalarios funcionarioId={funcionarioId} />
+        </>
       ) : aba === 'saude' ? (
         <section className="space-y-3">
           {!verDocs ? (
@@ -770,6 +773,44 @@ function TrocarFoto({ pessoa, aoTrocar }: { pessoa: Funcionario; aoTrocar: (img:
         }}
       />
     </label>
+  )
+}
+
+// O que a pessoa já recebeu pelo banco (Heitor, 09/10): salários, vales e diárias ligados a ela. Só a gestão vê.
+function PagamentosPessoa({ funcionarioId }: { funcionarioId: string }) {
+  const { store } = useApp()
+  const [lista, setLista] = useState<PagamentoPessoa[] | null>(null)
+  const [tudo, setTudo] = useState(false)
+  useEffect(() => {
+    store.pagamentosFuncionario(funcionarioId).then(setLista).catch(() => setLista([]))
+  }, [store, funcionarioId])
+  if (!lista) return null
+  const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const pagos = lista.filter((p) => p.pagoEm)
+  const ano = pagos.filter((p) => p.pagoEm!.slice(0, 4) === hoje().slice(0, 4)).reduce((s, p) => s + p.valor, 0)
+  return (
+    <section className="mb-3 rounded-2xl bg-white p-3 ring-1 ring-stone-200">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="font-bold">Pagamentos feitos</h3>
+        {pagos.length > 0 && <span className="text-xs text-stone-500">{reais(ano)} em {hoje().slice(0, 4)}</span>}
+      </div>
+      {lista.length === 0 ? (
+        <p className="text-sm text-stone-500">Nenhum pagamento ligado a esta pessoa ainda. Na conciliação, use "Lançar como despesa" › Funcionário.</p>
+      ) : (
+        <ul className="mt-1 divide-y divide-stone-100 text-sm">
+          {lista.slice(0, tudo ? undefined : 12).map((p) => (
+            <li key={p.id} className="flex items-baseline justify-between gap-2 py-1">
+              <span className="min-w-0 truncate">
+                <span className="text-stone-500">{(p.pagoEm ?? p.vencimento).split('-').reverse().slice(0, 2).join('/')}/{(p.pagoEm ?? p.vencimento).slice(2, 4)}</span> {p.descricao}
+                {!p.pagoEm && <span className="ml-1 text-xs text-amber-700">a pagar</span>}
+              </span>
+              <span className="shrink-0 font-semibold">{reais(p.valor)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {lista.length > 12 && !tudo && <button className="mt-1 text-xs font-semibold text-stone-500" onClick={() => setTudo(true)}>Ver todos ({lista.length})</button>}
+    </section>
   )
 }
 

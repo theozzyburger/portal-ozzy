@@ -2228,6 +2228,12 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       Object.assign(m, { status: 'pendente', contaPagarId: null, observacao: null })
       return espera(undefined)
     },
+    async pagamentosFuncionario(fid) {
+      exigeGestao()
+      return espera(contasPagarDemo.filter((c) => c.funcionarioId === fid || (c.origem ?? '').startsWith(`sal:${fid}:`))
+        .sort((a, b) => (b.pagoEm ?? b.vencimento).localeCompare(a.pagoEm ?? a.vencimento))
+        .map((c) => ({ id: c.id, descricao: c.descricao, vencimento: c.vencimento, pagoEm: c.pagoEm, valor: c.valorPago ?? c.valor, forma: c.forma, conta: planoDemo.find((p) => p.id === c.contaId)?.nome ?? null, conciliado: c.conciliado })))
+    },
     async registrarMovimento(movimentoId, r) {
       exigeFinanceiro()
       const m = extratoDemo.find((x) => x.id === movimentoId)
@@ -2236,14 +2242,14 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!r.centroCustoId) throw new Error('Escolha a loja.')
       const id = novoId('cp')
       contasPagarDemo.push(contaDemo(id, {
-        centroCustoId: r.centroCustoId, contaId: r.contaId, fornecedorId: r.fornecedorId ?? null, favorecido: r.fornecedorId ? null : r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
+        centroCustoId: r.centroCustoId, contaId: r.contaId, fornecedorId: r.fornecedorId ?? null, funcionarioId: r.funcionarioId ?? null, favorecido: r.fornecedorId ? null : r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
         competencia: m.data.slice(0, 8) + '01', vencimento: m.data, valor: -m.valor, forma: 'transferencia', pagoEm: m.data, valorPago: -m.valor, conciliado: true,
         observacao: 'Lançada pela conciliação bancária',
       }))
       Object.assign(m, { status: 'conciliado', contaPagarId: id })
       if (r.chave) {
         const i = regrasExtratoDemo.findIndex((x) => x.chave === r.chave)
-        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, fornecedorId: r.fornecedorId ?? null, ignorar: false }
+        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, fornecedorId: r.fornecedorId ?? null, funcionarioId: r.funcionarioId ?? null, ignorar: false }
         if (i >= 0) regrasExtratoDemo[i] = regra
         else regrasExtratoDemo.push(regra)
       }

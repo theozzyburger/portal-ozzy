@@ -1199,6 +1199,8 @@ export interface ContaPagar {
   centroCustoId: string
   contaId: string | null
   fornecedorId: string | null
+  // Pagamento para um funcionário (salário, vale, reembolso): aparece no perfil dele.
+  funcionarioId?: string | null
   favorecido: string | null
   descricao: string
   competencia: string // AAAA-MM-01
@@ -1275,6 +1277,7 @@ export interface RegraExtrato {
   contaId: string | null
   favorecido: string | null
   fornecedorId?: string | null
+  funcionarioId?: string | null
   ignorar: boolean
 }
 export interface SaldoExtrato {
@@ -1292,4 +1295,16 @@ export interface ExtratoOfx {
   fim: string | null
   saldo: { data: string; valor: number } | null
   movimentos: { fitid: string; data: string; valor: number; descricao: string; documento: string | null; tipo: string | null }[]
+}
+
+// O que um funcionário já recebeu (perfil › Salário, só a gestão).
+export interface PagamentoPessoa {
+  id: string
+  descricao: string
+  vencimento: string
+  pagoEm: string | null
+  valor: number
+  forma: string
+  conta: string | null
+  conciliado: boolean
 }

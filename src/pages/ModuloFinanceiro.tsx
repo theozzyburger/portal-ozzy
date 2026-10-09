@@ -205,42 +205,42 @@ function ContasPagar() {
         <div className="space-y-3">
           <p className="text-sm text-stone-500">{lista.length} {lista.length === 1 ? 'conta' : 'contas'} · {reais(soma(lista))}</p>
           {grupos.map((g) => (
-            <div key={g.dia} className="space-y-1">
-              <h3 className="text-sm font-semibold text-stone-500">
+            <div key={g.dia}>
+              <h3 className="mb-1 text-xs font-semibold text-stone-500">
                 {g.dia === h ? 'Hoje' : `${diaSemana(g.dia)}, ${dataCurta(g.dia)}`}
                 {filtro !== 'pagas' && g.dia < h && ' · vencida'}
                 <span className="font-normal"> · {reais(soma(g.itens))}</span>
               </h3>
+              <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200">
               {g.itens.map((c) => {
                 const s = situacao(c)
                 return (
-                  <Cartao key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <div key={c.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
                     <button className="min-w-0 flex-1 text-left" onClick={() => setEditar(c)}>
-                      <p className="font-semibold break-words">{c.descricao}{c.parcelas ? ` (${c.parcela}/${c.parcelas})` : ''}</p>
-                      <p className="text-sm text-stone-500">
+                      <p className="truncate text-sm font-semibold">{c.descricao}{c.parcelas ? ` (${c.parcela}/${c.parcelas})` : ''}</p>
+                      <p className={`truncate text-xs ${c.contaId ? 'text-stone-500' : 'font-semibold text-amber-700'}`}>
                         {[favorecidoDe(c, d.fornecedores), nomeCentro(d.centros.find((x) => x.id === c.centroCustoId)), nomeForma(c.forma)].filter(Boolean).join(' · ')}
-                      </p>
-                      <p className={`text-xs ${c.contaId ? 'text-stone-400' : 'font-semibold text-amber-700'}`}>
-                        {nomeConta(d.plano, c.contaId)}
+                        {' · '}{nomeConta(d.plano, c.contaId)}
                         {c.recorrenteId && <span className="ml-2 font-semibold text-stone-500">↻ recorrente</span>}
                         {c.origem && !c.recorrenteId && <span className="ml-2 font-semibold text-stone-500">vem do DP</span>}
                         {c.lote?.startsWith('cartao:') && <span className="ml-2 font-semibold text-stone-500">fatura do cartão</span>}
                       </p>
                     </button>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       <div className="text-right">
-                        <p className="font-semibold">{reais(c.valorPago ?? c.valor)}</p>
+                        <p className="text-sm font-semibold">{reais(c.valorPago ?? c.valor)}</p>
                         {s === 'paga' ? <Selo cor="verde">Paga {dataCurta(c.pagoEm!)}{c.conciliado ? ' · banco ✓' : ''}</Selo> : s !== 'depois' && <Selo cor={COR_SITUACAO[s]}>{s === 'vencida' ? 'Vencida' : s === 'hoje' ? 'Hoje' : 'Esta semana'}</Selo>}
                       </div>
                       {c.pagoEm ? (
-                        <Botao variante="fantasma" className="px-2!" onClick={() => desfazer(c)}>Desfazer</Botao>
+                        <Botao variante="fantasma" className="px-2! py-1! text-xs!" onClick={() => desfazer(c)}>Desfazer</Botao>
                       ) : (
-                        <Botao variante="secundario" onClick={() => setPagar(c)}>Pagar</Botao>
+                        <Botao variante="secundario" className="px-2.5! py-1! text-xs!" onClick={() => setPagar(c)}>Pagar</Botao>
                       )}
                     </div>
-                  </Cartao>
+                  </div>
                 )
               })}
+              </div>
             </div>
           ))}
         </div>
@@ -255,7 +255,7 @@ function ContasPagar() {
 
 function Kpi({ nome, valor, n, cor = '', aoClicar }: { nome: string; valor: number; n: number; cor?: string; aoClicar: () => void }) {
   return (
-    <Cartao onClick={aoClicar}>
+    <Cartao className="p-2.5!" onClick={aoClicar}>
       <p className="text-sm text-stone-500">{nome}</p>
       <p className={`text-lg font-bold ${cor}`}>{reais(valor)}</p>
       <p className="text-xs text-stone-400">{n} {n === 1 ? 'conta' : 'contas'}</p>

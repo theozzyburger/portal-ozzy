@@ -4,12 +4,28 @@ import { Botao, Titulo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, dataLonga, diaSemana, hoje, indiceSemana, inicioDaSemana } from '../lib/datas'
 import { podeGerenciar } from '../lib/permissoes'
-import { apelidoUnidade, type Folga, type TipoFolga, type Turno } from '../lib/types'
+import { apelidoUnidade, type Folga, type Funcionario, type TipoFolga, type Turno } from '../lib/types'
+
+// Produção e Escritório não são lojas, mas aparecem como opção no filtro (Heitor, 09/10).
+const AREAS = [{ id: 'producao', nome: 'Produção' }, { id: 'escritorio', nome: 'Escritório' }]
+const daArea = (p: Pick<Funcionario, 'unidadeId' | 'setor'>, filtro: string) =>
+  !filtro || (AREAS.some((a) => a.id === filtro) ? p.setor === filtro : p.unidadeId === filtro && !AREAS.some((a) => a.id === p.setor))
+const nomeFiltro = (filtro: string, nomeUnidade: (id: string) => string) => AREAS.find((a) => a.id === filtro)?.nome ?? apelidoUnidade(nomeUnidade(filtro))
+function OpcoesLocal() {
+  const { unidades } = useApp()
+  return (
+    <>
+      <option value="">Todas as unidades</option>
+      {unidades.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+      {AREAS.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+    </>
+  )
+}
 
 export default function Escala() {
-  const { eu, store, equipe, unidades, avisar } = useApp()
+  const { eu, store, equipe, avisar } = useApp()
   const gestao = podeGerenciar(eu.nivel)
-  const [visao, setVisao] = useState<'semana' | '30'>('semana')
+  const [visao, setVisao] = useState<'semana' | '30'>(gestao ? '30' : 'semana')
   const [inicio, setInicio] = useState(inicioDaSemana(hoje()))
   const [folgas, setFolgas] = useState<Folga[]>([])
   const [unidade, setUnidade] = useState(gestao ? '' : eu.unidadeId)
@@ -29,7 +45,7 @@ export default function Escala() {
   }, [carregar])
 
   const pessoas = equipe
-    .filter((f) => f.status === 'ativo' && (!unidade || f.unidadeId === unidade))
+    .filter((f) => f.status === 'ativo' && daArea(f, unidade))
     .sort((a, b) => (a.id === eu.id ? -1 : b.id === eu.id ? 1 : a.nome.localeCompare(b.nome)))
 
   const registro = (fid: string, d: string) => folgas.find((g) => g.funcionarioId === fid && g.data === d)
@@ -91,12 +107,7 @@ export default function Escala() {
         </Botao>
         {gestao && (
           <select className={`${estiloEntrada} w-auto! py-2!`} value={unidade} onChange={(e) => setUnidade(e.target.value)}>
-            <option value="">Todas as unidades</option>
-            {unidades.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nome}
-              </option>
-            ))}
+            <OpcoesLocal />
           </select>
         )}
       </div>
@@ -167,7 +178,7 @@ const diaMes = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`
 
 // Calendário dos próximos 30 dias para mandar no grupo (Gerente, Administrativo e Proprietário).
 function Proximos30({ unidade, setUnidade }: { unidade: string; setUnidade: (u: string) => void }) {
-  const { store, equipe, unidades, nomeUnidade, avisar } = useApp()
+  const { store, equipe, nomeUnidade, avisar } = useApp()
   const [folgas, setFolgas] = useState<Folga[] | null>(null)
   const [imprimir, setImprimir] = useState(false)
   const ini = hoje()
@@ -184,7 +195,7 @@ function Proximos30({ unidade, setUnidade }: { unidade: string; setUnidade: (u: 
     folgas
       .filter((g) => g.data === d)
       .map((g) => ({ g, p: pessoa(g.funcionarioId) }))
-      .filter((x) => x.p && x.p.status === 'ativo' && (!unidade || x.p.unidadeId === unidade))
+      .filter((x) => x.p && x.p.status === 'ativo' && daArea(x.p, unidade))
       .sort((a, b) => a.p!.nome.localeCompare(b.p!.nome))
   // Primeiro nome + o seguinte ("Kauã de Oliveira", não "Kauã de").
   const curto = (nome: string) => {
@@ -194,7 +205,7 @@ function Proximos30({ unidade, setUnidade }: { unidade: string; setUnidade: (u: 
   const comLoja = (id: string) => (unidade ? '' : ` (${apelidoUnidade(nomeUnidade(pessoa(id)!.unidadeId))})`)
 
   const texto = () => {
-    const linhas = [`*Folgas de ${diaMes(ini)} a ${diaMes(fim)}*${unidade ? ` · ${apelidoUnidade(nomeUnidade(unidade))}` : ''}`, '']
+    const linhas = [`*Folgas de ${diaMes(ini)} a ${diaMes(fim)}*${unidade ? ` · ${nomeFiltro(unidade, nomeUnidade)}` : ''}`, '']
     for (const d of dias) {
       const xs = doDia(d)
       if (!xs.length) continue
@@ -246,8 +257,7 @@ function Proximos30({ unidade, setUnidade }: { unidade: string; setUnidade: (u: 
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <select className={`${estiloEntrada} w-auto! py-2!`} value={unidade} onChange={(e) => setUnidade(e.target.value)} aria-label="Unidade">
-          <option value="">Todas as unidades</option>
-          {unidades.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+          <OpcoesLocal />
         </select>
         <Botao onClick={copiar}>Copiar para o WhatsApp</Botao>
         <Botao variante="secundario" onClick={() => setImprimir(true)}>Imprimir</Botao>
@@ -261,7 +271,7 @@ function Proximos30({ unidade, setUnidade }: { unidade: string; setUnidade: (u: 
       {imprimir && (
         <Impressao titulo="Folgas dos próximos 30 dias" aoFechar={() => setImprimir(false)}>
           <h1 className="mb-1 text-lg font-bold">Folgas de {dataLonga(ini)} a {dataLonga(fim)}</h1>
-          <p className="mb-3 text-xs">{unidade ? nomeUnidade(unidade) : 'Todas as unidades'} · amarelo = folga, azul = folga de feriado</p>
+          <p className="mb-3 text-xs">{unidade ? nomeFiltro(unidade, nomeUnidade) : 'Todas as unidades'} · amarelo = folga, azul = folga de feriado</p>
           {lista}
         </Impressao>
       )}

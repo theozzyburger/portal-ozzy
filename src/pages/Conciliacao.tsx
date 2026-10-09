@@ -164,22 +164,22 @@ export default function Conciliacao() {
             </select>
           )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Cartao onClick={() => setFiltro('pendentes')}>
+            <Cartao className="p-2.5!" onClick={() => setFiltro('pendentes')}>
               <p className="text-sm text-stone-500">Saídas a conciliar</p>
               <p className={`text-lg font-bold ${pendentes.length ? 'text-amber-700' : ''}`}>{pendentes.length}</p>
               <p className="text-xs text-stone-400">{reais(-pendentes.reduce((s, m) => s + m.valor, 0))}</p>
             </Cartao>
-            <Cartao onClick={() => setFiltro('pendentes')}>
+            <Cartao className="p-2.5!" onClick={() => setFiltro('pendentes')}>
               <p className="text-sm text-stone-500">Com sugestão pronta</p>
               <p className="text-lg font-bold">{comSugestao.length}</p>
               <p className="text-xs text-stone-400">mesmo valor e data perto{sugLote.size ? ` · ${sugLote.size} em lote` : ''}</p>
             </Cartao>
-            <Cartao onClick={() => setFiltro('conciliados')}>
+            <Cartao className="p-2.5!" onClick={() => setFiltro('conciliados')}>
               <p className="text-sm text-stone-500">Conciliados</p>
               <p className="text-lg font-bold">{movs.filter((m) => m.status === 'conciliado').length}</p>
               <p className="text-xs text-stone-400">de {movs.filter((m) => m.valor < 0).length} saídas</p>
             </Cartao>
-            <Cartao>
+            <Cartao className="p-2.5!">
               <p className="text-sm text-stone-500">Saldo no banco</p>
               <p className="text-lg font-bold">{saldo ? reais(saldo.saldo) : '—'}</p>
               <p className="text-xs text-stone-400">{saldo ? `em ${dataCurta(saldo.data)}` : 'o OFX não trouxe'}</p>
@@ -205,7 +205,7 @@ export default function Conciliacao() {
           )}
 
           {lista.length === 0 ? <Vazio>Nada aqui.</Vazio> : (
-            <div className="space-y-2">
+            <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200">
               {lista.map((m) => {
                 const s = sug.get(m.id)
                 const sl = sugLote.get(m.id)
@@ -213,26 +213,26 @@ export default function Conciliacao() {
                 const regra = m.status === 'pendente' ? regraDe(m) : undefined
                 const ligada = m.contaPagarId ? contaPorId.get(m.contaPagarId) : undefined
                 return (
-                  <Cartao key={m.id} className="space-y-2">
+                  <div key={m.id} className="space-y-1 px-3 py-2">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <span className="w-16 shrink-0 text-xs text-stone-500">{diaSemana(m.data)} {dataCurta(m.data)}</span>
                         {(() => {
                           const { tipo, nome, documento } = partesExtrato(m.descricao || 'Sem descrição')
                           return (
-                            <p className="break-words">
+                            <p className="min-w-0 break-words text-sm">
                               <span className="font-semibold">{nome}</span>
                               {tipo && <span className="ml-2 inline-block rounded-md bg-stone-100 px-1.5 py-0.5 align-middle text-[11px] font-medium text-stone-500" title={m.descricao}>{tipo}</span>}
                               {documento && <span className="ml-1 inline-block rounded-md bg-stone-100 px-1.5 py-0.5 align-middle text-[11px] text-stone-400">{documento.replace(/\D/g, '').length === 14 ? 'CNPJ' : 'CPF'} {documento}</span>}
                             </p>
                           )
                         })()}
-                        <p className="text-sm text-stone-500">{diaSemana(m.data)}, {dataCurta(m.data)}{m.documento ? ` · doc. ${m.documento}` : ''}</p>
                       </div>
-                      <p className={`shrink-0 font-bold ${m.valor < 0 ? '' : 'text-green-700'}`}>{reais(m.valor)}</p>
+                      <p className={`shrink-0 text-sm font-bold ${m.valor < 0 ? '' : 'text-green-700'}`}>{reais(m.valor)}</p>
                     </div>
 
                     {m.status === 'conciliado' && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                         <span><Selo cor="verde">Conciliado</Selo> {ligada ? `${ligada.descricao} · ${nomeCentro(d.centros.find((x) => x.id === ligada.centroCustoId))} · ${nomeConta(d.plano, ligada.contaId)}` : ''}
                           {ligada && !ligada.recorrenteId && !ligada.origem && (
                             <button className="ml-2 text-stone-500 underline" onClick={() => setRecorrenteDe(ligada)}>Repete todo mês?</button>
@@ -248,7 +248,7 @@ export default function Conciliacao() {
                       </div>
                     )}
                     {m.status === 'ignorado' && (
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                         <span><Selo>Ignorado</Selo> {m.observacao}</span>
                         <button className="font-semibold underline" onClick={() => acao(() => store.desconciliarMovimento(m.id))}>Voltar para conciliar</button>
                       </div>
@@ -256,12 +256,12 @@ export default function Conciliacao() {
                     {m.status === 'pendente' && m.valor < 0 && (
                       <>
                         {notaDe(m) ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 p-2 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50 px-2 py-1 text-xs">
                             <span>Ligado à nota {notaDe(m)!.numero ? `NF ${notaDe(m)!.numero}` : 'sem número'} · {notaDe(m)!.emitenteNome ?? ''}: fica conciliado quando a nota for lançada.</span>
-                            <Botao className="py-1.5!" onClick={() => ir('estoque/nota/' + notaDe(m)!.id)}>Abrir a nota</Botao>
+                            <Botao className="px-2.5! py-1! text-xs!" onClick={() => ir('estoque/nota/' + notaDe(m)!.id)}>Abrir a nota</Botao>
                           </div>
                         ) : sl ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-green-50 p-2 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-green-50 px-2 py-1 text-xs">
                             <span>
                               É <b>{nomeLote(sl.lote)}</b>: {sl.contas.length} contas que somam {reais(sl.total)}
                               <details><summary className="cursor-pointer text-stone-500">Ver as contas</summary>
@@ -269,36 +269,36 @@ export default function Conciliacao() {
                               </details>
                             </span>
                             <span className="flex gap-2">
-                              <Botao className="py-1.5!" onClick={() => acao(() => store.conciliarLote(m.id, sl.contas.map((c) => c.id), null))}>Confirmar</Botao>
-                              <Botao variante="fantasma" className="py-1.5!" onClick={() => setAchar(m)}>Outra</Botao>
+                              <Botao className="px-2.5! py-1! text-xs!" onClick={() => acao(() => store.conciliarLote(m.id, sl.contas.map((c) => c.id), null))}>Confirmar</Botao>
+                              <Botao variante="fantasma" className="px-2.5! py-1! text-xs!" onClick={() => setAchar(m)}>Outra</Botao>
                             </span>
                           </div>
                         ) : s ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-green-50 p-2 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-green-50 px-2 py-1 text-xs">
                             <span>
                               É <b>{s.descricao}</b>{s.parcelas ? ` (${s.parcela}/${s.parcelas})` : ''} · {favorecido(s)} · vence {dataCurta(s.vencimento)}{s.pagoEm ? ` · paga ${dataCurta(s.pagoEm)}` : ''}
                             </span>
                             <span className="flex gap-2">
-                              <Botao className="py-1.5!" onClick={() => acao(() => store.conciliarMovimento(m.id, s.id))}>Confirmar</Botao>
-                              <Botao variante="fantasma" className="py-1.5!" onClick={() => setAchar(m)}>Outra</Botao>
+                              <Botao className="px-2.5! py-1! text-xs!" onClick={() => acao(() => store.conciliarMovimento(m.id, s.id))}>Confirmar</Botao>
+                              <Botao variante="fantasma" className="px-2.5! py-1! text-xs!" onClick={() => setAchar(m)}>Outra</Botao>
                             </span>
                           </div>
                         ) : regra?.ignorar ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-stone-100 p-2 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-stone-100 px-2 py-1 text-xs">
                             <span>Da última vez foi ignorado: {regra.favorecido}</span>
-                            <Botao className="py-1.5!" onClick={() => acao(() => store.ignorarMovimento(m.id, regra.favorecido ?? 'Ignorado', null))}>Ignorar de novo</Botao>
+                            <Botao className="px-2.5! py-1! text-xs!" onClick={() => acao(() => store.ignorarMovimento(m.id, regra.favorecido ?? 'Ignorado', null))}>Ignorar de novo</Botao>
                           </div>
                         ) : regra && regra.centroCustoId ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 p-2 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50 px-2 py-1 text-xs">
                             <span>Da última vez: {nomeCentro(d.centros.find((x) => x.id === regra.centroCustoId))} · {nomeConta(d.plano, regra.contaId)}{regra.favorecido ? ` · ${regra.favorecido}` : ''}</span>
-                            <Botao className="py-1.5!" onClick={() => acao(() => store.registrarMovimento(m.id, {
-                              centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, fornecedorId: regra.fornecedorId ?? null, descricao: m.descricao, chave: chaveExtrato(m.descricao),
+                            <Botao className="px-2.5! py-1! text-xs!" onClick={() => acao(() => store.registrarMovimento(m.id, {
+                              centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, fornecedorId: regra.fornecedorId ?? null, funcionarioId: regra.funcionarioId ?? null, descricao: m.descricao, chave: chaveExtrato(m.descricao),
                             }))}>Lançar assim</Botao>
                           </div>
                         ) : (
-                          <p className="text-sm font-semibold text-amber-700">Não identificado: não achei conta a pagar com este valor.</p>
+                          <p className="text-xs font-semibold text-amber-700">Não identificado: nenhuma conta a pagar com este valor.</p>
                         )}
-                        <div className="flex flex-wrap gap-3 text-sm">
+                        <div className="flex flex-wrap gap-3 text-xs">
                           <button className="font-semibold underline" onClick={() => setAchar(m)}>Achar a conta</button>
                           <button className="font-semibold underline" onClick={() => setLancar(m)}>Lançar como despesa</button>
                           <button className="font-semibold underline" onClick={() => setIgnorar(m)}>Ignorar</button>
@@ -306,9 +306,9 @@ export default function Conciliacao() {
                       </>
                     )}
                     {m.status === 'pendente' && m.valor > 0 && (
-                      <button className="text-sm font-semibold underline" onClick={() => setIgnorar(m)}>Ignorar</button>
+                      <button className="text-xs font-semibold underline" onClick={() => setIgnorar(m)}>Ignorar</button>
                     )}
-                  </Cartao>
+                  </div>
                 )
               })}
             </div>
@@ -414,6 +414,19 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
   const valor = Math.abs(m.valor)
   // Já começa com o fornecedor que parece ser o do extrato (e a conta de sempre dele).
   const parecido = useMemo(() => fornecedorParecido(m.descricao, d.fornecedores), [m.descricao, d.fornecedores])
+  // Ou com o funcionário, quando o Pix foi para alguém da equipe (salário, vale, reembolso).
+  const { equipe } = useApp()
+  const pessoas = useMemo(() => [...equipe].sort((a, b) => Number(b.status === 'ativo') - Number(a.status === 'ativo') || a.nome.localeCompare(b.nome)), [equipe])
+  const pessoaParecida = useMemo(
+    () => (parecido ? null : fornecedorParecido(m.descricao, pessoas.map((p) => ({ id: p.id, nome: p.nome, cnpj: p.cpf ?? null, ativo: true })))),
+    [m.descricao, pessoas, parecido],
+  )
+  const [quem, setQuem] = useState<'fornecedor' | 'funcionario'>(pessoaParecida ? 'funcionario' : 'fornecedor')
+  const [funcionario, setFuncionario] = useState(pessoaParecida?.id ?? '')
+  // Regra da casa (Heitor, 09/10): salário cai dia 5 e adiantamento dia 20; freela recebe na segunda, valores baixos.
+  const diaMes = Number(m.data.slice(8, 10))
+  const segunda = new Date(m.data + 'T12:00:00').getDay() === 1
+  const pareceSer = diaMes >= 3 && diaMes <= 8 ? 'Salário' : diaMes >= 18 && diaMes <= 23 ? 'Adiantamento' : segunda && valor <= 400 ? 'Diária' : null
   const [v, setV] = useState({
     centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: parecido?.contaPadraoId ?? '', fornecedor: parecido?.nome ?? '', descricao: m.descricao,
   })
@@ -447,6 +460,20 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
 
   async function salvar() {
     setErro('')
+    if (quem === 'funcionario') {
+      const p = equipe.find((x) => x.id === funcionario)
+      if (!p) return setErro('Escolha o funcionário.')
+      if (!v.centro) return setErro('Escolha a loja.')
+      if (!v.conta) return setErro('Escolha a conta contábil (ex.: salários, vale, adiantamento).')
+      setSalvando(true)
+      try {
+        await store.registrarMovimento(m.id, { centroCustoId: v.centro, contaId: v.conta, favorecido: p.nome, funcionarioId: p.id, descricao: v.descricao, chave: chaveExtrato(m.descricao) })
+        return aoSalvar()
+      } catch (e) {
+        setErro((e as Error).message)
+        return setSalvando(false)
+      }
+    }
     if (!v.fornecedor.trim()) return setErro('Escolha o fornecedor.')
     if (!v.centro) return setErro('Escolha a loja.')
     if (comp === 'nao' && !v.conta) return setErro('Escolha a conta contábil.')
@@ -486,6 +513,17 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
       <div className="space-y-3">
         <p className="text-sm">{dataCurta(m.data)} · <b>{reais(m.valor)}</b> · {m.descricao}</p>
         <div className="space-y-1">
+          <p className="text-sm font-medium text-stone-700">Para quem foi?</p>
+          <div className="flex flex-wrap gap-2">
+            {([['fornecedor', 'Fornecedor'], ['funcionario', 'Funcionário']] as const).map(([id, nome]) => (
+              <button key={id} onClick={() => { setQuem(id); if (id === 'funcionario') setComp('nao') }}
+                className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${quem === id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-600 ring-stone-300'}`}>
+                {nome}
+              </button>
+            ))}
+          </div>
+        </div>
+        {quem === 'fornecedor' && <div className="space-y-1">
           <p className="text-sm font-medium text-stone-700">Tem nota fiscal ou recibo?</p>
           <div className="flex flex-wrap gap-2">
             {([['nao', 'Não, só a despesa'], ['nota', 'Nota já importada'], ['recibo', 'Recibo ou nota de papel']] as const).map(([id, nome]) => (
@@ -495,7 +533,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         {comp === 'nota' ? (
           <div className="space-y-2">
@@ -518,13 +556,34 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
           </div>
         ) : (
           <>
-            <Campo rotulo="Fornecedor">
-              <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
-              <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
-            </Campo>
-            {parecido && v.fornecedor === parecido.nome && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
-            {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
-              <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
+            {quem === 'funcionario' ? (
+              <>
+                <Campo rotulo="Funcionário">
+                  <select className={estiloEntrada} value={funcionario} onChange={(e) => setFuncionario(e.target.value)} aria-label="Funcionário">
+                    <option value="">Escolher</option>
+                    {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.status !== 'ativo' ? ' (desligado)' : ''}</option>)}
+                  </select>
+                </Campo>
+                {pessoaParecida && funcionario === pessoaParecida.id && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
+                {pareceSer && funcionario && (
+                  <p className="text-xs text-stone-600">
+                    Pela data e valor, parece <b>{pareceSer === 'Diária' ? 'diária (freela, paga na segunda)' : pareceSer === 'Salário' ? 'salário do dia 5' : 'adiantamento do dia 20'}</b>.{' '}
+                    <button className="font-semibold underline" onClick={() => setV({ ...v, descricao: `${pareceSer} · ${equipe.find((x) => x.id === funcionario)?.nome ?? ''}` })}>Usar na descrição</button>
+                  </p>
+                )}
+                <p className="text-xs text-stone-500">Fica no perfil da pessoa (aba Salário), que só a gestão vê.</p>
+              </>
+            ) : (
+              <>
+                <Campo rotulo="Fornecedor">
+                  <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
+                  <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
+                </Campo>
+                {parecido && v.fornecedor === parecido.nome && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
+                {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
+                  <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
+                )}
+              </>
             )}
             <Campo rotulo="Descrição"><input className={estiloEntrada} value={v.descricao} onChange={(e) => setV({ ...v, descricao: e.target.value })} /></Campo>
             <Campo rotulo="Loja">
@@ -545,11 +604,11 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
                 </div>
               </div>
             )}
-            <label className="flex items-center gap-2 text-sm">
+            {quem === 'fornecedor' && <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={rec.ligado} onChange={(e) => setRec({ ...rec, ligado: e.target.checked })} />
               Repete todo mês: cadastrar como pagamento recorrente
-            </label>
-            {rec.ligado && (
+            </label>}
+            {quem === 'fornecedor' && rec.ligado && (
               <div className="space-y-2 rounded-xl bg-stone-50 p-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Campo rotulo="Vence todo dia"><input className={estiloEntrada} inputMode="numeric" value={rec.dia} onChange={(e) => setRec({ ...rec, dia: e.target.value })} /></Campo>
