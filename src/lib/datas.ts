@@ -23,6 +23,8 @@ export const inicioDaSemana = (s: string) => {
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 export const diaSemana = (s: string) => DIAS[deIso(s).getDay()]
+// Posição na semana dos turnos: 0 = segunda … 6 = domingo.
+export const indiceSemana = (s: string) => (deIso(s).getDay() + 6) % 7
 
 export const dataCurta = (s: string) => {
   const [, m, d] = s.slice(0, 10).split('-')

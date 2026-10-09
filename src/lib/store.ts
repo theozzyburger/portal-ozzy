@@ -124,7 +124,8 @@ export interface Store {
   publicarComunicado(c: NovoComunicado): Promise<Comunicado>
   marcarLido(comunicadoId: string): Promise<void>
 
-  folgas(inicio: string, fim: string): Promise<Folga[]>
+  // Inclui as folgas automáticas do turno. 'trabalha' só vem com comTrabalha (tela de marcar folgas).
+  folgas(inicio: string, fim: string, opcoes?: { comTrabalha?: boolean }): Promise<Folga[]>
   alternarFolga(funcionarioId: string, data: string): Promise<void>
   // Só a gestão: tipo null tira a folga do dia.
   definirFolga(funcionarioId: string, data: string, tipo: TipoFolga | null): Promise<void>

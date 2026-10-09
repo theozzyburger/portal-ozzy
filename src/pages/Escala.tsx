@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import Impressao from '../components/Impressao'
 import { Botao, Titulo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
-import { addDias, dataCurta, dataLonga, diaSemana, hoje, inicioDaSemana } from '../lib/datas'
+import { addDias, dataCurta, dataLonga, diaSemana, hoje, indiceSemana, inicioDaSemana } from '../lib/datas'
 import { podeGerenciar } from '../lib/permissoes'
-import { apelidoUnidade, type Folga, type TipoFolga } from '../lib/types'
+import { apelidoUnidade, type Folga, type TipoFolga, type Turno } from '../lib/types'
 
 export default function Escala() {
   const { eu, store, equipe, unidades, avisar } = useApp()
@@ -15,7 +15,15 @@ export default function Escala() {
   const [unidade, setUnidade] = useState(gestao ? '' : eu.unidadeId)
   const dias = Array.from({ length: 7 }, (_, i) => addDias(inicio, i))
 
-  const carregar = useCallback(() => store.folgas(inicio, addDias(inicio, 6)).then(setFolgas), [store, inicio])
+  const carregar = useCallback(() => store.folgas(inicio, addDias(inicio, 6), { comTrabalha: true }).then(setFolgas), [store, inicio])
+  const [turnos, setTurnos] = useState<Turno[]>([])
+  useEffect(() => {
+    store.turnos().then(setTurnos).catch(() => setTurnos([]))
+  }, [store])
+  const turnoFechado = (fid: string, d: string) => {
+    const t = turnos.find((x) => x.id === equipe.find((f) => f.id === fid)?.turnoId)
+    return !!t && t.dias.some(Boolean) && !t.dias[indiceSemana(d)]
+  }
   useEffect(() => {
     carregar()
   }, [carregar])
@@ -24,16 +32,30 @@ export default function Escala() {
     .filter((f) => f.status === 'ativo' && (!unidade || f.unidadeId === unidade))
     .sort((a, b) => (a.id === eu.id ? -1 : b.id === eu.id ? 1 : a.nome.localeCompare(b.nome)))
 
-  const folgaDe = (fid: string, d: string) => folgas.find((g) => g.funcionarioId === fid && g.data === d)?.tipo ?? null
+  const registro = (fid: string, d: string) => folgas.find((g) => g.funcionarioId === fid && g.data === d)
+  const folgaDe = (fid: string, d: string) => {
+    const g = registro(fid, d)
+    return g && g.tipo !== 'trabalha' ? g.tipo : null
+  }
 
   // Cada toque passa para o próximo: sem folga → folga → folga de feriado → sem folga.
+  // No dia fechado do turno: folga do turno → feriado → vai trabalhar → folga do turno.
   const alternar = async (fid: string, d: string) => {
     if (!gestao) return
-    const atual = folgaDe(fid, d)
-    const proximo: TipoFolga | null = atual === null ? 'normal' : atual === 'normal' ? 'feriado' : null
+    const g = registro(fid, d)
+    let proximo: TipoFolga | null
+    if (turnoFechado(fid, d)) {
+      proximo = g?.tipo === 'feriado' ? 'trabalha' : g?.tipo === 'trabalha' ? null : 'feriado'
+    } else {
+      const atual = folgaDe(fid, d)
+      proximo = atual === null ? 'normal' : atual === 'normal' ? 'feriado' : null
+    }
     await store.definirFolga(fid, d, proximo)
     await carregar()
-    avisar(proximo === 'normal' ? 'Folga marcada' : proximo === 'feriado' ? 'Folga de feriado marcada' : 'Folga removida')
+    avisar(
+      proximo === 'normal' ? 'Folga marcada' : proximo === 'feriado' ? 'Folga de feriado marcada' : proximo === 'trabalha' ? 'Marcado: trabalha neste dia'
+        : g?.tipo === 'trabalha' ? 'Volta a ser folga do turno' : 'Folga removida',
+    )
   }
 
   return (
@@ -83,6 +105,7 @@ export default function Escala() {
           <span>Toque num dia para trocar:</span>
           <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-ozzy-500" /> folga</span>
           <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-sky-600" /> folga de feriado</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-ozzy-200" /> folga do turno (dia sem horário, entra sozinha)</span>
         </p>
       )}
 
@@ -111,16 +134,18 @@ export default function Escala() {
                   </td>
                   {dias.map((d) => {
                     const folga = folgaDe(p.id, d)
+                    const auto = !!registro(p.id, d)?.automatica
+                    const trabalha = registro(p.id, d)?.tipo === 'trabalha'
                     return (
                       <td key={d} className="px-1 py-1.5 text-center">
                         <button
                           disabled={!gestao}
                           onClick={() => alternar(p.id, d)}
                           className={`h-9 w-full min-w-11 rounded-lg text-xs font-bold transition ${
-                            folga === 'feriado' ? 'bg-sky-600 text-white' : folga ? 'bg-ozzy-500 text-carvao' : 'bg-stone-50 text-stone-300'
+                            folga === 'feriado' ? 'bg-sky-600 text-white' : auto ? 'bg-ozzy-200 text-carvao' : folga ? 'bg-ozzy-500 text-carvao' : trabalha ? 'bg-stone-100 text-stone-600' : 'bg-stone-50 text-stone-300'
                           } ${gestao ? 'hover:ring-2 hover:ring-carvao' : 'cursor-default'}`}
                         >
-                          {folga === 'feriado' ? 'FERIADO' : folga ? 'FOLGA' : '·'}
+                          {folga === 'feriado' ? 'FERIADO' : folga ? 'FOLGA' : trabalha ? 'TRAB.' : '·'}
                         </button>
                       </td>
                     )

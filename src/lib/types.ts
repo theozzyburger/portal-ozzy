@@ -112,12 +112,15 @@ export interface Comunicado {
   lidoPor: string[]
 }
 
-export type TipoFolga = 'normal' | 'feriado'
+// 'trabalha': a pessoa trabalha num dia em que o turno dela é fechado (desfaz a folga automática).
+export type TipoFolga = 'normal' | 'feriado' | 'trabalha'
 export interface Folga {
   id: string
   funcionarioId: string
   data: string
   tipo: TipoFolga
+  // Folga que vem do turno (dia sem horário, ex.: segunda), sem ninguém precisar marcar.
+  automatica?: boolean
 }
 
 export const NIVEIS: { valor: Nivel; nome: string }[] = [

@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
 import { hoje } from './datas'
+import { comFolgasDoTurno } from './pessoal'
 import type { NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
@@ -314,9 +315,15 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       const u = exigeEu()
       await sb.from('comunicado_leituras').upsert({ comunicado_id: id, funcionario_id: u.id }, { ignoreDuplicates: true })
     },
-    async folgas(inicio, fim) {
-      const linhas = ok(await sb.from('folgas').select('*').gte('data', inicio).lte('data', fim)) ?? []
-      return linhas.map((r: any): Folga => ({ id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo ?? 'normal' }))
+    async folgas(inicio, fim, opcoes) {
+      const [linhas, pessoas, turnos] = await Promise.all([
+        sb.from('folgas').select('*').gte('data', inicio).lte('data', fim).then(ok),
+        sb.from('funcionarios').select('id, turno_id, status, data_admissao').not('turno_id', 'is', null).then(ok),
+        sb.from('turnos').select('id, dias').then(ok),
+      ])
+      const marcadas = (linhas ?? []).map((r: any): Folga => ({ id: r.id, funcionarioId: r.funcionario_id, data: r.data, tipo: r.tipo ?? 'normal' }))
+      const ps = (pessoas ?? []).map((r: any) => ({ id: r.id, turnoId: r.turno_id, status: r.status, dataAdmissao: r.data_admissao }))
+      return comFolgasDoTurno(marcadas, ps, (turnos ?? []) as any[], inicio, fim, opcoes?.comTrabalha)
     },
     async definirFolga(fid, data, tipo) {
       if (!tipo) ok(await sb.from('folgas').delete().eq('funcionario_id', fid).eq('data', data))

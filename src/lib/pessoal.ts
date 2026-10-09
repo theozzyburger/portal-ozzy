@@ -1,5 +1,5 @@
-import { addDias, inicioDaSemana } from './datas'
-import type { Admissao, Desligamento, Documento, EntregaUniforme, Funcionario } from './types'
+import { addDias, indiceSemana, inicioDaSemana } from './datas'
+import type { Admissao, Desligamento, Documento, EntregaUniforme, Folga, Funcionario, Turno } from './types'
 
 const diasEntre = (a: string, b: string) => Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
 
@@ -201,4 +201,29 @@ export function progressoAdmissao(p: Funcionario, c: ContextoAdmissao, a: Pick<A
   const etapas = etapasAdmissao(p, c)
   const feitas = etapas.filter((e) => etapaFeita(e, a)).length
   return { feitas, total: etapas.length, proxima: etapas.find((e) => !etapaFeita(e, a)) ?? null }
+}
+
+// Folgas do turno (Heitor, 09/10): o dia em que o turno da pessoa não tem horário (ex.: segunda) já é folga,
+// sem marcar. O que foi marcado à mão vale por cima: feriado, folga normal ou 'trabalha' (vai trabalhar nesse dia).
+export function comFolgasDoTurno(
+  marcadas: Folga[],
+  pessoas: Pick<Funcionario, 'id' | 'turnoId' | 'status' | 'dataAdmissao'>[],
+  turnos: Pick<Turno, 'id' | 'dias'>[],
+  inicio: string,
+  fim: string,
+  comTrabalha = false,
+): Folga[] {
+  const marcada = new Set(marcadas.map((g) => `${g.funcionarioId}|${g.data}`))
+  const autos: Folga[] = []
+  for (const p of pessoas) {
+    const t = p.turnoId ? turnos.find((x) => x.id === p.turnoId) : undefined
+    if (!t || p.status !== 'ativo') continue
+    // Turno sem nenhum dia de trabalho (ainda não montado) não vira folga.
+    if (!t.dias.some(Boolean)) continue
+    for (let d = inicio; d <= fim; d = addDias(d, 1)) {
+      if (t.dias[indiceSemana(d)] || (p.dataAdmissao && d < p.dataAdmissao) || marcada.has(`${p.id}|${d}`)) continue
+      autos.push({ id: `turno:${p.id}:${d}`, funcionarioId: p.id, data: d, tipo: 'normal', automatica: true })
+    }
+  }
+  return [...marcadas.filter((g) => comTrabalha || g.tipo !== 'trabalha'), ...autos]
 }

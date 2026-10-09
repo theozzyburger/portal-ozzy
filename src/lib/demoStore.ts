@@ -7,6 +7,7 @@ import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
 import { addMesesData } from './vencimentos'
 import { TURNOS_PADRAO } from './turnos'
+import { comFolgasDoTurno } from './pessoal'
 import { sha256 } from './regulamento'
 import REGULAMENTO_2025 from './regulamento-2025.md?raw'
 
@@ -70,7 +71,7 @@ const funcionarios: Funcionario[] = [
   // Manutencista, cadastrado em 07/10. Atende as três lojas; celular fictício.
   f('p-vanderlei', 'Vanderlei Aparecido', '11999990032', 'Manutencista', 'burger-psd', 'manutencao', ADMISSAO_A_CONFIRMAR, 'f1', 'ativo', null, 'manutencao'),
   // EXEMPLO de admissão em andamento (fictício), para o passo a passo aparecer na demonstração.
-  { ...f('p-novo-exemplo', 'Pedro Henrique Alves', '11999990040', 'Auxiliar de cozinha', 'burger-psd', 'funcionario', hoje() > '2026-10-08' ? addDias(hoje(), -1) : hoje(), 'p-queli-souza', 'ativo', null, 'cozinha'), cpf: '52998224725', dataNascimento: '2004-03-12', sexo: 'masculino', tamCamiseta: 'M', tamCalca: '40', tamCalcado: 41, experienciaDias1: 10, experienciaDias2: 80 },
+  { ...f('p-novo-exemplo', 'Pedro Henrique Alves', '11999990040', 'Auxiliar de cozinha', 'burger-psd', 'funcionario', hoje() > '2026-10-08' ? addDias(hoje(), -1) : hoje(), 'p-queli-souza', 'ativo', null, 'cozinha'), cpf: '52998224725', dataNascimento: '2004-03-12', sexo: 'masculino', tamCamiseta: 'M', tamCalca: '40', tamCalcado: 41, experienciaDias1: 10, experienciaDias2: 80, turnoId: 't-psd-cozinha' },
   f('p-caciano-souza', 'Caciano Ribeiro Silva Souza', '11999990024', 'Atendente', 'burger-va', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-arlene-santos', 'inativo', '2026-07-28', 'atendimento'),
   f('p-gilson-silva', 'Gilson Bento Silva', '11999990025', 'Auxiliar', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-queli-souza', 'inativo', '2026-07-23', 'cozinha'),
   f('p-joao-costa', 'João Victor Alves da Costa', '11999990026', 'Atendente', 'burger-psd', 'funcionario', ADMISSAO_A_CONFIRMAR, 'p-maria-costa', 'inativo', '2026-07-09', 'atendimento'),
@@ -1096,11 +1097,11 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const c = comunicados.find((x) => x.id === id)
       if (c && !c.lidoPor.includes(u.id)) c.lidoPor.push(u.id)
     },
-    async folgas(inicio, fim) {
+    async folgas(inicio, fim, opcoes) {
       const u = exigeEu()
-      return espera(
-        folgas.filter((g) => g.data >= inicio && g.data <= fim && podeVerFuncionario(u, porId(g.funcionarioId))),
-      )
+      const marcadas = folgas.filter((g) => g.data >= inicio && g.data <= fim && podeVerFuncionario(u, porId(g.funcionarioId)))
+      const visiveis = funcionarios.filter((f) => podeVerFuncionario(u, f))
+      return espera(comFolgasDoTurno(marcadas, visiveis, turnos, inicio, fim, opcoes?.comTrabalha))
     },
     async alternarFolga(fid, data) {
       exigeGestao()
