@@ -854,6 +854,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         nome: f.nome.trim(), contato: texto(f.contato), telefone: texto(f.telefone), observacao: texto(f.observacao), ativo: f.ativo,
         ...(f.cnpj !== undefined ? { cnpj: f.cnpj ? soDigitos(f.cnpj) || null : null } : {}),
         ...(f.contaPadraoId !== undefined ? { conta_padrao_id: f.contaPadraoId } : {}),
+        ...(f.razaoSocial !== undefined ? { razao_social: f.razaoSocial?.trim() || null } : {}),
       }
       return paraFornecedor(f.id
         ? ok(await sb.from('fornecedores').update(linha).eq('id', f.id).select().single())
@@ -1337,7 +1338,7 @@ const paraDiariaEvento = (r: any): DiariaFreelaEvento => ({
 })
 
 const paraFornecedor = (r: any): Fornecedor => ({
-  id: r.id, nome: r.nome, contato: r.contato, telefone: r.telefone, observacao: r.observacao, ativo: r.ativo, cnpj: r.cnpj ?? null, contaPadraoId: r.conta_padrao_id ?? null,
+  id: r.id, nome: r.nome, contato: r.contato, telefone: r.telefone, observacao: r.observacao, ativo: r.ativo, cnpj: r.cnpj ?? null, contaPadraoId: r.conta_padrao_id ?? null, razaoSocial: r.razao_social ?? null,
 })
 const paraNota = (r: any): NotaFiscal => ({
   id: r.id, chave: r.chave, numero: r.numero, serie: r.serie, emissao: r.emissao, fornecedorId: r.fornecedor_id, emitenteCnpj: r.emitente_cnpj,

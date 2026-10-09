@@ -879,6 +879,8 @@ export interface Fornecedor {
   // Preenchidos pela importação de nota (0044).
   cnpj?: string | null
   contaPadraoId?: string | null
+  // Como aparece no banco e nas notas, quando é diferente do nome fantasia (0055).
+  razaoSocial?: string | null
 }
 export interface Insumo {
   id: string

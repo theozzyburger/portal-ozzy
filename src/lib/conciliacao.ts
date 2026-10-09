@@ -93,31 +93,62 @@ export function sugestoesLote(movs: MovimentoExtrato[], contas: ContaPagar[], ja
   return porMov
 }
 
-// Fornecedor que parece ser o do extrato (Heitor, 09/10): primeiro pelo CPF/CNPJ do texto, depois pelo nome
-// ("PIX ENVIADO MERCADO SAO JOSE" acha "Mercado São José Ltda").
+// Fornecedor que parece ser o do extrato (Heitor, 09/10). Nesta ordem:
+// 1) o que já foi usado antes para o mesmo nome no extrato (aprende com as correções: "GAIVOTA" → Pama);
+// 2) o CPF/CNPJ do texto; 3) o nome fantasia ou a razão social parecidos.
 const SEM_PESO = new Set(['ltda', 'me', 'epp', 'eireli', 'sa', 'cia', 'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'comercio', 'servicos', 'industria', 'pix', 'enviado'])
 const palavrasNome = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !SEM_PESO.has(w))
-export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'cnpj' | 'ativo'>>(descricao: string, fornecedores: F[]): F | null {
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !SEM_PESO.has(w))
+export const chaveNomeExtrato = (descricao: string) => palavrasNome(partesExtrato(descricao).nome).join(' ')
+
+// Nome no extrato → fornecedor que foi escolhido da última vez (das saídas já conciliadas).
+// Vale também para funcionário (quem recebeu o Pix da última vez com esse nome).
+export function aprendidosDe(movs: MovimentoExtrato[], contas: ContaPagar[]) {
+  const porId = new Map(contas.map((c) => [c.id, c]))
+  const fornecedores = new Map<string, string>()
+  const pessoas = new Map<string, string>()
+  for (const m of [...movs].sort((a, b) => a.data.localeCompare(b.data))) {
+    if (m.status !== 'conciliado' || !m.contaPagarId) continue
+    const c = porId.get(m.contaPagarId)
+    const k = chaveNomeExtrato(m.descricao)
+    if (!c || !k) continue
+    if (c.fornecedorId) { fornecedores.set(k, c.fornecedorId); pessoas.delete(k) }
+    else if (c.funcionarioId) { pessoas.set(k, c.funcionarioId); fornecedores.delete(k) }
+  }
+  return { fornecedores, pessoas }
+}
+
+const notaNome = (ext: string[], nome: string | null | undefined) => {
+  const fw = palavrasNome(nome ?? '')
+  if (!fw.length) return 0
+  const bate = (w: string) => ext.some((e) => e === w || (e.length >= 4 && w.startsWith(e)) || (w.length >= 4 && e.startsWith(w)))
+  // A primeira palavra tem que estar no extrato ("Distribuidora Exemplo" não vale para "IMOBILIARIA EXEMPLO").
+  if (!bate(fw[0])) return 0
+  return fw.filter(bate).length / Math.max(fw.length, Math.min(ext.length, 3))
+}
+
+export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'cnpj' | 'ativo' | 'razaoSocial'>>(
+  descricao: string, fornecedores: F[], aprendidos?: Map<string, string>,
+): F | null {
   const { nome, documento } = partesExtrato(descricao)
   const ativos = fornecedores.filter((f) => f.ativo)
+  const ext = palavrasNome(nome)
+  const usado = aprendidos?.get(ext.join(' '))
+  if (usado) {
+    const f = ativos.find((x) => x.id === usado)
+    if (f) return f
+  }
   const doc = documento?.replace(/\D/g, '')
   if (doc && doc.length >= 11) {
     const f = ativos.find((x) => x.cnpj?.replace(/\D/g, '') === doc)
     if (f) return f
   }
-  const ext = palavrasNome(nome)
   if (!ext.length) return null
   let melhor: F | null = null
   let nota = 0
   for (const f of ativos) {
-    const fw = palavrasNome(f.nome)
-    if (!fw.length) continue
-    // Palavra igual ou começo de palavra (extrato corta nomes: "SUPERMERC" → "supermercado").
-    const bate = (w: string) => ext.some((e) => e === w || (e.length >= 4 && w.startsWith(e)) || (w.length >= 4 && e.startsWith(w)))
-    // A primeira palavra do fornecedor tem que estar no extrato ("Distribuidora Exemplo" não vale para "IMOBILIARIA EXEMPLO").
-    if (!bate(fw[0])) continue
-    const n = fw.filter(bate).length / Math.max(fw.length, Math.min(ext.length, 3))
+    // Nome fantasia vale um pouco mais que a razão social no empate.
+    const n = Math.max(notaNome(ext, f.nome) + 0.01, notaNome(ext, f.razaoSocial))
     if (n > nota) { nota = n; melhor = f }
   }
   return nota >= 0.5 ? melhor : null

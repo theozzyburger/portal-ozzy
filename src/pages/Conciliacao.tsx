@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
-import { type GrupoLote, LIMITE_DIARIA, candidatas, fornecedorParecido, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
+import { type GrupoLote, LIMITE_DIARIA, aprendidosDe, candidatas, chaveNomeExtrato, fornecedorParecido, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx, partesExtrato } from '../lib/ofx'
 
@@ -347,7 +347,7 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
   const perto = candidatas(m, d.contas, d.fornecedores, usadas)
   const lotes = lotesPara(m, gruposLote(d.contas, usadas))
   const nome = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
-  const parecido = fornecedorParecido(m.descricao, d.fornecedores)
+  const parecido = fornecedorParecido(m.descricao, d.fornecedores, aprendidosDe(d.movs, d.contas).fornecedores)
   const dele = parecido ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && c.fornecedorId === parecido.id) : []
   const todas = busca
     ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && `${c.descricao} ${nome(c)}`.toLowerCase().includes(busca.toLowerCase()))
@@ -413,13 +413,18 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
   const { store } = useApp()
   const valor = Math.abs(m.valor)
   // Já começa com o fornecedor que parece ser o do extrato (e a conta de sempre dele).
-  const parecido = useMemo(() => fornecedorParecido(m.descricao, d.fornecedores), [m.descricao, d.fornecedores])
+  const aprendidos = useMemo(() => aprendidosDe(d.movs, d.contas), [d.movs, d.contas])
+  const pessoaUsada = aprendidos.pessoas.get(chaveNomeExtrato(m.descricao))
+  const parecido = useMemo(
+    () => (pessoaUsada ? null : fornecedorParecido(m.descricao, d.fornecedores, aprendidos.fornecedores)),
+    [m.descricao, d.fornecedores, aprendidos, pessoaUsada],
+  )
   // Ou com o funcionário, quando o Pix foi para alguém da equipe (salário, vale, reembolso).
   const { equipe } = useApp()
   const pessoas = useMemo(() => [...equipe].sort((a, b) => Number(b.status === 'ativo') - Number(a.status === 'ativo') || a.nome.localeCompare(b.nome)), [equipe])
   const pessoaParecida = useMemo(
-    () => (parecido ? null : fornecedorParecido(m.descricao, pessoas.map((p) => ({ id: p.id, nome: p.nome, cnpj: p.cpf ?? null, ativo: true })))),
-    [m.descricao, pessoas, parecido],
+    () => (parecido ? null : fornecedorParecido(m.descricao, pessoas.map((p) => ({ id: p.id, nome: p.nome, cnpj: p.cpf ?? null, ativo: true })), aprendidos.pessoas)),
+    [m.descricao, pessoas, parecido, aprendidos],
   )
   const [quem, setQuem] = useState<'fornecedor' | 'funcionario'>(pessoaParecida ? 'funcionario' : 'fornecedor')
   const [funcionario, setFuncionario] = useState(pessoaParecida?.id ?? '')
@@ -591,7 +596,11 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
                   <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
                   <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
                 </Campo>
-                {parecido && v.fornecedor === parecido.nome && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
+                {parecido && v.fornecedor === parecido.nome && (
+                  <p className="text-xs text-stone-500">
+                    {aprendidos.fornecedores.get(chaveNomeExtrato(m.descricao)) === parecido.id ? 'Foi o usado da última vez para este nome.' : 'Sugerido pelo texto do extrato.'} Se não for, é só trocar: da próxima vez ele lembra.
+                  </p>
+                )}
                 {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
                   <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
                 )}

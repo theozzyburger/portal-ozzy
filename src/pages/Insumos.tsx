@@ -252,7 +252,7 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
 function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo[]; fornecedores: Fornecedor[]; aoMudar: () => Promise<void> }) {
   const { store, avisar } = useApp()
   const [editando, setEditando] = useState<Fornecedor | 'novo' | null>(null)
-  const [f, setF] = useState({ nome: '', cnpj: '', contato: '', telefone: '', observacao: '', contaPadraoId: '' })
+  const [f, setF] = useState({ nome: '', razaoSocial: '', cnpj: '', contato: '', telefone: '', observacao: '', contaPadraoId: '' })
   const [ativo, setAtivo] = useState(true)
   const [erro, setErro] = useState('')
   const [plano, setPlano] = useState<ContaContabil[]>([])
@@ -267,8 +267,8 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
     setErro('')
     setAtivo(x === 'novo' ? true : x.ativo)
     setF(x === 'novo'
-      ? { nome: '', cnpj: '', contato: '', telefone: '', observacao: '', contaPadraoId: '' }
-      : { nome: x.nome, cnpj: formatarCnpj(x.cnpj), contato: x.contato ?? '', telefone: x.telefone ?? '', observacao: x.observacao ?? '', contaPadraoId: x.contaPadraoId ?? '' })
+      ? { nome: '', razaoSocial: '', cnpj: '', contato: '', telefone: '', observacao: '', contaPadraoId: '' }
+      : { nome: x.nome, razaoSocial: x.razaoSocial ?? '', cnpj: formatarCnpj(x.cnpj), contato: x.contato ?? '', telefone: x.telefone ?? '', observacao: x.observacao ?? '', contaPadraoId: x.contaPadraoId ?? '' })
   }
   const salvar = async (ev: React.FormEvent) => {
     ev.preventDefault()
@@ -276,7 +276,7 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
     const cnpj = f.cnpj.replace(/\D/g, '')
     if (cnpj && cnpj.length !== 14 && cnpj.length !== 11) return setErro('O CNPJ precisa ter 14 números (ou 11, se for CPF).')
     try {
-      await store.salvarFornecedor({ id: editando === 'novo' ? undefined : editando!.id, nome: f.nome, contato: f.contato || null, telefone: f.telefone || null, observacao: f.observacao || null, ativo, cnpj: cnpj || null, contaPadraoId: f.contaPadraoId || null })
+      await store.salvarFornecedor({ id: editando === 'novo' ? undefined : editando!.id, nome: f.nome, contato: f.contato || null, telefone: f.telefone || null, observacao: f.observacao || null, ativo, cnpj: cnpj || null, contaPadraoId: f.contaPadraoId || null, razaoSocial: f.razaoSocial || null })
       setEditando(null)
       await aoMudar()
       avisar('Fornecedor salvo')
@@ -307,12 +307,13 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
         <Vazio>Nenhum fornecedor cadastrado.</Vazio>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
-          {fornecedores.filter((x) => inativos || x.ativo).filter((x) => !busca || `${x.nome} ${x.cnpj ?? ''}`.toLowerCase().includes(busca.toLowerCase()) || (x.cnpj ?? '').includes(busca.replace(/\D/g, '') || '-')).map((x) => {
+          {fornecedores.filter((x) => inativos || x.ativo).filter((x) => !busca || `${x.nome} ${x.razaoSocial ?? ''} ${x.cnpj ?? ''}`.toLowerCase().includes(busca.toLowerCase()) || (x.cnpj ?? '').includes(busca.replace(/\D/g, '') || '-')).map((x) => {
             const n = insumos.filter((i) => i.fornecedorId === x.id && i.ativo).length
             return (
               <li key={x.id}>
                 <button onClick={() => abrir(x)} className="flex h-full w-full flex-col rounded-2xl bg-white p-3.5 text-left ring-1 ring-stone-200 hover:ring-carvao">
                   <span className="font-semibold">{x.nome} {!x.ativo && <Selo>Inativo</Selo>}</span>
+                  {x.razaoSocial && <span className="text-xs text-stone-600">{x.razaoSocial}</span>}
                   <span className="text-xs text-stone-500">{[x.cnpj ? formatarCnpj(x.cnpj) : null, x.contato, x.telefone, n ? `${n} insumo${n === 1 ? '' : 's'} ativo${n === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ')}</span>
                 </button>
               </li>
@@ -323,7 +324,10 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
       {editando && (
         <Modal titulo={editando === 'novo' ? 'Novo fornecedor' : editando.nome} aberto aoFechar={() => setEditando(null)}>
           <form onSubmit={salvar} className="space-y-4">
-            <Campo rotulo="Nome"><input className={estiloEntrada} value={f.nome} onChange={mudar('nome')} required /></Campo>
+            <Campo rotulo="Nome (fantasia)"><input className={estiloEntrada} value={f.nome} onChange={mudar('nome')} required /></Campo>
+            <Campo rotulo="Razão social" dica="Como aparece no extrato do banco e nas notas. Ajuda a conciliação a achar este fornecedor.">
+              <input className={estiloEntrada} value={f.razaoSocial} onChange={mudar('razaoSocial')} placeholder="Ex.: Gaivota Comércio de Alimentos Ltda" />
+            </Campo>
             <div className="grid grid-cols-2 gap-3">
               <Campo rotulo="CNPJ" dica="Liga as notas fiscais a este fornecedor."><input inputMode="numeric" className={estiloEntrada} value={f.cnpj} onChange={mudar('cnpj')} /></Campo>
               <Campo rotulo="Conta contábil de sempre">
