@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
-import { type GrupoLote, candidatas, fornecedorParecido, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
+import { type GrupoLote, LIMITE_DIARIA, candidatas, fornecedorParecido, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx, partesExtrato } from '../lib/ofx'
 
@@ -426,10 +426,22 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
   // Regra da casa (Heitor, 09/10): salário cai dia 5 e adiantamento dia 20; freela recebe na segunda, valores baixos.
   const diaMes = Number(m.data.slice(8, 10))
   const segunda = new Date(m.data + 'T12:00:00').getDay() === 1
-  const pareceSer = diaMes >= 3 && diaMes <= 8 ? 'Salário' : diaMes >= 18 && diaMes <= 23 ? 'Adiantamento' : segunda && valor <= 400 ? 'Diária' : null
+  const pareceSer = valor <= LIMITE_DIARIA ? 'Diária' : diaMes >= 3 && diaMes <= 8 ? 'Salário' : diaMes >= 18 && diaMes <= 23 ? 'Adiantamento' : segunda ? 'Diária' : null
+  // Conta e loja sugeridas pela pessoa: diária de freela (valor baixo) ou salário do setor dela.
+  const sugPessoa = (id: string) => {
+    const p = equipe.find((x) => x.id === id)
+    return p ? sugestaoPessoal(p, valor, d.plano, d.centros) : null
+  }
+  const inicialPessoa = pessoaParecida ? sugPessoa(pessoaParecida.id) : null
   const [v, setV] = useState({
-    centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: parecido?.contaPadraoId ?? '', fornecedor: parecido?.nome ?? '', descricao: m.descricao,
+    centro: inicialPessoa?.centro || (d.centros.some((x) => x.id === 'central') ? 'central' : ''),
+    conta: inicialPessoa?.conta || (parecido?.contaPadraoId ?? ''), fornecedor: parecido?.nome ?? '', descricao: m.descricao,
   })
+  function escolherFuncionario(id: string) {
+    setFuncionario(id)
+    const s = sugPessoa(id)
+    if (s) setV((x) => ({ ...x, conta: s.conta || x.conta, centro: s.centro || x.centro }))
+  }
   const [comp, setComp] = useState<Comprovante>('nao')
   const [numero, setNumero] = useState('')
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -559,7 +571,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
             {quem === 'funcionario' ? (
               <>
                 <Campo rotulo="Funcionário">
-                  <select className={estiloEntrada} value={funcionario} onChange={(e) => setFuncionario(e.target.value)} aria-label="Funcionário">
+                  <select className={estiloEntrada} value={funcionario} onChange={(e) => escolherFuncionario(e.target.value)} aria-label="Funcionário">
                     <option value="">Escolher</option>
                     {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.status !== 'ativo' ? ' (desligado)' : ''}</option>)}
                   </select>
@@ -567,7 +579,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
                 {pessoaParecida && funcionario === pessoaParecida.id && <p className="text-xs text-stone-500">Sugerido pelo texto do extrato. Se não for, é só trocar.</p>}
                 {pareceSer && funcionario && (
                   <p className="text-xs text-stone-600">
-                    Pela data e valor, parece <b>{pareceSer === 'Diária' ? 'diária (freela, paga na segunda)' : pareceSer === 'Salário' ? 'salário do dia 5' : 'adiantamento do dia 20'}</b>.{' '}
+                    Pela data e valor, parece <b>{pareceSer === 'Diária' ? 'diária de freela' : pareceSer === 'Salário' ? 'salário do dia 5' : 'adiantamento do dia 20'}</b>: a conta contábil e a loja já vieram {pareceSer === 'Diária' ? 'como freelancer' : 'como salário'} do setor da pessoa.{' '}
                     <button className="font-semibold underline" onClick={() => setV({ ...v, descricao: `${pareceSer} · ${equipe.find((x) => x.id === funcionario)?.nome ?? ''}` })}>Usar na descrição</button>
                   </p>
                 )}

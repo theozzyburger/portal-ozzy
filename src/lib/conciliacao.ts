@@ -1,4 +1,4 @@
-import type { ContaPagar, Fornecedor, MovimentoExtrato } from './types'
+import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, Funcionario, MovimentoExtrato } from './types'
 import { chaveExtrato, partesExtrato } from './ofx'
 
 const dias = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000)
@@ -121,4 +121,27 @@ export function fornecedorParecido<F extends Pick<Fornecedor, 'id' | 'nome' | 'c
     if (n > nota) { nota = n; melhor = f }
   }
   return nota >= 0.5 ? melhor : null
+}
+
+// Pagamento para funcionário (Heitor, 09/10): valor baixo (até R$ 400) é diária de freela; acima disso é salário,
+// na conta do setor da pessoa. A loja vem do cadastro (Produção vai para a Central).
+const CONTAS_SETOR: Record<string, { salario: string; freela: string }> = {
+  cozinha: { salario: '2.6', freela: '2.4' },
+  pizzaria: { salario: '2.6', freela: '2.4' },
+  atendimento: { salario: '2.7', freela: '2.10' },
+  producao: { salario: '2.8', freela: '2.11' },
+  escritorio: { salario: '2.9', freela: '2.10' },
+}
+export const LIMITE_DIARIA = 400
+export function sugestaoPessoal(
+  p: Pick<Funcionario, 'setor' | 'unidadeId'>,
+  valor: number,
+  plano: Pick<ContaContabil, 'id' | 'codigo'>[],
+  centros: Pick<CentroCusto, 'id'>[],
+) {
+  const freela = valor <= LIMITE_DIARIA
+  const c = CONTAS_SETOR[p.setor ?? ''] ?? { salario: '2.1', freela: '2.4' }
+  const conta = plano.find((x) => x.codigo === (freela ? c.freela : c.salario))?.id ?? ''
+  const centro = p.setor === 'producao' && centros.some((x) => x.id === 'central') ? 'central' : centros.some((x) => x.id === p.unidadeId) ? p.unidadeId : ''
+  return { conta, centro, tipo: freela ? ('Diária' as const) : ('Salário' as const) }
 }
