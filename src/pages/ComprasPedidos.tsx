@@ -38,7 +38,32 @@ const linhaItem = (d: Dados, i: ItemCompra) => `${mostrarQtd(i.quantidade)} ${i.
 
 // ——— Lista de pedidos ———
 
+// Situação de uma compra a receber (Heitor, 09/10): passou do dia previsto sem chegar = atrasada.
+type Situacao = 'atrasada' | 'hoje' | 'prazo' | 'rascunho' | 'fechada'
+function situacao(p: PedidoCompra): Situacao {
+  if (p.status === 'rascunho') return 'rascunho'
+  if (p.status !== 'pedido') return 'fechada'
+  return p.previsaoEntrega < hoje() ? 'atrasada' : p.previsaoEntrega === hoje() ? 'hoje' : 'prazo'
+}
+const SECOES: { s: Situacao; titulo: string; cor: string }[] = [
+  { s: 'atrasada', titulo: 'Atrasadas', cor: 'text-red-700' },
+  { s: 'hoje', titulo: 'Chegam hoje', cor: 'text-amber-800' },
+  { s: 'prazo', titulo: 'No prazo', cor: 'text-stone-700' },
+  { s: 'rascunho', titulo: 'Rascunhos (ainda não pedidos)', cor: 'text-stone-500' },
+]
+const quandoChega = (p: PedidoCompra) => {
+  const dias = diasEntre(hoje(), p.previsaoEntrega)
+  const data = `${diaSemana(p.previsaoEntrega).toLowerCase()} ${dataCurta(p.previsaoEntrega)}`
+  if (p.status === 'recebido') return `chegou${p.recebidoEm ? ' ' + dataCurta(p.recebidoEm) : ''}`
+  if (p.status === 'cancelado') return 'cancelado'
+  if (p.status === 'rascunho') return `previsto ${data}`
+  if (dias < 0) return `atrasada há ${-dias} ${dias === -1 ? 'dia' : 'dias'} (era ${data})`
+  if (dias === 0) return 'chega hoje'
+  return `chega ${data} · em ${dias} ${dias === 1 ? 'dia' : 'dias'}`
+}
+
 export function PedidosCompra() {
+  const { store, avisar } = useApp()
   const { d, erro, carregar } = useDados()
   const [editando, setEditando] = useState<PedidoCompra | 'novo' | null>(null)
   const [filtro, setFiltro] = useState<'abertos' | 'todos'>('abertos')
@@ -54,36 +79,61 @@ export function PedidosCompra() {
     .filter((p) => (filtro === 'todos' || p.status === 'rascunho' || p.status === 'pedido'))
     .filter((p) => !termo || (fornecedor(p.fornecedorId)?.nome ?? '').toLowerCase().includes(termo) || p.itens.some((i) => (d.insumos.find((x) => x.id === i.insumoId)?.nome ?? '').toLowerCase().includes(termo)))
     .sort((a, b) => a.previsaoEntrega.localeCompare(b.previsaoEntrega) * (filtro === 'abertos' ? 1 : -1))
+  const abertos = d.pedidos.filter((p) => p.status === 'pedido' || p.status === 'rascunho')
+  const conta = (s: Situacao) => abertos.filter((p) => situacao(p) === s).length
+
+  const linha = (p: PedidoCompra) => {
+    const sit = situacao(p)
+    return (
+      <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-stone-50">
+        <button onClick={() => setEditando(p)} className="min-w-0 flex-1 text-left">
+          <div className="truncate text-sm font-semibold">{fornecedor(p.fornecedorId)?.nome ?? 'Fornecedor'} <span className="font-normal text-stone-500">#{p.numero}</span></div>
+          <div className="truncate text-xs text-stone-500">
+            {p.itens.slice(0, 3).map((i) => linhaItem(d, i)).join(', ')}{p.itens.length > 3 ? ` e mais ${p.itens.length - 3}` : ''} · para {nomeCentro(d.centros.find((c) => c.id === p.centroCustoId))}
+          </div>
+          <div className={`text-xs font-semibold ${sit === 'atrasada' ? 'text-red-700' : sit === 'hoje' ? 'text-amber-800' : 'text-stone-600'}`}>{quandoChega(p)}</div>
+        </button>
+        {p.status === 'pedido' ? (
+          <Botao variante="secundario" className="shrink-0 px-3! py-1.5!" onClick={async () => {
+            try { await store.receberPedidoCompra(p.id, true); avisar('Marcado como recebido'); await carregar() } catch (e) { avisar((e as Error).message) }
+          }}>Chegou</Botao>
+        ) : <Selo cor={SELO_STATUS[p.status]}>{nomeStatus(p.status)}</Selo>}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Botao onClick={() => setEditando('novo')}>+ Novo pedido de compra</Botao>
-        <select value={filtro} onChange={(e) => setFiltro(e.target.value as 'abertos' | 'todos')} className={`${estiloEntrada} w-auto!`}>
+        <select value={filtro} onChange={(e) => setFiltro(e.target.value as 'abertos' | 'todos')} className={`${estiloEntrada} w-auto!`} aria-label="Mostrar">
           <option value="abertos">A receber</option><option value="todos">Todos</option>
         </select>
         <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Fornecedor ou item" className={`${estiloEntrada} max-w-xs`} />
       </div>
-      {lista.length === 0 ? <Vazio>{filtro === 'abertos' ? 'Nenhum pedido a receber.' : 'Nenhum pedido de compra ainda.'}</Vazio> : (
-        <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200">
-          {lista.map((p) => {
-            const atrasado = p.status === 'pedido' && p.previsaoEntrega < hoje()
-            return (
-              <button key={p.id} onClick={() => setEditando(p)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-stone-50">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold">{fornecedor(p.fornecedorId)?.nome ?? 'Fornecedor'} <span className="font-normal text-stone-500">#{p.numero}</span></div>
-                  <div className="truncate text-xs text-stone-500">
-                    {nomeCategoria(p.categoria)} · para {nomeCentro(d.centros.find((c) => c.id === p.centroCustoId))} · {p.itens.length} {p.itens.length === 1 ? 'item' : 'itens'} · {reais(p.total)}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className={`text-xs font-semibold ${atrasado ? 'text-red-700' : 'text-stone-600'}`}>{atrasado ? 'atrasado · ' : ''}chega {diaSemana(p.previsaoEntrega).toLowerCase()} {dataCurta(p.previsaoEntrega)}</div>
-                  <Selo cor={SELO_STATUS[p.status]}>{nomeStatus(p.status)}</Selo>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        {SECOES.slice(0, 3).map(({ s, titulo, cor }) => (
+          <div key={s} className={`rounded-2xl bg-white p-3 text-center ring-1 ${s === 'atrasada' && conta(s) ? 'ring-red-300' : 'ring-stone-200'}`}>
+            <div className={`text-2xl font-bold ${conta(s) ? cor : 'text-stone-300'}`}>{conta(s)}</div>
+            <div className="text-xs text-stone-500">{titulo}</div>
+          </div>
+        ))}
+      </div>
+
+      {lista.length === 0 ? <Vazio>{filtro === 'abertos' ? 'Nenhuma compra a receber.' : 'Nenhum pedido de compra ainda.'}</Vazio> : filtro === 'abertos' ? (
+        SECOES.map(({ s, titulo, cor }) => {
+          const daqui = lista.filter((p) => situacao(p) === s)
+          if (!daqui.length) return null
+          return (
+            <section key={s} className="space-y-1">
+              <h3 className={`text-sm font-bold ${cor}`}>{titulo} ({daqui.length})</h3>
+              <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200">{daqui.map(linha)}</div>
+            </section>
+          )
+        })
+      ) : (
+        <div className="divide-y divide-stone-100 rounded-2xl bg-white ring-1 ring-stone-200">{lista.map(linha)}</div>
       )}
     </div>
   )
