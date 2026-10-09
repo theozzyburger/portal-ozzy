@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { Producao, Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { chamadoEmAberto } from './types'
 import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
@@ -211,6 +211,9 @@ const insumosDemo: Insumo[] = [
   ins('in6', 'Tomate', 'Hortifruti', 'kg', 9, 'fo2'),
   ins('in7', 'Refrigerante lata', 'Bebidas', 'un', 3.2, 'fo1', { embalagem: 'fardo', embalagemQtd: 12 }),
   ins('in8', 'Azeite', 'Óleos / Gorduras', 'l', null, null, { observacao: 'Sem preço: cadastre para o custo ficar completo.' }),
+  ins('in9', 'Óleo de soja', 'Óleos / Gorduras', 'l', 8, 'fo1'),
+  ins('in10', 'Cheiro verde', 'Hortifruti', 'kg', 12, 'fo2'),
+  ins('in11', 'Alho', 'Hortifruti', 'kg', 30, 'fo2'),
 ]
 const precosInsumoDemo: PrecoInsumo[] = insumosDemo.map((i) => ({ id: 'pi' + i.id, insumoId: i.id, preco: i.preco, em: haHoras(24 * 5), por: null, origem: 'exemplo' }))
 const rec = (id: string, nome: string, tipo: Receita['tipo'], extra: Partial<Receita> = {}): Receita => ({
@@ -223,9 +226,11 @@ const receitasDemo: Receita[] = [
   rec('re3', 'Refrigerante (exemplo)', 'produto', { linha: 'Bebidas', origem: 'revenda', precoVenda: 9 }),
   rec('re4', 'Pizza margherita (exemplo)', 'produto', { linha: 'Pizza', precoVenda: 50 }),
   rec('re5', 'Cannoli (exemplo)', 'produto', { linha: 'Sobremesa', precoVenda: 25, versaoAtual: 0 }),
+  rec('re6', 'Maionese verde (exemplo)', 'preparo', { linha: null, conservacao: 'Refrigerado até 5 °C', validadeDias: 4, modoPreparo: '1. Bata o cheiro verde e o alho com um pouco de óleo.\n2. Vá colocando o resto do óleo em fio até emulsionar.' }),
 ]
 const it = (insumoId: string | null, subReceitaId: string | null, quantidade: number, aproveitamento = 1) => ({ insumoId, subReceitaId, quantidade, aproveitamento })
 const versoesReceitaDemo: VersaoReceita[] = [
+  { id: 've6', receitaId: 're6', numero: 1, rendimento: 1, custoTotal: 8.27, nota: 'Exemplo', criadaEm: haHoras(24 * 10), criadaPor: 'f1', itens: [it('in9', null, 0.8), it('in10', null, 0.12, 0.8), it('in11', null, 0.02)] },
   { id: 've1', receitaId: 're1', numero: 1, rendimento: 1, custoTotal: 34.08, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in4', null, 0.33), it('in3', null, 0.67)] },
   { id: 've2', receitaId: 're2', numero: 1, rendimento: 1, custoTotal: 7.78, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025)] },
   { id: 've3', receitaId: 're2', numero: 2, rendimento: 1, custoTotal: 8.28, nota: 'Mais rúcula, a pedido da cozinha', criadaEm: haHoras(24 * 3), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025), it('in5', null, 0.02, 0.8)] },
@@ -840,6 +845,7 @@ const recorrentesDemo: ContaRecorrente[] = [
   { id: 'rc3', descricao: 'Energia (exemplo)', fornecedorId: null, fornecedorNome: 'DISTRIBUIDORA DE ENERGIA', centroCustoId: 'central', contaId: 'pc4.3', valor: 2800, variavel: true, dia: 23, forma: 'boleto', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'a_confirmar', observacao: 'Valor muda; média jul–set 2.831,52' },
   { id: 'rc4', descricao: 'Nutricionista (exemplo)', fornecedorId: null, fornecedorNome: 'NUTRI EXEMPLO', centroCustoId: 'burger-psd', contaId: 'pc5.24', valor: 420, variavel: false, dia: 10, forma: 'boleto', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'a_confirmar', observacao: null },
 ]
+const producoesDemo: Producao[] = []
 const movimentosDemo: MovimentoEstoque[] = [
   { id: 'mv1', centroCustoId: 'burger-psd', insumoId: 'in3', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 5, custoUnit: 40, notaItemId: 'ni5', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
   { id: 'mv2', centroCustoId: 'burger-psd', insumoId: 'in2', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 2, custoUnit: 148, notaItemId: 'ni6', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
@@ -2362,6 +2368,43 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async movimentosEstoque() {
       exigeGestao()
       return espera([...movimentosDemo].sort((a, b) => b.data.localeCompare(a.data)))
+    },
+    async producoes(de, ate) {
+      exigeGestao()
+      return espera(producoesDemo.filter((p) => p.data >= de && p.data <= ate).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).map((p) => ({ ...p })))
+    },
+    async lancarProducao(n) {
+      const u = exigeGestao()
+      if (!n.centroCustoId) throw new Error('Escolha a loja.')
+      if (!(n.quantidade > 0)) throw new Error('Diga quanto foi produzido.')
+      const r = n.receitaId ? receitasDemo.find((x) => x.id === n.receitaId) : undefined
+      let insumoId = n.insumoId
+      if (r) {
+        insumoId = r.insumoId ?? insumosDemo.find((i) => i.nome.toLowerCase() === r.nome.toLowerCase())?.id ?? null
+        if (!insumoId) {
+          insumoId = novoId('in')
+          insumosDemo.push(ins(insumoId, r.nome, 'Preparos', r.unidade, null, null, { observacao: 'Produção própria (criado ao lançar a produção).' }))
+        }
+        r.insumoId = insumoId
+      }
+      if (!insumoId) throw new Error('Escolha o que foi produzido.')
+      if (n.saidas.some((x) => x.insumoId === insumoId)) throw new Error('O preparo não pode ser ingrediente dele mesmo.')
+      const custo = n.saidas.reduce((t, x) => t + x.quantidade * (insumosDemo.find((i) => i.id === x.insumoId)?.preco ?? 0), 0)
+      const id = novoId('pr')
+      producoesDemo.push({ id, centroCustoId: n.centroCustoId, data: n.data, receitaId: r?.id ?? null, versao: r?.versaoAtual ?? null, insumoId, quantidade: n.quantidade, custoTotal: Math.round(custo * 10000) / 10000, observacao: n.observacao.trim() || null, criadoEm: agora(), criadoPor: u.id })
+      const nome = insumosDemo.find((i) => i.id === insumoId)?.nome ?? ''
+      for (const x of n.saidas.filter((x) => x.quantidade > 0)) movimentosDemo.push({ id: novoId('mv'), centroCustoId: n.centroCustoId, insumoId: x.insumoId, data: n.data, tipo: 'saida', quantidade: -x.quantidade, custoUnit: null, notaItemId: null, observacao: 'Produção de ' + nome, criadoEm: agora(), producaoId: id })
+      movimentosDemo.push({ id: novoId('mv'), centroCustoId: n.centroCustoId, insumoId, data: n.data, tipo: 'entrada', quantidade: n.quantidade, custoUnit: custo > 0 ? custo / n.quantidade : null, notaItemId: null, observacao: 'Produção' + (n.observacao.trim() ? ' · ' + n.observacao.trim() : ''), criadoEm: agora(), producaoId: id })
+      const i = insumosDemo.find((x) => x.id === insumoId)
+      if (i) Object.assign(i, { ativo: true, ...(custo > 0 ? { preco: Math.round((custo / n.quantidade) * 10000) / 10000, precoEm: agora() } : {}) })
+      return espera(id)
+    },
+    async desfazerProducao(id) {
+      exigeGestao()
+      const k = producoesDemo.findIndex((p) => p.id === id)
+      if (k >= 0) producoesDemo.splice(k, 1)
+      for (let j = movimentosDemo.length - 1; j >= 0; j--) if (movimentosDemo[j].producaoId === id) movimentosDemo.splice(j, 1)
+      return espera(undefined)
     },
     async lancarMovimentoEstoque(m) {
       exigeGestao()

@@ -846,7 +846,7 @@ function Movimentos() {
                   <tr key={m.id}>
                     <td className="px-3 py-2 whitespace-nowrap">{dataCurta(m.data)}</td>
                     <td className="px-3 py-2">{ins?.nome ?? '—'}{m.observacao && <span className="block text-xs text-stone-400">{m.observacao}</span>}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{NOME_TIPO[m.tipo]}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{m.producaoId ? 'Produção' : NOME_TIPO[m.tipo]}</td>
                     <td className={`px-3 py-2 text-right whitespace-nowrap ${m.quantidade < 0 ? 'text-red-700' : 'text-green-700'}`}>
                       {m.quantidade > 0 ? '+' : ''}{mostrarQtd(m.quantidade)} {ins?.unidade}
                     </td>

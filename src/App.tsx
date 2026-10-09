@@ -26,6 +26,7 @@ import Manutencao from './pages/Manutencao'
 import Fichas from './pages/Fichas'
 import Freelancers from './pages/Freelancers'
 import Motoboys from './pages/Motoboys'
+import Producao from './pages/Producao'
 import Salarios from './pages/Salarios'
 import ModuloFinanceiro from './pages/ModuloFinanceiro'
 import Estoque from './pages/Estoque'
@@ -144,6 +145,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (modulo.id === 'estoque') conteudo = <Estoque sub={sub} param={param} />
   else if (modulo.id === 'freelancers') conteudo = <Freelancers />
   else if (modulo.id === 'motoboys') conteudo = <Motoboys />
+  else if (modulo.id === 'producao') conteudo = <Producao />
   else if (modulo.id === 'eventos') conteudo = <Eventos sub={sub} param={param} />
   else if (modulo.id !== 'rh') conteudo = <EmBreve modulo={modulo} />
   else if (abaRh === 'turnos') conteudo = <Turnos />

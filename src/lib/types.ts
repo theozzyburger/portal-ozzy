@@ -956,6 +956,8 @@ export interface Receita {
   modoPreparo: string | null
   ativo: boolean
   versaoAtual: number
+  // Item de estoque que a produção deste preparo alimenta (0058).
+  insumoId?: string | null
 }
 export interface ItemReceita {
   insumoId: string | null
@@ -1286,6 +1288,31 @@ export interface MovimentoEstoque {
   notaItemId: string | null
   observacao: string | null
   criadoEm: string
+  // Movimento de uma produção de preparo (0058).
+  producaoId?: string | null
+}
+// Produção de pré-preparo (0058): entra o preparo, saem os ingredientes da ficha.
+export interface Producao {
+  id: string
+  centroCustoId: string
+  data: string
+  receitaId: string | null
+  versao: number | null
+  insumoId: string
+  quantidade: number
+  custoTotal: number | null
+  observacao: string | null
+  criadoEm: string
+  criadoPor: string | null
+}
+export interface NovaProducao {
+  centroCustoId: string
+  data: string
+  receitaId: string | null
+  insumoId: string | null
+  quantidade: number
+  saidas: { insumoId: string; quantidade: number }[]
+  observacao: string
 }
 
 // Conciliação bancária (0045): movimentos do extrato OFX e a memória de classificação pelo texto.

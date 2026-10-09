@@ -3,7 +3,7 @@ import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, t
 import { chaveDe, daChave } from './types'
 import { hoje } from './datas'
 import { comFolgasDoTurno } from './pessoal'
-import type { Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -1263,7 +1263,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async movimentosEstoque() {
       return (ok(await sb.from('estoque_movimentos').select('*').order('data', { ascending: false })) ?? []).map((r: any) => ({
         id: r.id, centroCustoId: r.centro_custo_id, insumoId: r.insumo_id, data: r.data, tipo: r.tipo, quantidade: Number(r.quantidade),
-        custoUnit: numeroOuNulo(r.custo_unit), notaItemId: r.nota_item_id, observacao: r.observacao, criadoEm: r.criado_em,
+        custoUnit: numeroOuNulo(r.custo_unit), notaItemId: r.nota_item_id, observacao: r.observacao, criadoEm: r.criado_em, producaoId: r.producao_id ?? null,
       }))
     },
     async extrato() {
@@ -1352,6 +1352,21 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('extrato_movimentos').update({ status: 'ignorado', observacao: motivo }).eq('id', movimentoId))
       if (chaveSempre) ok(await sb.from('extrato_regras').upsert({ chave: chaveSempre, ignorar: true, favorecido: motivo, atualizado_em: new Date().toISOString() }))
     },
+    async producoes(de, ate) {
+      return (ok(await sb.from('producoes').select('*').gte('data', de).lte('data', ate).order('data', { ascending: false }).order('criado_em', { ascending: false })) ?? []).map((r: any): Producao => ({
+        id: r.id, centroCustoId: r.centro_custo_id, data: r.data, receitaId: r.receita_id, versao: r.versao, insumoId: r.insumo_id, quantidade: Number(r.quantidade),
+        custoTotal: numeroOuNulo(r.custo_total), observacao: r.observacao, criadoEm: r.criado_em, criadoPor: r.criado_por,
+      }))
+    },
+    async lancarProducao(p) {
+      return ok(await sb.rpc('lancar_producao', {
+        p_centro: p.centroCustoId, p_data: p.data, p_receita: p.receitaId, p_insumo: p.insumoId, p_quantidade: p.quantidade,
+        p_saidas: p.saidas.map((x) => ({ insumo_id: x.insumoId, quantidade: x.quantidade })), p_obs: p.observacao.trim() || null,
+      })) as string
+    },
+    async desfazerProducao(id) {
+      ok(await sb.rpc('desfazer_producao', { p_id: id }))
+    },
     async lancarMovimentoEstoque(m) {
       ok(await sb.from('estoque_movimentos').insert({
         centro_custo_id: m.centroCustoId, insumo_id: m.insumoId, data: m.data, tipo: m.tipo, quantidade: m.quantidade,
@@ -1417,7 +1432,7 @@ const paraInsumo = (r: any): Insumo => ({
 const paraReceita = (r: any): Receita => ({
   id: r.id, nome: r.nome, tipo: r.tipo, linha: r.linha, operacaoId: r.operacao_id, origem: r.origem, unidade: r.unidade, precoVenda: numeroOuNulo(r.preco_venda),
   tempoPreparoMin: r.tempo_preparo_min, tempoFinalizacaoMin: r.tempo_finalizacao_min, capacidadeHora: r.capacidade_hora, equipamentos: r.equipamentos,
-  conservacao: r.conservacao, validadeDias: r.validade_dias, modoPreparo: r.modo_preparo ?? null, ativo: r.ativo, versaoAtual: r.versao_atual,
+  conservacao: r.conservacao, validadeDias: r.validade_dias, modoPreparo: r.modo_preparo ?? null, ativo: r.ativo, versaoAtual: r.versao_atual, insumoId: r.insumo_id ?? null,
 })
 
 const linhaItemEnvio = (i: NovoItemEnvio) => ({
