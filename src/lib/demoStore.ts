@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { Producao, Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { chamadoEmAberto } from './types'
 import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
@@ -214,7 +214,19 @@ const insumosDemo: Insumo[] = [
   ins('in9', 'Óleo de soja', 'Óleos / Gorduras', 'l', 8, 'fo1'),
   ins('in10', 'Cheiro verde', 'Hortifruti', 'kg', 12, 'fo2'),
   ins('in11', 'Alho', 'Hortifruti', 'kg', 30, 'fo2'),
+  // Lista de fechamento das lojas (exemplo; a real vem da Eclética).
+  ins('in12', 'Maionese verde', 'Preparos', 'kg', 8.8, null),
+  ins('in13', 'Molho especial', 'Preparos', 'kg', 14, null),
+  ins('in14', 'Cebola caramelizada', 'Preparos', 'kg', 16, null),
+  ins('in15', 'Alface americana', 'Cozinha das lojas', 'un', 4, null),
+  ins('in16', 'Blend burger 1 unidade (100g)', 'Cozinha das lojas', 'kg', 42, null),
+  ins('in17', 'Bacon fatiado', 'Cozinha das lojas', 'kg', 38, null),
+  ins('in18', 'Pão brioche mini (PCT com 12)', 'Cozinha das lojas', 'un', 1.1, null),
+  ins('in19', 'Coca cola 350ml lata', 'Atendimento das lojas', 'un', 3.2, null),
+  ins('in20', 'Guardanapo sachê personalizado', 'Atendimento das lojas', 'un', 0.05, null),
+  ins('in21', 'Saco kraft P PCT C/ 100', 'Atendimento das lojas', 'un', 0.3, null),
 ]
+const prePreparoDemo = new Set(['in12', 'in13', 'in14'])
 const precosInsumoDemo: PrecoInsumo[] = insumosDemo.map((i) => ({ id: 'pi' + i.id, insumoId: i.id, preco: i.preco, em: haHoras(24 * 5), por: null, origem: 'exemplo' }))
 const rec = (id: string, nome: string, tipo: Receita['tipo'], extra: Partial<Receita> = {}): Receita => ({
   id, nome, tipo, linha: 'Foca', operacaoId: null, origem: 'propria', unidade: tipo === 'produto' ? 'un' : 'kg', precoVenda: null,
@@ -846,6 +858,29 @@ const recorrentesDemo: ContaRecorrente[] = [
   { id: 'rc4', descricao: 'Nutricionista (exemplo)', fornecedorId: null, fornecedorNome: 'NUTRI EXEMPLO', centroCustoId: 'burger-psd', contaId: 'pc5.24', valor: 420, variavel: false, dia: 10, forma: 'boleto', inicio: mesAtual().slice(0, 7), fim: null, situacao: 'a_confirmar', observacao: null },
 ]
 const producoesDemo: Producao[] = []
+// Ideal de segunda a domingo (exemplo).
+const listaFechDemo: ItemListaFechamento[] = (['burger-psd', 'burger-va'] as const).flatMap((u, k) => ([
+  ['cozinha', 'in15', 'Uni', [8, 8, 8, 10, 12, 12, 10]],
+  ['cozinha', 'in16', 'Kg', [20, 20, 25, 30, 45, 45, 35]],
+  ['cozinha', 'in17', 'Kg', [3, 3, 3, 4, 6, 6, 5]],
+  ['cozinha', 'in14', 'Kg', [1, 1, 1, 1.5, 2, 2, 1.5]],
+  ['cozinha', 'in12', 'Kg', [1.5, 1.5, 1.5, 2, 3, 3, 2]],
+  ['cozinha', 'in13', 'Kg', [2, 2, 2, 3, 4, 4, 3]],
+  ['cozinha', 'in18', 'Uni', [24, 24, 24, 36, 48, 48, 36]],
+  ['atendimento', 'in19', 'Uni', [48, 48, 48, 72, 96, 96, 72]],
+  ['atendimento', 'in20', 'Uni', [300, 300, 300, 300, 500, 500, 400]],
+  ['atendimento', 'in21', 'Pct', [null, null, null, null, null, null, null]],
+] as const).map(([setor, insumoId, un, ideal], j): ItemListaFechamento => ({
+  id: `fi${k}${j}`, unidadeId: u, setor, insumoId, nome: '', unidadeContagem: un, ordem: j + 1, ideal: ideal.map((x) => (x === null ? null : k ? x * 0.8 : x)), prePreparo: false, ativo: true,
+})))
+const fechamentosDemo: Fechamento[] = [{
+  id: 'fc1', unidadeId: 'burger-va', setor: 'cozinha', data: addDias(hoje(), -1), para: hoje(), responsavel: 'Ana (exemplo)', observacao: null, fala: null, enviadoEm: haHoras(12), enviadoPor: null,
+}]
+const contagensFechDemo: { fechamentoId: string; itemId: string; contagem: number | null; sugestao: number | null; pedido: number | null }[] = [
+  { fechamentoId: 'fc1', itemId: 'fi13', contagem: 1, sugestao: 3, pedido: 3 },
+  { fechamentoId: 'fc1', itemId: 'fi14', contagem: 0.5, sugestao: 1.5, pedido: 2 },
+  { fechamentoId: 'fc1', itemId: 'fi10', contagem: 2, sugestao: 6, pedido: 6 },
+]
 const movimentosDemo: MovimentoEstoque[] = [
   { id: 'mv1', centroCustoId: 'burger-psd', insumoId: 'in3', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 5, custoUnit: 40, notaItemId: 'ni5', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
   { id: 'mv2', centroCustoId: 'burger-psd', insumoId: 'in2', data: addDias(hoje(), -9), tipo: 'entrada_nf', quantidade: 2, custoUnit: 148, notaItemId: 'ni6', observacao: 'NF 10198 · Distribuidora Exemplo', criadoEm: haHoras(24 * 8) },
@@ -2404,6 +2439,86 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const k = producoesDemo.findIndex((p) => p.id === id)
       if (k >= 0) producoesDemo.splice(k, 1)
       for (let j = movimentosDemo.length - 1; j >= 0; j--) if (movimentosDemo[j].producaoId === id) movimentosDemo.splice(j, 1)
+      return espera(undefined)
+    },
+    async listaFechamento(unidadeId, setor, data) {
+      const u = exigeEu()
+      if (!(podeGerenciar(u.nivel) || u.setor === 'producao' || u.unidadeId === unidadeId)) return espera([])
+      const f = fechamentosDemo.find((x) => x.unidadeId === unidadeId && x.setor === setor && x.data === data)
+      const dia = (new Date(addDias(data, 1) + 'T12:00:00').getDay() + 6) % 7
+      return espera(listaFechDemo.filter((i) => i.unidadeId === unidadeId && i.setor === setor && i.ativo).map((i): ItemFechamento => {
+        const c = f && contagensFechDemo.find((x) => x.fechamentoId === f.id && x.itemId === i.id)
+        return {
+          itemId: i.id, insumoId: i.insumoId, nome: insumosDemo.find((x) => x.id === i.insumoId)?.nome ?? '', unidadeContagem: i.unidadeContagem, ordem: i.ordem,
+          prePreparo: prePreparoDemo.has(i.insumoId), ideal: i.ideal[dia] ?? null, contagem: c?.contagem ?? null, sugestao: c?.sugestao ?? null, pedido: c?.pedido ?? null,
+        }
+      }))
+    },
+    async fechamentos(de, ate) {
+      const u = exigeEu()
+      return espera(fechamentosDemo.filter((f) => f.data >= de && f.data <= ate && (podeGerenciar(u.nivel) || u.setor === 'producao' || u.unidadeId === f.unidadeId)).map((f) => ({ ...f })))
+    },
+    async enviarFechamento(e) {
+      const u = exigeEu()
+      if (!(podeGerenciar(u.nivel) || u.unidadeId === e.unidadeId)) throw new Error('Só quem é desta loja (ou a gestão) envia o fechamento.')
+      let f = fechamentosDemo.find((x) => x.unidadeId === e.unidadeId && x.setor === e.setor && x.data === e.data)
+      const dados = { responsavel: e.responsavel.trim() || null, observacao: e.observacao.trim() || null, fala: e.fala.trim() || null, enviadoEm: agora(), enviadoPor: u.id }
+      if (f) Object.assign(f, dados)
+      else fechamentosDemo.push((f = { id: novoId('fc'), unidadeId: e.unidadeId, setor: e.setor, data: e.data, para: addDias(e.data, 1), ...dados }))
+      const id = f.id
+      for (let j = contagensFechDemo.length - 1; j >= 0; j--) if (contagensFechDemo[j].fechamentoId === id) contagensFechDemo.splice(j, 1)
+      for (const i of e.itens) contagensFechDemo.push({ fechamentoId: id, itemId: i.itemId, contagem: i.contagem, sugestao: i.sugestao, pedido: i.pedido || null })
+      return espera(id)
+    },
+    async pedidosProducao(para) {
+      const u = exigeEu()
+      if (!(podeGerenciar(u.nivel) || u.setor === 'producao')) return espera([])
+      const r = new Map<string, PedidoProducao>()
+      for (const f of fechamentosDemo.filter((x) => x.para === para))
+        for (const c of contagensFechDemo.filter((x) => x.fechamentoId === f.id && (x.pedido ?? 0) > 0)) {
+          const it = listaFechDemo.find((x) => x.id === c.itemId)!
+          const ins = insumosDemo.find((x) => x.id === it.insumoId)!
+          const p = r.get(ins.id) ?? {
+            insumoId: ins.id, nome: ins.nome, setor: f.setor, unidadeContagem: it.unidadeContagem, unidade: ins.unidade, prePreparo: prePreparoDemo.has(ins.id),
+            psd: null, va: null, total: 0, central: movimentosDemo.filter((m) => m.centroCustoId === 'central' && m.insumoId === ins.id).reduce((t, m) => t + m.quantidade, 0),
+          }
+          if (f.unidadeId === 'burger-psd') p.psd = (p.psd ?? 0) + c.pedido!
+          else p.va = (p.va ?? 0) + c.pedido!
+          p.total += c.pedido!
+          r.set(ins.id, p)
+        }
+      return espera([...r.values()].sort((a, b) => Number(b.prePreparo) - Number(a.prePreparo) || a.setor.localeCompare(b.setor) || a.nome.localeCompare(b.nome)))
+    },
+    async contarCentral(data, itens) {
+      const u = exigeEu()
+      if (!(podeGerenciar(u.nivel) || u.setor === 'producao')) throw new Error('Seu nível de acesso não permite esta ação.')
+      let n = 0
+      for (const i of itens) {
+        const saldo = movimentosDemo.filter((m) => m.centroCustoId === 'central' && m.insumoId === i.insumoId).reduce((t, m) => t + m.quantidade, 0)
+        const dif = i.quantidade - saldo
+        if (Math.abs(dif) > 0.0001) {
+          movimentosDemo.push({ id: novoId('mv'), centroCustoId: 'central', insumoId: i.insumoId, data, tipo: 'ajuste', quantidade: dif, custoUnit: null, notaItemId: null, observacao: 'Contagem da produção: ' + i.quantidade, criadoEm: agora() })
+          n++
+        }
+      }
+      return espera(n)
+    },
+    async itensListaFechamento(unidadeId, setor) {
+      exigeGestao()
+      return espera(listaFechDemo.filter((i) => i.unidadeId === unidadeId && i.setor === setor).sort((a, b) => a.ordem - b.ordem)
+        .map((i) => ({ ...i, ideal: [...i.ideal], nome: insumosDemo.find((x) => x.id === i.insumoId)?.nome ?? '', prePreparo: prePreparoDemo.has(i.insumoId) })))
+    },
+    async salvarItemListaFechamento(i) {
+      exigeGestao()
+      const dados = { unidadeId: i.unidadeId, setor: i.setor, insumoId: i.insumoId, unidadeContagem: i.unidadeContagem.trim() || 'Uni', ordem: i.ordem, ideal: [...i.ideal], ativo: i.ativo, prePreparo: false }
+      const atual = i.id ? listaFechDemo.find((x) => x.id === i.id) : undefined
+      if (atual) Object.assign(atual, dados)
+      else {
+        if (listaFechDemo.some((x) => x.unidadeId === i.unidadeId && x.setor === i.setor && x.insumoId === i.insumoId)) throw new Error('Este item já está na lista.')
+        listaFechDemo.push({ id: novoId('fi'), nome: '', ...dados })
+      }
+      if (i.prePreparo) prePreparoDemo.add(i.insumoId)
+      else prePreparoDemo.delete(i.insumoId)
       return espera(undefined)
     },
     async lancarMovimentoEstoque(m) {

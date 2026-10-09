@@ -1,8 +1,8 @@
 import { podeGerenciar, vejoResultado } from './permissoes'
-import type { Nivel } from './types'
+import { LOJAS_FECHAMENTO, type Funcionario } from './types'
 
 export type IdIcone =
-  | 'inicio' | 'rh' | 'freelancers' | 'motoboys' | 'producao' | 'fichas' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
+  | 'inicio' | 'rh' | 'freelancers' | 'motoboys' | 'fechamento' | 'producao' | 'fichas' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
   | 'checklists' | 'regras' | 'treinamentos' | 'manutencao' | 'eventos'
 
 export interface Modulo {
@@ -15,7 +15,7 @@ export interface Modulo {
   origem?: string
   soGestao?: boolean
   // Regra própria de quem vê (no lugar de soGestao).
-  ve?: (n: Nivel) => boolean
+  ve?: (eu: Funcionario) => boolean
 }
 
 // Ordem do menu lateral. Funcionário, Supervisor e Manutenção não veem Fichas, Administrativo,
@@ -28,10 +28,13 @@ export const MODULOS: Modulo[] = [
   // Cadastro e pagamento semanal dos motoboys (09/10), que não são da equipe.
   { id: 'motoboys', nome: 'Motoboys', pronto: true, soGestao: true },
   // Central de produção (09/10): lançar o que foi produzido; depois pedidos das lojas e lista de preparo.
-  { id: 'producao', nome: 'Produção', pronto: true, soGestao: true },
+  // Fechamento das lojas (09/10): quem é da PSD ou da Vila conta o estoque no fim do turno e faz o pedido à Central.
+  { id: 'fechamento', nome: 'Fechamento e pedido', pronto: true, ve: (eu) => podeGerenciar(eu.nivel) || (LOJAS_FECHAMENTO.includes(eu.unidadeId as never) && eu.nivel !== 'manutencao') },
+  // Central de produção (09/10): pedidos das lojas, lista de preparo e o que foi produzido. Gestão e quem é da produção.
+  { id: 'producao', nome: 'Produção', pronto: true, ve: (eu) => podeGerenciar(eu.nivel) || eu.setor === 'producao' },
   { id: 'fichas', nome: 'Fichas técnicas', pronto: true, soGestao: true },
   {
-    id: 'financeiro', nome: 'Financeiro', pronto: true, ve: vejoResultado,
+    id: 'financeiro', nome: 'Financeiro', pronto: true, ve: (eu) => vejoResultado(eu.nivel),
     resumo: 'Contas a pagar, despesas por conta contábil e loja, e o resultado do Lucro Fácil.',
   },
   {
@@ -80,4 +83,4 @@ export const MODULOS: Modulo[] = [
   },
 ]
 
-export const modulosVisiveis = (n: Nivel) => MODULOS.filter((m) => (m.ve ? m.ve(n) : !m.soGestao || podeGerenciar(n)))
+export const modulosVisiveis = (eu: Funcionario) => MODULOS.filter((m) => (m.ve ? m.ve(eu) : !m.soGestao || podeGerenciar(eu.nivel)))

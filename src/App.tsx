@@ -27,6 +27,7 @@ import Fichas from './pages/Fichas'
 import Freelancers from './pages/Freelancers'
 import Motoboys from './pages/Motoboys'
 import Producao from './pages/Producao'
+import Fechamento from './pages/Fechamento'
 import Salarios from './pages/Salarios'
 import ModuloFinanceiro from './pages/ModuloFinanceiro'
 import Estoque from './pages/Estoque'
@@ -113,7 +114,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   const { eu, nomeUnidade, store } = useApp()
   const [area = 'inicio', sub, param] = useRota()
   const [menuAberto, setMenuAberto] = useState(false)
-  const modulos = modulosVisiveis(eu.nivel)
+  const modulos = modulosVisiveis(eu)
   // Freelancers saiu do Departamento Pessoal para o menu (08/10): link antigo continua funcionando.
   useEffect(() => {
     if (area === 'rh' && sub === 'freelancers') ir('freelancers')
@@ -146,6 +147,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (modulo.id === 'freelancers') conteudo = <Freelancers />
   else if (modulo.id === 'motoboys') conteudo = <Motoboys />
   else if (modulo.id === 'producao') conteudo = <Producao />
+  else if (modulo.id === 'fechamento') conteudo = <Fechamento />
   else if (modulo.id === 'eventos') conteudo = <Eventos sub={sub} param={param} />
   else if (modulo.id !== 'rh') conteudo = <EmBreve modulo={modulo} />
   else if (abaRh === 'turnos') conteudo = <Turnos />

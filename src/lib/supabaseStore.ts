@@ -3,7 +3,7 @@ import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, t
 import { chaveDe, daChave } from './types'
 import { hoje } from './datas'
 import { comFolgasDoTurno } from './pessoal'
-import type { Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -1366,6 +1366,48 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async desfazerProducao(id) {
       ok(await sb.rpc('desfazer_producao', { p_id: id }))
+    },
+    async listaFechamento(unidadeId, setor, data) {
+      return (ok(await sb.rpc('lista_fechamento', { p_unidade: unidadeId, p_setor: setor, p_data: data })) ?? []).map((r: any): ItemFechamento => ({
+        itemId: r.item_id, insumoId: r.insumo_id, nome: r.nome, unidadeContagem: r.unidade_contagem, ordem: r.ordem, prePreparo: r.pre_preparo,
+        ideal: numeroOuNulo(r.ideal), contagem: numeroOuNulo(r.contagem), sugestao: numeroOuNulo(r.sugestao), pedido: numeroOuNulo(r.pedido),
+      }))
+    },
+    async fechamentos(de, ate) {
+      return (ok(await sb.from('fechamentos').select('*').gte('data', de).lte('data', ate).order('data', { ascending: false })) ?? []).map((r: any): Fechamento => ({
+        id: r.id, unidadeId: r.unidade_id, setor: r.setor, data: r.data, para: r.para, responsavel: r.responsavel, observacao: r.observacao,
+        fala: r.fala, enviadoEm: r.enviado_em, enviadoPor: r.enviado_por,
+      }))
+    },
+    async enviarFechamento(f) {
+      return ok(await sb.rpc('enviar_fechamento', {
+        p_unidade: f.unidadeId, p_setor: f.setor, p_data: f.data, p_responsavel: f.responsavel, p_obs: f.observacao, p_fala: f.fala,
+        p_itens: f.itens.map((i) => ({ item_id: i.itemId, contagem: i.contagem, sugestao: i.sugestao, pedido: i.pedido })),
+      })) as string
+    },
+    async pedidosProducao(para) {
+      return (ok(await sb.rpc('pedidos_producao', { p_para: para })) ?? []).map((r: any): PedidoProducao => ({
+        insumoId: r.insumo_id, nome: r.nome, setor: r.setor, unidadeContagem: r.unidade_contagem, unidade: r.unidade, prePreparo: r.pre_preparo,
+        psd: numeroOuNulo(r.psd), va: numeroOuNulo(r.va), total: Number(r.total), central: Number(r.central),
+      }))
+    },
+    async contarCentral(data, itens) {
+      return ok(await sb.rpc('contar_central', { p_data: data, p_itens: itens.map((i) => ({ insumo_id: i.insumoId, quantidade: i.quantidade })) })) as number
+    },
+    async itensListaFechamento(unidadeId, setor) {
+      const linhas = ok(await sb.from('fechamento_itens').select('*, insumos(nome, pre_preparo)').eq('unidade_id', unidadeId).eq('setor', setor).order('ordem')) ?? []
+      return linhas.map((r: any): ItemListaFechamento => ({
+        id: r.id, unidadeId: r.unidade_id, setor: r.setor, insumoId: r.insumo_id, nome: r.insumos?.nome ?? '', unidadeContagem: r.unidade_contagem,
+        ordem: r.ordem, ideal: Array.from({ length: 7 }, (_, k) => numeroOuNulo(r.ideal?.[k])), prePreparo: !!r.insumos?.pre_preparo, ativo: r.ativo,
+      }))
+    },
+    async salvarItemListaFechamento(i) {
+      const linha = {
+        unidade_id: i.unidadeId, setor: i.setor, insumo_id: i.insumoId, unidade_contagem: i.unidadeContagem.trim() || 'Uni', ordem: i.ordem,
+        ideal: i.ideal.some((x) => x !== null) ? i.ideal : null, ativo: i.ativo,
+      }
+      ok(i.id ? await sb.from('fechamento_itens').update(linha).eq('id', i.id) : await sb.from('fechamento_itens').insert(linha))
+      ok(await sb.from('insumos').update({ pre_preparo: i.prePreparo }).eq('id', i.insumoId))
     },
     async lancarMovimentoEstoque(m) {
       ok(await sb.from('estoque_movimentos').insert({

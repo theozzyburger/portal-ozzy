@@ -3,14 +3,319 @@ import { Botao, Campo, Modal, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje } from '../lib/datas'
 import { lerValor, mostrarQtd, nomeCentro, reais } from '../lib/financeiro'
-import type { CentroCusto, Insumo, Producao as ProducaoT, Receita, VersaoReceita } from '../lib/types'
+import { podeGerenciar } from '../lib/permissoes'
+import { LOJAS_FECHAMENTO } from '../lib/types'
+import type { CentroCusto, Fechamento, Insumo, ItemListaFechamento, PedidoProducao, Producao as ProducaoT, Receita, SetorFechamento, VersaoReceita } from '../lib/types'
 
-// Menu Produção (Heitor, 09/10). Primeiro passo: lançar o que a produção fez no dia (entra o preparo,
-// saem os ingredientes da ficha). Depois vêm os pedidos das lojas e a lista de preparo.
+// Menu Produção (Heitor, 09/10): pedidos das lojas (vindos do fechamento), lista de preparo descontando o que
+// já tem na Central, lançar o que foi produzido (entra o preparo, saem os ingredientes da ficha) e as listas.
 
 interface Dados { insumos: Insumo[]; receitas: Receita[]; versoes: VersaoReceita[]; centros: CentroCusto[]; producoes: ProducaoT[] }
+type Aba = 'pedidos' | 'produzido' | 'listas'
+const NOME_LOJA: Record<string, string> = { 'burger-psd': 'PSD', 'burger-va': 'Vila' }
+const NOME_SETOR: Record<SetorFechamento, string> = { cozinha: 'Cozinha', atendimento: 'Atendimento' }
+const DIAS_CURTOS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+const q = (n: number | null) => (n === null || n === 0 ? '' : mostrarQtd(n))
 
 export default function Producao() {
+  const { eu } = useApp()
+  const gestao = podeGerenciar(eu.nivel)
+  const [aba, setAba] = useState<Aba>('pedidos')
+  const abas: [Aba, string][] = gestao ? [['pedidos', 'Pedidos das lojas'], ['produzido', 'Produzido'], ['listas', 'Listas']] : [['pedidos', 'Pedidos das lojas']]
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-bold">Produção</h1>
+        <p className="text-sm text-stone-500">Os pedidos que as lojas mandaram no fechamento, o que precisa preparar e o que foi produzido.</p>
+      </div>
+      {abas.length > 1 && (
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
+          {abas.map(([a, nome]) => (
+            <button key={a} onClick={() => setAba(a)} className={`rounded-lg py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>{nome}</button>
+          ))}
+        </div>
+      )}
+      {aba === 'pedidos' && <Pedidos />}
+      {aba === 'produzido' && <Produzido />}
+      {aba === 'listas' && <Listas />}
+    </div>
+  )
+}
+
+// ——— Pedidos das lojas e lista de preparo ———
+
+function Pedidos() {
+  const { store, avisar, nomeDe } = useApp()
+  const [para, setPara] = useState(hoje())
+  const [linhas, setLinhas] = useState<PedidoProducao[] | null>(null)
+  const [fechs, setFechs] = useState<Fechamento[]>([])
+  const [tem, setTem] = useState<Record<string, string>>({})
+  const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const carregar = useCallback(async () => {
+    try {
+      const [l, f] = await Promise.all([store.pedidosProducao(para), store.fechamentos(addDias(para, -1), addDias(para, -1))])
+      setLinhas(l)
+      setFechs(f)
+      setTem(Object.fromEntries(l.filter((x) => x.prePreparo && x.central > 0).map((x) => [x.insumoId, String(Math.round(x.central * 1000) / 1000).replace('.', ',')])))
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }, [store, para])
+  useEffect(() => { setLinhas(null); carregar() }, [carregar])
+
+  if (erro) return <p className="text-red-700">{erro}</p>
+  const preparar = (linhas ?? []).filter((l) => l.prePreparo)
+  const separar = (linhas ?? []).filter((l) => !l.prePreparo)
+  const temNa = (l: PedidoProducao) => lerValor(tem[l.insumoId] ?? '') ?? 0
+  const fazer = (l: PedidoProducao) => Math.max(0, Math.round((l.total - temNa(l)) * 1000) / 1000)
+  const mudados = preparar.filter((l) => tem[l.insumoId] !== undefined && lerValor(tem[l.insumoId]) !== null && Math.abs((lerValor(tem[l.insumoId]) ?? 0) - l.central) > 0.0001)
+
+  const copiar = async (texto: string) => {
+    try { await navigator.clipboard.writeText(texto); avisar('Copiado') } catch { avisar('Não consegui copiar') }
+  }
+  const textoPreparo = () => [`*Preparar para ${diaSemana(para).toLowerCase()} ${dataCurta(para)}*`, ...preparar.filter((l) => fazer(l) > 0).map((l) => `${l.nome}: ${mostrarQtd(fazer(l))} ${l.unidadeContagem}`)].join('\n')
+  const textoSeparar = (loja: string) => {
+    const campo = loja === 'burger-psd' ? 'psd' : 'va'
+    return [`*Separação ${NOME_LOJA[loja]} para ${dataCurta(para)}*`, ...(linhas ?? []).filter((l) => (l[campo] ?? 0) > 0).map((l) => `${l.nome}: ${mostrarQtd(l[campo]!)} ${l.unidadeContagem}`)].join('\n')
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Botao variante="secundario" onClick={() => setPara(addDias(para, -1))} aria-label="Dia anterior">‹</Botao>
+        <span className="min-w-44 text-center font-semibold">Para {diaSemana(para).toLowerCase()}, {dataCurta(para)}</span>
+        <Botao variante="secundario" onClick={() => setPara(addDias(para, 1))} aria-label="Dia seguinte">›</Botao>
+        {para !== hoje() && <button className="text-sm font-semibold text-stone-500 underline" onClick={() => setPara(hoje())}>Hoje</button>}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {LOJAS_FECHAMENTO.flatMap((u) => (['cozinha', 'atendimento'] as const).map((s) => {
+          const f = fechs.find((x) => x.unidadeId === u && x.setor === s)
+          return (
+            <span key={u + s} className={`rounded-full px-3 py-1 text-xs font-semibold ${f ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'}`}>
+              {NOME_LOJA[u]} {NOME_SETOR[s].toLowerCase()}: {f ? `enviado ${new Date(f.enviadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${f.responsavel ? ' · ' + f.responsavel : f.enviadoPor ? ' · ' + nomeDe(f.enviadoPor) : ''}` : 'não enviou'}
+            </span>
+          )
+        }))}
+      </div>
+      {fechs.filter((f) => f.observacao).map((f) => (
+        <p key={f.id} className="text-sm text-stone-600"><b>{NOME_LOJA[f.unidadeId]} {NOME_SETOR[f.setor].toLowerCase()}:</b> {f.observacao}</p>
+      ))}
+
+      {!linhas ? <p className="text-stone-400">Carregando…</p> : linhas.length === 0 ? <Vazio>Nenhum pedido para este dia ainda.</Vazio> : (
+        <>
+          <section className="space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="font-bold">Para preparar</h2>
+                <p className="text-xs text-stone-500">Pedido das lojas menos o que já tem na Central. Corrija o “Tem na Central” se a contagem for outra.</p>
+              </div>
+              <div className="flex gap-2">
+                {mudados.length > 0 && (
+                  <Botao variante="secundario" disabled={salvando} onClick={async () => {
+                    setSalvando(true)
+                    try {
+                      await store.contarCentral(hoje(), mudados.map((l) => ({ insumoId: l.insumoId, quantidade: lerValor(tem[l.insumoId])! })))
+                      avisar('Estoque da Central atualizado')
+                      await carregar()
+                    } catch (e) { avisar((e as Error).message) } finally { setSalvando(false) }
+                  }}>Salvar contagem da Central ({mudados.length})</Botao>
+                )}
+                <Botao variante="secundario" disabled={!preparar.some((l) => fazer(l) > 0)} onClick={() => copiar(textoPreparo())}>Copiar</Botao>
+              </div>
+            </div>
+            {preparar.length === 0 ? <Vazio>Nenhum preparo pedido.</Vazio> : (
+              <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-stone-200">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-xs text-stone-500">
+                    <th className="px-2 py-2">Preparo</th><th className="px-1 py-2 text-right">PSD</th><th className="px-1 py-2 text-right">Vila</th>
+                    <th className="px-1 py-2 text-right">Total</th><th className="px-1 py-2 text-center">Tem na Central</th><th className="px-2 py-2 text-right">Fazer</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {preparar.map((l) => (
+                      <tr key={l.insumoId}>
+                        <td className="px-2 py-2 font-semibold">{l.nome} <span className="text-xs font-normal text-stone-500">{l.unidadeContagem}</span></td>
+                        <td className="px-1 py-2 text-right">{q(l.psd)}</td>
+                        <td className="px-1 py-2 text-right">{q(l.va)}</td>
+                        <td className="px-1 py-2 text-right">{mostrarQtd(l.total)}</td>
+                        <td className="px-1 py-1 text-center">
+                          <input inputMode="decimal" aria-label={`Quanto tem de ${l.nome} na Central`} value={tem[l.insumoId] ?? ''} placeholder="0"
+                            onChange={(e) => setTem((v) => ({ ...v, [l.insumoId]: e.target.value }))} className={`${estiloEntrada} w-16! px-1! text-center`} />
+                        </td>
+                        <td className={`px-2 py-2 text-right font-bold ${fazer(l) > 0 ? '' : 'text-emerald-700'}`}>{fazer(l) > 0 ? mostrarQtd(fazer(l)) : 'tem'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="font-bold">Para separar</h2>
+                <p className="text-xs text-stone-500">Tudo o que as lojas pediram, com os preparos acima.</p>
+              </div>
+              <div className="flex gap-2">
+                {LOJAS_FECHAMENTO.map((u) => (
+                  <Botao key={u} variante="secundario" onClick={() => copiar(textoSeparar(u))}>Copiar {NOME_LOJA[u]}</Botao>
+                ))}
+              </div>
+            </div>
+            {(['cozinha', 'atendimento'] as const).map((s) => {
+              const doSetor = [...preparar, ...separar].filter((l) => l.setor === s)
+              if (!doSetor.length) return null
+              return (
+                <div key={s} className="overflow-x-auto rounded-2xl bg-white ring-1 ring-stone-200">
+                  <p className="px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-stone-500">{NOME_SETOR[s]}</p>
+                  <table className="w-full text-sm">
+                    <thead><tr className="text-left text-xs text-stone-500">
+                      <th className="px-3 py-2">Item</th><th className="px-2 py-2 text-right">PSD</th><th className="px-2 py-2 text-right">Vila</th><th className="px-3 py-2 text-right">Total</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {doSetor.map((l) => (
+                        <tr key={l.insumoId}>
+                          <td className="px-3 py-1.5">{l.nome} <span className="text-xs text-stone-500">{l.unidadeContagem}</span></td>
+                          <td className="px-2 py-1.5 text-right">{q(l.psd)}</td>
+                          <td className="px-2 py-1.5 text-right">{q(l.va)}</td>
+                          <td className="px-3 py-1.5 text-right font-semibold">{mostrarQtd(l.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })}
+          </section>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ——— Listas de fechamento (gestão): itens, unidade de contagem e estoque ideal por dia ———
+
+function Listas() {
+  const { store, avisar } = useApp()
+  const [loja, setLoja] = useState<string>('burger-psd')
+  const [setor, setSetor] = useState<SetorFechamento>('cozinha')
+  const [itens, setItens] = useState<ItemListaFechamento[] | null>(null)
+  const [insumos, setInsumos] = useState<Insumo[]>([])
+  const [mudou, setMudou] = useState<Set<string>>(new Set())
+  const [busca, setBusca] = useState('')
+  const [novo, setNovo] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+  const carregar = useCallback(async () => {
+    try {
+      const [l, i] = await Promise.all([store.itensListaFechamento(loja, setor), store.insumos()])
+      setItens(l)
+      setInsumos(i)
+      setMudou(new Set())
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }, [store, loja, setor])
+  useEffect(() => { setItens(null); carregar() }, [carregar])
+
+  const mudar = (id: string, m: Partial<ItemListaFechamento>) => {
+    setItens((l) => l!.map((x) => (x.id === id ? { ...x, ...m } : x)))
+    setMudou((s) => new Set(s).add(id))
+  }
+  const salvar = async () => {
+    setSalvando(true)
+    try {
+      for (const i of itens!.filter((x) => mudou.has(x.id))) await store.salvarItemListaFechamento(i)
+      avisar('Lista salva')
+      await carregar()
+    } catch (e) {
+      avisar((e as Error).message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  if (erro) return <p className="text-red-700">{erro}</p>
+  const termo = busca.trim().toLowerCase()
+  const visiveis = (itens ?? []).filter((i) => !termo || i.nome.toLowerCase().includes(termo))
+  const fora = insumos.filter((i) => i.ativo && !(itens ?? []).some((x) => x.insumoId === i.id))
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={loja} onChange={(e) => setLoja(e.target.value)} className={`${estiloEntrada} w-auto!`}>
+          {LOJAS_FECHAMENTO.map((u) => <option key={u} value={u}>{u === 'burger-psd' ? 'Parque São Domingos' : 'Vila Anastácio'}</option>)}
+        </select>
+        <select value={setor} onChange={(e) => setSetor(e.target.value as SetorFechamento)} className={`${estiloEntrada} w-auto!`}>
+          <option value="cozinha">Cozinha</option><option value="atendimento">Atendimento</option>
+        </select>
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Procurar item" className={`${estiloEntrada} max-w-xs`} />
+      </div>
+      <p className="text-xs text-stone-500">Estoque ideal: quanto a loja precisa ter no começo de cada dia, na unidade em que conta. Em branco = sem sugestão. “Preparo” marca o que a Central prepara (entra na lista de preparo).</p>
+      {!itens ? <p className="text-stone-400">Carregando…</p> : (
+        <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-stone-200">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-xs text-stone-500">
+              <th className="px-3 py-2">Item</th><th className="px-1 py-2">Un.</th>
+              {DIAS_CURTOS.map((d) => <th key={d} className="px-1 py-2 text-center">{d}</th>)}
+              <th className="px-1 py-2 text-center">Preparo</th><th className="px-2 py-2 text-center">Ativo</th>
+            </tr></thead>
+            <tbody className="divide-y divide-stone-100">
+              {visiveis.map((i) => (
+                <tr key={i.id} className={i.ativo ? '' : 'opacity-50'}>
+                  <td className="min-w-48 px-3 py-1">{i.nome}</td>
+                  <td className="px-1 py-1"><input value={i.unidadeContagem} onChange={(e) => mudar(i.id, { unidadeContagem: e.target.value })} className={`${estiloEntrada} w-14! px-1! text-center`} aria-label={`Unidade de ${i.nome}`} /></td>
+                  {i.ideal.map((v, k) => (
+                    <td key={k} className="px-1 py-1">
+                      <input inputMode="decimal" defaultValue={v === null ? '' : String(v).replace('.', ',')} aria-label={`Ideal de ${i.nome} na ${DIAS_CURTOS[k]}`}
+                        onChange={(e) => mudar(i.id, { ideal: i.ideal.map((x, j) => (j === k ? lerValor(e.target.value) : x)) })}
+                        className={`${estiloEntrada} w-14! px-1! text-center`} />
+                    </td>
+                  ))}
+                  <td className="px-1 py-1 text-center"><input type="checkbox" checked={i.prePreparo} onChange={(e) => mudar(i.id, { prePreparo: e.target.checked })} aria-label={`${i.nome} é preparo da Central`} /></td>
+                  <td className="px-2 py-1 text-center"><input type="checkbox" checked={i.ativo} onChange={(e) => mudar(i.id, { ativo: e.target.checked })} aria-label={`${i.nome} está na lista`} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={novo} onChange={(e) => setNovo(e.target.value)} className={`${estiloEntrada} max-w-xs`}>
+          <option value="">Adicionar item do cadastro…</option>
+          {fora.map((i) => <option key={i.id} value={i.id}>{i.nome}</option>)}
+        </select>
+        <Botao variante="secundario" disabled={!novo} onClick={async () => {
+          const ins = insumos.find((x) => x.id === novo)!
+          try {
+            await store.salvarItemListaFechamento({
+              unidadeId: loja, setor, insumoId: ins.id, unidadeContagem: ins.unidade === 'kg' ? 'Kg' : ins.unidade === 'l' ? 'Lts' : 'Uni',
+              ordem: Math.max(0, ...(itens ?? []).map((x) => x.ordem)) + 1, ideal: Array(7).fill(null), prePreparo: false, ativo: true,
+            })
+            setNovo('')
+            avisar('Item adicionado')
+            await carregar()
+          } catch (e) { avisar((e as Error).message) }
+        }}>Adicionar</Botao>
+      </div>
+      {mudou.size > 0 && (
+        <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-3 shadow-lg ring-1 ring-stone-300">
+          <span className="text-sm text-stone-600">{mudou.size} {mudou.size === 1 ? 'item alterado' : 'itens alterados'}</span>
+          <div className="flex gap-2">
+            <Botao variante="fantasma" onClick={() => { setItens(null); carregar() }}>Descartar</Botao>
+            <Botao onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</Botao>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ——— Produzido: lançar a produção do dia ———
+
+function Produzido() {
   const { store, avisar, nomeDe } = useApp()
   const [d, setD] = useState<Dados | null>(null)
   const [erro, setErro] = useState('')
@@ -31,10 +336,7 @@ export default function Producao() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">Produção</h1>
-          <p className="text-sm text-stone-500">Lance o que foi produzido: entra o preparo e saem os ingredientes da ficha, no estoque da cozinha que produziu.</p>
-        </div>
+        <p className="text-sm text-stone-500">Lance o que foi produzido: entra o preparo e saem os ingredientes da ficha, no estoque da cozinha que produziu.</p>
         <Botao onClick={() => setLancando(true)}>+ Lançar produção</Botao>
       </div>
 

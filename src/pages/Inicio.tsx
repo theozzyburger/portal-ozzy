@@ -167,7 +167,7 @@ export default function Inicio() {
       <section>
         <Titulo>Áreas do portal</Titulo>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {modulosVisiveis(eu.nivel)
+          {modulosVisiveis(eu)
             .filter((m) => m.id !== 'inicio')
             .map((m) => (
               <button

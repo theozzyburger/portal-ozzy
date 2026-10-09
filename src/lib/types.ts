@@ -1370,3 +1370,66 @@ export interface PagamentoPessoa {
   conta: string | null
   conciliado: boolean
 }
+
+// Fechamento das lojas e pedido para a Central (09/10).
+export type SetorFechamento = 'cozinha' | 'atendimento'
+export const LOJAS_FECHAMENTO = ['burger-psd', 'burger-va'] as const
+// Item da lista de um dia: o ideal é o do dia seguinte (o do pedido).
+export interface ItemFechamento {
+  itemId: string
+  insumoId: string
+  nome: string
+  unidadeContagem: string
+  ordem: number
+  prePreparo: boolean
+  ideal: number | null
+  contagem: number | null
+  sugestao: number | null
+  pedido: number | null
+}
+export interface Fechamento {
+  id: string
+  unidadeId: string
+  setor: SetorFechamento
+  data: string
+  para: string
+  responsavel: string | null
+  observacao: string | null
+  fala: string | null
+  enviadoEm: string
+  enviadoPor: string | null
+}
+export interface EnvioFechamento {
+  unidadeId: string
+  setor: SetorFechamento
+  data: string
+  responsavel: string
+  observacao: string
+  fala: string
+  itens: { itemId: string; contagem: number | null; sugestao: number | null; pedido: number | null }[]
+}
+export interface PedidoProducao {
+  insumoId: string
+  nome: string
+  setor: SetorFechamento
+  unidadeContagem: string
+  unidade: UnidadeMedida
+  prePreparo: boolean
+  psd: number | null
+  va: number | null
+  total: number
+  central: number
+}
+// Cadastro da lista (gestão): ideal de segunda (0) a domingo (6).
+export interface ItemListaFechamento {
+  id: string
+  unidadeId: string
+  setor: SetorFechamento
+  insumoId: string
+  nome: string
+  unidadeContagem: string
+  ordem: number
+  ideal: (number | null)[]
+  prePreparo: boolean
+  ativo: boolean
+}
