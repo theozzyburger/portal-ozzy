@@ -1246,6 +1246,7 @@ export interface RegraExtrato {
   centroCustoId: string | null
   contaId: string | null
   favorecido: string | null
+  fornecedorId?: string | null
   ignorar: boolean
 }
 export interface SaldoExtrato {

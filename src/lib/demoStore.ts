@@ -2186,14 +2186,14 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (!r.centroCustoId) throw new Error('Escolha a loja.')
       const id = novoId('cp')
       contasPagarDemo.push(contaDemo(id, {
-        centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
+        centroCustoId: r.centroCustoId, contaId: r.contaId, fornecedorId: r.fornecedorId ?? null, favorecido: r.fornecedorId ? null : r.favorecido || null, descricao: r.descricao.trim() || m.descricao,
         competencia: m.data.slice(0, 8) + '01', vencimento: m.data, valor: -m.valor, forma: 'transferencia', pagoEm: m.data, valorPago: -m.valor, conciliado: true,
         observacao: 'Lançada pela conciliação bancária',
       }))
       Object.assign(m, { status: 'conciliado', contaPagarId: id })
       if (r.chave) {
         const i = regrasExtratoDemo.findIndex((x) => x.chave === r.chave)
-        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, ignorar: false }
+        const regra = { chave: r.chave, centroCustoId: r.centroCustoId, contaId: r.contaId, favorecido: r.favorecido, fornecedorId: r.fornecedorId ?? null, ignorar: false }
         if (i >= 0) regrasExtratoDemo[i] = regra
         else regrasExtratoDemo.push(regra)
       }

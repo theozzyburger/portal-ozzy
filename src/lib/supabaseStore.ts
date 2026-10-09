@@ -1235,7 +1235,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async regrasExtrato() {
       return (ok(await sb.from('extrato_regras').select('*')) ?? []).map((r: any) => ({
-        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, ignorar: r.ignorar,
+        chave: r.chave, centroCustoId: r.centro_custo_id, contaId: r.conta_id, favorecido: r.favorecido, fornecedorId: r.fornecedor_id ?? null, ignorar: r.ignorar,
       }))
     },
     async importarExtrato(e) {
@@ -1262,7 +1262,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async registrarMovimento(movimentoId, r) {
       ok(await sb.rpc('registrar_movimento', {
-        p_mov: movimentoId, p_centro: r.centroCustoId, p_conta: r.contaId, p_favorecido: r.favorecido ?? '', p_descricao: r.descricao, p_chave: r.chave,
+        p_mov: movimentoId, p_centro: r.centroCustoId, p_conta: r.contaId, p_favorecido: r.favorecido ?? '', p_descricao: r.descricao, p_chave: r.chave, p_fornecedor: r.fornecedorId ?? null,
       }))
     },
     async ignorarMovimento(movimentoId, motivo, chaveSempre) {

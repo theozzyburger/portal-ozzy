@@ -325,7 +325,7 @@ export interface Store {
   conciliarLote(movimentoId: string, contaIds: string[], contaDiferencaId: string | null): Promise<void>
   conciliarMovimento(movimentoId: string, contaPagarId: string): Promise<void>
   desconciliarMovimento(movimentoId: string): Promise<void>
-  registrarMovimento(movimentoId: string, r: { centroCustoId: string; contaId: string | null; favorecido: string | null; descricao: string; chave: string }): Promise<void>
+  registrarMovimento(movimentoId: string, r: { centroCustoId: string; contaId: string | null; favorecido: string | null; fornecedorId?: string | null; descricao: string; chave: string }): Promise<void>
   ignorarMovimento(movimentoId: string, motivo: string, chaveSempre: string | null): Promise<void>
   lancarMovimentoEstoque(m: Omit<MovimentoEstoque, 'id' | 'criadoEm' | 'notaItemId' | 'custoUnit'> & { custoUnit?: number | null }): Promise<void>
   salvarMembroEquipe(m: Omit<MembroEquipeEvento, 'id'> & { id?: string }): Promise<MembroEquipeEvento>

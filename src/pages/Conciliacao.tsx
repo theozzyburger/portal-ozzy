@@ -5,6 +5,7 @@ import { dataCurta, diaSemana } from '../lib/datas'
 import { type GrupoLote, candidatas, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { gruposDoPlano, nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx } from '../lib/ofx'
+import { garantirFornecedor } from './LancarContas'
 import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
 
 interface Dados {
@@ -248,7 +249,7 @@ export default function Conciliacao() {
                           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 p-2 text-sm">
                             <span>Da última vez: {nomeCentro(d.centros.find((x) => x.id === regra.centroCustoId))} · {nomeConta(d.plano, regra.contaId)}{regra.favorecido ? ` · ${regra.favorecido}` : ''}</span>
                             <Botao className="py-1.5!" onClick={() => acao(() => store.registrarMovimento(m.id, {
-                              centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, descricao: m.descricao, chave: chaveExtrato(m.descricao),
+                              centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, fornecedorId: regra.fornecedorId ?? null, descricao: m.descricao, chave: chaveExtrato(m.descricao),
                             }))}>Lançar assim</Botao>
                           </div>
                         ) : (
@@ -348,33 +349,48 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
 
 function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
-  const [v, setV] = useState({ centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: '', favorecido: '', descricao: m.descricao })
+  const [v, setV] = useState({ centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: '', fornecedor: '', descricao: m.descricao })
   const [erro, setErro] = useState('')
+  const [salvando, setSalvando] = useState(false)
   const grupos = gruposDoPlano(d.plano)
+  const ativos = d.fornecedores.filter((f) => f.ativo)
+  // Escolheu um fornecedor conhecido: já traz a conta de sempre dele.
+  function mudarFornecedor(texto: string) {
+    const f = ativos.find((x) => x.nome.toLowerCase() === texto.trim().toLowerCase())
+    setV({ ...v, fornecedor: texto, conta: v.conta || f?.contaPadraoId || '' })
+  }
   async function salvar() {
+    if (!v.fornecedor.trim()) return setErro('Escolha o fornecedor.')
     if (!v.centro) return setErro('Escolha a loja.')
     if (!v.conta) return setErro('Escolha a conta contábil.')
+    setSalvando(true)
     try {
-      await store.registrarMovimento(m.id, { centroCustoId: v.centro, contaId: v.conta || null, favorecido: v.favorecido || null, descricao: v.descricao, chave: chaveExtrato(m.descricao) })
+      const f = await garantirFornecedor(store, d.fornecedores, v.fornecedor)
+      await store.registrarMovimento(m.id, { centroCustoId: v.centro, contaId: v.conta || null, favorecido: f.nome, fornecedorId: f.id, descricao: v.descricao, chave: chaveExtrato(m.descricao) })
       aoSalvar()
     } catch (e) {
       setErro((e as Error).message)
+      setSalvando(false)
     }
   }
   return (
     <Modal titulo="Lançar como despesa" aberto aoFechar={aoFechar}>
       <div className="space-y-3">
         <p className="text-sm">{dataCurta(m.data)} · <b>{reais(m.valor)}</b>. Vira uma conta já paga e conciliada. Na próxima vez que esse texto aparecer no extrato, o portal sugere o mesmo.</p>
+        <Campo rotulo="Fornecedor">
+          <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
+          <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
+        </Campo>
+        {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
+          <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
+        )}
         <Campo rotulo="Descrição"><input className={estiloEntrada} value={v.descricao} onChange={(e) => setV({ ...v, descricao: e.target.value })} /></Campo>
-        <div className="grid grid-cols-2 gap-3">
-          <Campo rotulo="Loja">
-            <select className={estiloEntrada} value={v.centro} onChange={(e) => setV({ ...v, centro: e.target.value })}>
-              <option value="">Escolher</option>
-              {d.centros.map((x) => <option key={x.id} value={x.id}>{nomeCentro(x)}</option>)}
-            </select>
-          </Campo>
-          <Campo rotulo="Para quem foi"><input className={estiloEntrada} value={v.favorecido} onChange={(e) => setV({ ...v, favorecido: e.target.value })} /></Campo>
-        </div>
+        <Campo rotulo="Loja">
+          <select className={estiloEntrada} value={v.centro} onChange={(e) => setV({ ...v, centro: e.target.value })}>
+            <option value="">Escolher</option>
+            {d.centros.map((x) => <option key={x.id} value={x.id}>{nomeCentro(x)}</option>)}
+          </select>
+        </Campo>
         <Campo rotulo="Conta contábil">
           <select className={estiloEntrada} value={v.conta} onChange={(e) => setV({ ...v, conta: e.target.value })}>
             <option value="" disabled>Escolher</option>
@@ -388,7 +404,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
         {erro && <p className="text-sm text-red-700">{erro}</p>}
         <div className="flex justify-end gap-2">
           <Botao variante="secundario" onClick={aoFechar}>Cancelar</Botao>
-          <Botao onClick={salvar}>Lançar</Botao>
+          <Botao onClick={salvar} disabled={salvando}>{salvando ? 'Lançando…' : 'Lançar'}</Botao>
         </div>
       </div>
     </Modal>
