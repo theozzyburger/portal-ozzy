@@ -75,6 +75,7 @@ export default function Inicio() {
       <MeusAvisos docs={isentoDeRotinas(eu.nivel) ? null : meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento && !isentoDeRotinas(eu.nivel)} />
 
       <DependeDeMim />
+      {gestao && <ComprasAtrasadas />}
       {eu.nivel === 'manutencao' && <ResumoChamados />}
       {atendeChamados(eu.nivel) && <ResumoPreventiva />}
 
@@ -374,6 +375,42 @@ function DependeDeMim() {
       </ul>
       {modal}
     </div>
+  )
+}
+
+// Compra que passou do dia previsto sem chegar (Heitor, 09/10): a gerência e o administrativo precisam saber na hora.
+function ComprasAtrasadas() {
+  const { store } = useApp()
+  const [linhas, setLinhas] = useState<{ id: string; numero: number; fornecedor: string; itens: string; dias: number }[]>([])
+  useEffect(() => {
+    let vivo = true
+    store.pedidosCompra().then(async (ps) => {
+      const atrasadas = ps.filter((p) => p.status === 'pedido' && p.previsaoEntrega < hoje())
+      if (!atrasadas.length || !vivo) return setLinhas([])
+      const [fs, ins] = await Promise.all([store.fornecedores(), store.insumos()])
+      const nome = (id: string) => ins.find((i) => i.id === id)?.nome ?? 'item'
+      if (vivo) setLinhas(atrasadas.sort((a, b) => a.previsaoEntrega.localeCompare(b.previsaoEntrega)).map((p) => ({
+        id: p.id, numero: p.numero, fornecedor: fs.find((f) => f.id === p.fornecedorId)?.nome ?? 'Fornecedor',
+        itens: p.itens.slice(0, 3).map((i) => nome(i.insumoId)).join(', ') + (p.itens.length > 3 ? ` e mais ${p.itens.length - 3}` : ''),
+        dias: Math.round((Date.parse(hoje() + 'T12:00:00') - Date.parse(p.previsaoEntrega + 'T12:00:00')) / 86400000),
+      })))
+    }, () => undefined)
+    return () => { vivo = false }
+  }, [store])
+  if (!linhas.length) return null
+  return (
+    <button onClick={() => ir('compras')} className="block w-full space-y-1 rounded-2xl bg-red-50 p-4 text-left ring-1 ring-red-200 hover:ring-red-400">
+      <span className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-red-800">{linhas.length === 1 ? '1 compra atrasada' : `${linhas.length} compras atrasadas`}</span>
+        <span className="text-sm font-semibold">Ver ›</span>
+      </span>
+      {linhas.slice(0, 5).map((l) => (
+        <span key={l.id} className="block text-sm text-stone-700">
+          <b>{l.fornecedor}</b> #{l.numero} · {l.dias === 1 ? 'há 1 dia' : `há ${l.dias} dias`} · <span className="text-stone-500">{l.itens}</span>
+        </span>
+      ))}
+      {linhas.length > 5 && <span className="block text-xs text-stone-500">e mais {linhas.length - 5}</span>}
+    </button>
   )
 }
 
