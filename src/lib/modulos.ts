@@ -18,7 +18,7 @@ export interface Modulo {
   ve?: (eu: Funcionario) => boolean
 }
 
-// Ordem do menu lateral. Funcionário, Supervisor e Manutenção não veem Fichas, Administrativo,
+// Ordem do menu lateral. Funcionário, Supervisor e Manutenção não veem Fichas,
 // Compras, Estoque e Eventos (pedido de 07/10). Os "em breve" seguem o plano e o roteiro da reunião de regras.
 export const MODULOS: Modulo[] = [
   { id: 'inicio', nome: 'Início', pronto: true },
@@ -36,12 +36,6 @@ export const MODULOS: Modulo[] = [
   {
     id: 'financeiro', nome: 'Financeiro', pronto: true, ve: (eu) => vejoResultado(eu.nivel),
     resumo: 'Contas a pagar, despesas por conta contábil e loja, e o resultado do Lucro Fácil.',
-  },
-  {
-    id: 'administrativo', soGestao: true, nome: 'Administrativo', pronto: false,
-    resumo: 'Rotina do escritório e quem pode decidir o quê.',
-    itens: ['Contas a pagar e aprovações', 'Pedidos de reembolso com comprovante', 'Matriz de autoridade com limites de valor'],
-    origem: 'Regras definidas na reunião de estrutura e processos.',
   },
   {
     id: 'compras', soGestao: true, nome: 'Compras', pronto: true,
