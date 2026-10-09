@@ -1,4 +1,4 @@
-import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, Funcionario, MovimentoExtrato } from './types'
+import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, Funcionario, MovimentoExtrato, PedidoCompra } from './types'
 import { chaveExtrato, partesExtrato } from './ofx'
 
 const dias = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86_400_000)
@@ -204,4 +204,30 @@ export function sugestaoPessoal(
   const conta = plano.find((x) => x.codigo === (freela ? c.freela : c.salario))?.id ?? ''
   const centro = p.setor === 'producao' && centros.some((x) => x.id === 'central') ? 'central' : centros.some((x) => x.id === p.unidadeId) ? p.unidadeId : ''
   return { conta, centro, tipo: freela ? ('Diária' as const) : ('Salário' as const) }
+}
+
+// Pedido de compra parecido com uma saída do banco (Heitor, 09/10: só sugestão). Vale o pedido feito antes do débito,
+// até 60 dias depois da entrega, com valor igual (até 2% ou R$ 0,50 de diferença) e do fornecedor que o extrato parece,
+// ou com valor exato quando não deu para saber o fornecedor. Pedido já lançado ("Pedido de compra #N" numa conta) sai.
+export function pedidoParecido(
+  m: { data: string; valor: number },
+  pedidos: PedidoCompra[],
+  contas: { descricao: string }[],
+  fornecedorId: string | null,
+): PedidoCompra | null {
+  const valor = Math.abs(m.valor)
+  const usados = new Set(contas.map((c) => /Pedido de compra #(\d+)/.exec(c.descricao)?.[1]).filter(Boolean))
+  const limite = (p: PedidoCompra) => {
+    const d = new Date(p.previsaoEntrega + 'T12:00:00')
+    d.setDate(d.getDate() + 60)
+    return d.toISOString().slice(0, 10)
+  }
+  const candidatos = pedidos.filter((p) =>
+    (p.status === 'pedido' || p.status === 'recebido') && p.total > 0 && !usados.has(String(p.numero)) &&
+    p.dataPedido <= m.data && m.data <= limite(p))
+  const diferenca = (p: PedidoCompra) => Math.abs(p.total - valor)
+  const doFornecedor = fornecedorId ? candidatos.filter((p) => p.fornecedorId === fornecedorId && diferenca(p) <= Math.max(0.5, p.total * 0.02)) : []
+  const exatos = candidatos.filter((p) => diferenca(p) < 0.01)
+  const lista = doFornecedor.length ? doFornecedor : exatos.length === 1 ? exatos : []
+  return lista.sort((a, b) => diferenca(a) - diferenca(b))[0] ?? null
 }

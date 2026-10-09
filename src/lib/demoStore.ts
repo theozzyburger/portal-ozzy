@@ -922,6 +922,7 @@ const extratoDemo: MovimentoExtrato[] = [
   movExtrato('ex9', 1, -1550, 'SISPAG PIX LOTE 000123'),
   movExtrato('ex10', 1, -415, 'PIX ENVIADO RENAN EXEMPLO DIAS'),
   movExtrato('ex11', 2, -180, 'PIX ENVIADO CIBELI ALVES'),
+  movExtrato('ex12', 0, -234, 'PIX ENVIADO HORTIFRUTI EXEMPLO LTDA'),
 ]
 const regrasExtratoDemo: RegraExtrato[] = [{ chave: 'tar pacote servicos', centroCustoId: 'burger-psd', contaId: 'pc5.22', favorecido: 'Itaú', ignorar: false }]
 const saldosExtratoDemo: SaldoExtrato[] = [{ banco: '341', agencia: '0000', conta: '00000-0', data: addDias(hoje(), -1), saldo: 18432.1 }]

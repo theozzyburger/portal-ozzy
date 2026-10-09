@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
-import { type GrupoLote, type TipoQuem, LIMITE_DIARIA, aprendidosDe, candidatas, quemParece, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
+import { type GrupoLote, type TipoQuem, LIMITE_DIARIA, aprendidosDe, candidatas, pedidoParecido, quemParece, sugestaoPessoal, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
 import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx, partesExtrato } from '../lib/ofx'
 
@@ -14,11 +14,11 @@ import type { NotaFiscal, FormaPagamento } from '../lib/types'
 import { FORMAS_PAGAMENTO } from '../lib/types'
 import { addMeses, mesDe } from '../lib/datas'
 import { ir } from '../lib/rota'
-import type { Funcionario, Motoboy, CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
+import type { PedidoCompra, Funcionario, Motoboy, CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
 
 interface Dados {
   movs: MovimentoExtrato[]; contas: ContaPagar[]; centros: CentroCusto[]; plano: ContaContabil[]; fornecedores: Fornecedor[]
-  regras: RegraExtrato[]; saldos: SaldoExtrato[]; notas: NotaFiscal[]; motoboys: Motoboy[]
+  regras: RegraExtrato[]; saldos: SaldoExtrato[]; notas: NotaFiscal[]; motoboys: Motoboy[]; pedidos: PedidoCompra[]
 }
 
 const FILTROS = [
@@ -43,13 +43,14 @@ export default function Conciliacao() {
   const [lendo, setLendo] = useState(false)
   const [achar, setAchar] = useState<MovimentoExtrato | null>(null)
   const [lancar, setLancar] = useState<MovimentoExtrato | null>(null)
+  const [lancarPedido, setLancarPedido] = useState<PedidoCompra | null>(null)
   const [ignorar, setIgnorar] = useState<MovimentoExtrato | null>(null)
   const [recorrenteDe, setRecorrenteDe] = useState<ContaPagar | null>(null)
   const arquivo = useRef<HTMLInputElement>(null)
 
   const carregar = useCallback(
-    () => Promise.all([store.extrato(), store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores(), store.regrasExtrato(), store.saldosExtrato(), store.notasFiscais(), store.motoboys()])
-      .then(([movs, contas, centros, plano, fornecedores, regras, saldos, notas, motoboys]) => setD({ movs, contas, centros, plano, fornecedores, regras, saldos, notas, motoboys }), (e) => setErro(e.message)),
+    () => Promise.all([store.extrato(), store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores(), store.regrasExtrato(), store.saldosExtrato(), store.notasFiscais(), store.motoboys(), store.pedidosCompra().catch(() => [])])
+      .then(([movs, contas, centros, plano, fornecedores, regras, saldos, notas, motoboys, pedidos]) => setD({ movs, contas, centros, plano, fornecedores, regras, saldos, notas, motoboys, pedidos }), (e) => setErro(e.message)),
     [store],
   )
   useEffect(() => {
@@ -101,6 +102,17 @@ export default function Conciliacao() {
   const pendentes = movs.filter((m) => m.status === 'pendente' && m.valor < 0)
   const comSugestao = pendentes.filter((m) => sug.has(m.id) || sugLote.has(m.id))
   const regraDe = (m: MovimentoExtrato) => d.regras.find((r) => r.chave === chaveExtrato(m.descricao))
+  // Pedido de compra que parece ser este débito (fornecedor do extrato e valor do pedido).
+  const aprendidosTodos = d.pedidos.length ? aprendidosDe(d.movs, d.contas) : null
+  const pedidoCache = new Map<string, PedidoCompra | null>()
+  const pedidoDe = (m: MovimentoExtrato) => {
+    if (!aprendidosTodos) return null
+    if (!pedidoCache.has(m.id)) {
+      const q = quemParece(m.descricao, { fornecedores: d.fornecedores, pessoas: [], motoboys: [] }, aprendidosTodos)
+      pedidoCache.set(m.id, pedidoParecido(m, d.pedidos, d.contas, q?.tipo === 'fornecedor' ? q.id : null))
+    }
+    return pedidoCache.get(m.id)!
+  }
   const favorecido = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
   // Busca (Heitor, 09/10): pelo texto do extrato, valor ("312,45"), data ("09/10") ou a conta ligada.
   const termos = simplesBusca(busca).split(/\s+/).filter(Boolean)
@@ -295,7 +307,15 @@ export default function Conciliacao() {
                               centroCustoId: regra.centroCustoId!, contaId: regra.contaId, favorecido: regra.favorecido, fornecedorId: regra.fornecedorId ?? null, funcionarioId: regra.funcionarioId ?? null, motoboyId: regra.motoboyId ?? null, descricao: m.descricao, chave: chaveExtrato(m.descricao),
                             }))}>Lançar assim</Botao>
                           </div>
-                        ) : (
+                        ) : pedidoDe(m) ? (() => {
+                          const pc = pedidoDe(m)!
+                          return (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50 px-2 py-1 text-xs">
+                              <span>Parece o <b>pedido de compra #{pc.numero}</b> · {d.fornecedores.find((f) => f.id === pc.fornecedorId)?.nome ?? ''} · {reais(pc.total)} · {pc.status === 'recebido' ? 'chegou' : 'entrega'} {dataCurta(pc.recebidoEm ?? pc.previsaoEntrega)}</span>
+                              <Botao className="px-2.5! py-1! text-xs!" onClick={() => { setLancarPedido(pc); setLancar(m) }}>Lançar com este pedido</Botao>
+                            </div>
+                          )
+                        })() : (
                           <p className="text-xs font-semibold text-amber-700">Não identificado: nenhuma conta a pagar com este valor.</p>
                         )}
                         <div className="flex flex-wrap gap-3 text-xs">
@@ -318,7 +338,7 @@ export default function Conciliacao() {
 
       {achar && <AcharConta d={d} m={achar} aoFechar={() => setAchar(null)} aoEscolher={(c) => { setAchar(null); acao(() => store.conciliarMovimento(achar.id, c.id)) }}
         aoEscolherLote={(ids, dif) => { setAchar(null); acao(() => store.conciliarLote(achar.id, ids, dif)) }} />}
-      {lancar && <LancarDespesa d={d} m={lancar} aoFechar={() => setLancar(null)} aoSalvar={() => { setLancar(null); carregar() }} />}
+      {lancar && <LancarDespesa d={d} m={lancar} pedido={lancarPedido} aoFechar={() => { setLancar(null); setLancarPedido(null) }} aoSalvar={() => { setLancar(null); setLancarPedido(null); carregar() }} />}
       {recorrenteDe && (
         <EditarRecorrente
           d={d} r={null}
@@ -420,7 +440,7 @@ type Comprovante = 'nao' | 'nota' | 'recibo'
 
 // Lançar uma saída do extrato (09/10): só a despesa, ou ligada a uma nota/recibo (entra no estoque e atualiza o preço do insumo).
 // Se repete todo mês, já cadastra o recorrente.
-function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoSalvar: () => void }) {
+function LancarDespesa({ d, m, pedido, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; pedido?: PedidoCompra | null; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
   const valor = Math.abs(m.valor)
   // Já começa com quem parece ser o do extrato, procurando em fornecedores, equipe e motoboys juntos.
@@ -428,10 +448,12 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
   const { equipe } = useApp()
   const pessoas = useMemo(() => [...equipe].sort((a, b) => Number(b.status === 'ativo') - Number(a.status === 'ativo') || a.nome.localeCompare(b.nome)), [equipe])
   const sugerido = useMemo(() => quemParece(m.descricao, listasQuem(d, equipe), aprendidos), [m.descricao, d, equipe, aprendidos])
-  const parecido = sugerido?.tipo === 'fornecedor' ? d.fornecedores.find((f) => f.id === sugerido.id) ?? null : null
+  // Veio de um pedido de compra: o fornecedor e a loja são os do pedido.
+  const doPedido = pedido ? d.fornecedores.find((f) => f.id === pedido.fornecedorId) ?? null : null
+  const parecido = doPedido ?? (sugerido?.tipo === 'fornecedor' ? d.fornecedores.find((f) => f.id === sugerido.id) ?? null : null)
   const pessoaParecida = sugerido?.tipo === 'funcionario' ? sugerido : null
   const motoParecido = sugerido?.tipo === 'motoboy' ? d.motoboys.find((x) => x.id === sugerido.id) ?? null : null
-  const [quem, setQuem] = useState<TipoQuem>(sugerido?.tipo ?? 'fornecedor')
+  const [quem, setQuem] = useState<TipoQuem>(pedido ? 'fornecedor' : sugerido?.tipo ?? 'fornecedor')
   const [funcionario, setFuncionario] = useState(pessoaParecida?.id ?? '')
   const [motoboy, setMotoboy] = useState(motoParecido?.id ?? '')
   const motoboysLista = useMemo(() => [...d.motoboys].sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome)), [d.motoboys])
@@ -451,8 +473,9 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
     return u && d.centros.some((x) => x.id === u) ? u : ''
   }
   const [v, setV] = useState({
-    centro: inicialPessoa?.centro || (motoParecido ? centroMoto(motoParecido.id) : '') || (d.centros.some((x) => x.id === 'central') ? 'central' : ''),
-    conta: inicialPessoa?.conta || (motoParecido ? contaMotoboys : '') || (parecido?.contaPadraoId ?? ''), fornecedor: parecido?.nome ?? '', descricao: m.descricao,
+    centro: pedido?.centroCustoId || inicialPessoa?.centro || (motoParecido ? centroMoto(motoParecido.id) : '') || (d.centros.some((x) => x.id === 'central') ? 'central' : ''),
+    conta: (pedido ? '' : inicialPessoa?.conta || (motoParecido ? contaMotoboys : '')) || (parecido?.contaPadraoId ?? ''), fornecedor: parecido?.nome ?? '',
+    descricao: pedido ? `Pedido de compra #${pedido.numero} · ${parecido?.nome ?? ''}` : m.descricao,
   })
   function escolherFuncionario(id: string) {
     setFuncionario(id)
