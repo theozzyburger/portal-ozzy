@@ -1143,7 +1143,11 @@ export interface NotaFiscal {
   lancadaEm: string | null
   criadoEm: string
   itens?: ItemNota[]
+  // Débito do extrato que pagou esta nota (veio da conciliação): ao lançar, já fica paga e conciliada.
+  extratoMovimentoId?: string | null
 }
+// Item digitado num recibo ou nota sem XML.
+export interface ItemRecibo { descricao: string; unidade: string | null; quantidade: number; valorTotal: number; insumoId: string | null }
 // O que sai do XML da NF-e (lido no navegador) para importar.
 export interface NotaImportada {
   chave: string

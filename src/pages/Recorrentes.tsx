@@ -120,21 +120,25 @@ export default function Recorrentes() {
   )
 }
 
-function EditarRecorrente({ d, r, aoFechar, aoSalvar }: { d: D; r: ContaRecorrente | null; aoFechar: () => void; aoSalvar: () => void }) {
+// modelo: valores iniciais de um recorrente novo (ex.: vindo de uma conta da conciliação).
+export function EditarRecorrente({ d, r, modelo, aoFechar, aoSalvar }: {
+  d: Dados; r: ContaRecorrente | null; modelo?: Omit<ContaRecorrente, 'id'>; aoFechar: () => void; aoSalvar: () => void
+}) {
   const { store } = useApp()
+  const base = r ?? modelo
   const [v, setV] = useState(() => ({
-    descricao: r?.descricao ?? '',
-    fornecedor: r?.fornecedorNome ?? d.fornecedores.find((f) => f.id === r?.fornecedorId)?.nome ?? '',
-    centroCustoId: r?.centroCustoId ?? lojaPadrao(d.centros),
-    contaId: r?.contaId ?? '',
-    valor: r ? mostrarValor(r.valor) : '',
-    variavel: r?.variavel ?? false,
-    dia: String(r?.dia ?? 10),
-    forma: r?.forma ?? ('boleto' as FormaPagamento),
-    inicio: r?.inicio ?? proximoMes(10),
-    fim: r?.fim ?? '',
-    situacao: r?.situacao === 'a_confirmar' ? 'ativa' : (r?.situacao ?? 'ativa') as SituacaoRecorrente,
-    observacao: r?.observacao ?? '',
+    descricao: base?.descricao ?? '',
+    fornecedor: base?.fornecedorNome ?? d.fornecedores.find((f) => f.id === base?.fornecedorId)?.nome ?? '',
+    centroCustoId: base?.centroCustoId ?? lojaPadrao(d.centros),
+    contaId: base?.contaId ?? '',
+    valor: base ? mostrarValor(base.valor) : '',
+    variavel: base?.variavel ?? false,
+    dia: String(base?.dia ?? 10),
+    forma: base?.forma ?? ('boleto' as FormaPagamento),
+    inicio: base?.inicio ?? proximoMes(10),
+    fim: base?.fim ?? '',
+    situacao: base?.situacao === 'a_confirmar' ? 'ativa' : (base?.situacao ?? 'ativa') as SituacaoRecorrente,
+    observacao: base?.observacao ?? '',
   }))
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)

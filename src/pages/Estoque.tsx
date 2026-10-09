@@ -201,7 +201,7 @@ function NotaManual({ aberto, aoFechar, c, aoCriar }: {
   return (
     <Modal titulo="Nota sem XML" aberto={aberto} aoFechar={aoFechar}>
       <div className="space-y-3">
-        <p className="text-sm text-stone-500">Para nota de papel, recibo ou serviço. Anexe a foto ou o PDF. Sem os itens, ela não dá entrada no estoque: só vira conta a pagar.</p>
+        <p className="text-sm text-stone-500">Para nota de papel, recibo ou serviço. Anexe a foto ou o PDF. Na próxima tela você coloca os itens: os insumos entram no estoque e o preço é atualizado.</p>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo="Número"><input className={estiloEntrada} value={v.numero} onChange={(e) => setV({ ...v, numero: e.target.value })} /></Campo>
           <Campo rotulo="Emissão"><input type="date" className={estiloEntrada} value={v.emissao} onChange={(e) => setV({ ...v, emissao: e.target.value })} /></Campo>
@@ -241,7 +241,11 @@ function NotaManual({ aberto, aoFechar, c, aoCriar }: {
 interface ItemEdit { id: string; insumoId: string; fator: string; foraEstoque: boolean }
 interface ParcelaEdit { vencimento: string; valor: string; forma: FormaPagamento; documento: string }
 
+interface ReciboEdit { insumoId: string; descricao: string; quantidade: string; valor: string }
+
 function parcelasIniciais(n: NotaFiscal): ParcelaEdit[] {
+  // Veio da conciliação: o débito do extrato já pagou, à vista.
+  if (n.extratoMovimentoId) return [{ vencimento: n.emissao, valor: mostrarValor(n.valorTotal), forma: 'cartao_debito', documento: '' }]
   const forma = formaDoTPag(n.pagamentoXml.find((p) => p.tPag !== '90')?.tPag)
   if (n.duplicatas.length) {
     return n.duplicatas.map((d) => ({ vencimento: d.vencimento, valor: mostrarValor(d.valor), forma: forma === 'dinheiro' ? 'boleto' : forma, documento: d.numero ?? '' }))
@@ -259,6 +263,7 @@ function DetalheNota({ id }: { id: string }) {
   const [centro, setCentro] = useState('')
   const [conta, setConta] = useState('')
   const [itens, setItens] = useState<ItemEdit[]>([])
+  const [recibo, setRecibo] = useState<ReciboEdit[]>([])
   const [parcelas, setParcelas] = useState<ParcelaEdit[]>([])
   const [atualizarPreco, setAtualizarPreco] = useState(true)
   const [salvando, setSalvando] = useState(false)
@@ -273,6 +278,11 @@ function DetalheNota({ id }: { id: string }) {
       setCentro(nota.centroCustoId ?? '')
       setItens((nota.itens ?? []).map((i) => ({ id: i.id, insumoId: i.insumoId ?? '', fator: i.fator ? String(i.fator).replace('.', ',') : '', foraEstoque: i.foraEstoque })))
       setParcelas(parcelasIniciais(nota))
+      if (!nota.chave) {
+        setRecibo((nota.itens ?? []).map((i) => ({
+          insumoId: i.insumoId ?? '', descricao: i.insumoId ? '' : i.descricao, quantidade: String(i.quantidade).replace('.', ','), valor: mostrarValor(i.valorTotal),
+        })))
+      }
       if (financeiro) setContas((await store.contasPagar()).filter((x) => x.notaId === id))
       if (nota.arquivo) setLink(await store.linkArquivoNota(nota.arquivo))
     } catch (e) {
@@ -294,7 +304,7 @@ function DetalheNota({ id }: { id: string }) {
   const aberta = n.status === 'conferir'
   const somaParcelas = r2(parcelas.reduce((s, p) => s + (lerValor(p.valor) ?? 0), 0))
   const diferenca = r2(n.valorTotal - somaParcelas)
-  const pendentes = itens.filter((i) => !i.insumoId && !i.foraEstoque).length
+  const pendentes = n.chave ? itens.filter((i) => !i.insumoId && !i.foraEstoque).length : 0
   const mudarItem = (k: number, m: Partial<ItemEdit>) => setItens(itens.map((x, i) => (i === k ? { ...x, ...m } : x)))
   const mudarParcela = (k: number, m: Partial<ParcelaEdit>) => setParcelas(parcelas.map((x, i) => (i === k ? { ...x, ...m } : x)))
 
@@ -307,14 +317,26 @@ function DetalheNota({ id }: { id: string }) {
     setAviso('')
     if (!centro) return setAviso('Escolha a loja que recebeu a nota.')
     if (!conta) return setAviso('Escolha a conta contábil.')
+    const reciboValido = recibo.filter((x) => x.insumoId || x.descricao.trim() || x.valor.trim())
+    for (const x of reciboValido) {
+      if (!x.insumoId && !x.descricao.trim()) return setAviso('Escolha o insumo de cada item do recibo (ou escreva o que é).')
+      if (!(lerValor(x.quantidade)! > 0) || !(lerValor(x.valor)! > 0)) return setAviso('Coloque a quantidade e o valor de cada item do recibo.')
+    }
     if (pendentes) return setAviso(`${pendentes} ${pendentes === 1 ? 'item está' : 'itens estão'} sem insumo. Escolha o insumo ou marque "não controla".`)
     for (const p of parcelas) if (!p.vencimento || !(lerValor(p.valor)! > 0)) return setAviso('Confira o vencimento e o valor de cada pagamento.')
     if (Math.abs(diferenca) > 0.05) return setAviso(`Os pagamentos somam ${reais(somaParcelas)} e a nota é de ${reais(n!.valorTotal)}.`)
     setSalvando(true)
     try {
+      // Recibo: salva os itens digitados (quantidade já na unidade do insumo) e lança com eles.
+      const doRecibo = !n!.chave
+        ? (await store.salvarItensNota(n!.id, reciboValido.map((x) => {
+            const ins = x.insumoId ? insumoPorId.get(x.insumoId) : undefined
+            return { descricao: ins?.nome ?? x.descricao, unidade: ins?.unidade ?? null, quantidade: lerValor(x.quantidade)!, valorTotal: lerValor(x.valor)!, insumoId: x.insumoId || null }
+          }))).map((i) => ({ id: i.id, insumoId: i.insumoId, fator: 1, foraEstoque: !i.insumoId }))
+        : null
       await store.lancarNota(n!.id, {
         centroCustoId: centro, contaId: conta, competencia: null, atualizarPreco,
-        itens: itens.map((i) => ({ id: i.id, insumoId: i.foraEstoque ? null : i.insumoId || null, fator: lerValor(i.fator), foraEstoque: i.foraEstoque })),
+        itens: doRecibo ?? itens.map((i) => ({ id: i.id, insumoId: i.foraEstoque ? null : i.insumoId || null, fator: lerValor(i.fator), foraEstoque: i.foraEstoque })),
         parcelas: parcelas.map((p) => ({ vencimento: p.vencimento, valor: lerValor(p.valor)!, forma: p.forma, documento: p.documento || null })),
       })
       await carregar()
@@ -386,7 +408,72 @@ function DetalheNota({ id }: { id: string }) {
         </div>
       </Cartao>
 
-      {(n.itens?.length ?? 0) > 0 && (
+      {n.extratoMovimentoId && (
+        <Cartao className="space-y-1 bg-blue-50!">
+          <p className="text-sm">
+            {aberta
+              ? 'Esta nota veio da conciliação: o débito do extrato já pagou. Ao lançar, a conta já entra paga e o débito fica conciliado.'
+              : 'Paga pelo débito do extrato (conciliada).'}
+          </p>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <button className="font-semibold underline" onClick={() => ir('financeiro/conciliacao')}>Voltar para a conciliação</button>
+            {aberta && (
+              <button className="font-semibold underline" onClick={async () => { await store.ligarNotaExtrato(n.id, null); await carregar() }}>Desligar do extrato</button>
+            )}
+          </div>
+        </Cartao>
+      )}
+
+      {!n.chave && (aberta || recibo.length > 0) && (
+        <Cartao className="space-y-3">
+          <h2 className="font-semibold">Itens do recibo</h2>
+          <p className="text-sm text-stone-500">
+            Diga o que foi comprado: os insumos entram no estoque da loja e o preço deles é atualizado. A quantidade é na unidade do insumo (kg, un…). Serviço ou algo que não se controla: deixe sem insumo e escreva o que é.
+          </p>
+          <div className="space-y-2">
+            {recibo.map((x, k) => {
+              const ins = x.insumoId ? insumoPorId.get(x.insumoId) : undefined
+              const q = lerValor(x.quantidade) ?? 0
+              const v = lerValor(x.valor) ?? 0
+              const mudar = (m: Partial<ReciboEdit>) => setRecibo(recibo.map((y, i) => (i === k ? { ...y, ...m } : y)))
+              return (
+                <div key={k} className="grid grid-cols-2 gap-2 border-b border-stone-100 pb-2 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-center">
+                  <div className="col-span-2 space-y-1 sm:col-span-1">
+                    <select aria-label="Insumo" className={`${estiloEntrada} py-1.5!`} value={x.insumoId} disabled={!aberta} onChange={(e) => mudar({ insumoId: e.target.value })}>
+                      <option value="">Sem insumo (não controla)</option>
+                      {insumosAtivos.map((i) => <option key={i.id} value={i.id}>{i.nome} ({i.unidade})</option>)}
+                    </select>
+                    {!x.insumoId && <input aria-label="O que é" placeholder="O que é (ex.: conserto, gelo)" className={`${estiloEntrada} py-1.5!`} value={x.descricao} disabled={!aberta} onChange={(e) => mudar({ descricao: e.target.value })} />}
+                  </div>
+                  <label className="flex items-center gap-1 text-sm text-stone-600">
+                    <input aria-label="Quantidade" inputMode="decimal" placeholder="Qtd" className={`${estiloEntrada} py-1.5!`} value={x.quantidade} disabled={!aberta} onChange={(e) => mudar({ quantidade: e.target.value })} />
+                    {ins?.unidade}
+                  </label>
+                  <input aria-label="Valor do item" inputMode="decimal" placeholder="Valor R$" className={`${estiloEntrada} py-1.5!`} value={x.valor} disabled={!aberta} onChange={(e) => mudar({ valor: e.target.value })} />
+                  {aberta ? <button className="text-sm text-red-700 hover:underline" onClick={() => setRecibo(recibo.filter((_, i) => i !== k))}>Tirar</button> : <span />}
+                  {ins && q > 0 && v > 0 && (
+                    <p className="col-span-2 text-xs text-stone-500 sm:col-span-4">
+                      {reais(v / q)}/{ins.unidade}{ins.preco ? ` (cadastro: ${reais(ins.preco)})` : ''}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {aberta && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <button className="font-semibold underline" onClick={() => setRecibo([...recibo, { insumoId: '', descricao: '', quantidade: '', valor: '' }])}>+ Item</button>
+              {recibo.length > 0 && (
+                <span className="text-stone-500">
+                  Itens {reais(recibo.reduce((t, x) => t + (lerValor(x.valor) ?? 0), 0))} de {reais(n.valorTotal)}
+                </span>
+              )}
+            </div>
+          )}
+        </Cartao>
+      )}
+
+      {n.chave && (n.itens?.length ?? 0) > 0 && (
         <Cartao className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Itens da nota ({n.itens!.length})</h2>
@@ -498,7 +585,7 @@ function DetalheNota({ id }: { id: string }) {
               Soma {reais(somaParcelas)}{Math.abs(diferenca) > 0.05 ? ` · falta ${reais(diferenca)}` : ' · confere com a nota'}
             </span>
           </div>
-          {(n.itens?.length ?? 0) > 0 && (
+          {((n.chave && (n.itens?.length ?? 0) > 0) || recibo.some((x) => x.insumoId)) && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={atualizarPreco} onChange={(e) => setAtualizarPreco(e.target.checked)} />
               Atualizar o preço dos insumos com o desta nota (o custo das fichas acompanha)

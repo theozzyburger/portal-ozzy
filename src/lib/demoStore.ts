@@ -1975,8 +1975,26 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         emitenteNome: x.emitenteNome?.trim() || f?.nome || null, destinatarioCnpj: null, centroCustoId: x.centroCustoId, valorProdutos: null, frete: null,
         desconto: null, valorTotal: x.valorTotal, pagamentoXml: [], duplicatas: [], arquivo: x.arquivo ? URL.createObjectURL(x.arquivo) : null,
         observacao: x.observacao?.trim() || null, status: 'conferir', lancadaEm: null, criadoEm: agora(), itens: [],
+        extratoMovimentoId: x.extratoMovimentoId ?? null,
       })
       return espera(id)
+    },
+    async salvarItensNota(notaId, itens) {
+      exigeGestao()
+      const n = notasDemo.find((x) => x.id === notaId)
+      if (!n || n.status !== 'conferir') throw new Error('Esta nota já foi lançada.')
+      n.itens = itens.map((i, k) => ({
+        id: novoId('ni'), ordem: k + 1, codigo: null, ean: null, descricao: i.descricao.trim(), ncm: null, cfop: null, unidade: i.unidade,
+        quantidade: i.quantidade, valorUnit: i.quantidade > 0 ? i.valorTotal / i.quantidade : null, valorTotal: i.valorTotal, insumoId: i.insumoId, fator: null, foraEstoque: false,
+      }))
+      return espera(n.itens.map((i) => ({ ...i })))
+    },
+    async ligarNotaExtrato(notaId, movimentoId) {
+      exigeGestao()
+      if (movimentoId && notasDemo.some((x) => x.extratoMovimentoId === movimentoId && x.id !== notaId)) throw new Error('Este débito já está ligado a outra nota.')
+      const n = notasDemo.find((x) => x.id === notaId)
+      if (n && n.status === 'conferir') n.extratoMovimentoId = movimentoId
+      return espera(undefined)
     },
     async linkArquivoNota(caminho) {
       return espera(caminho)
@@ -1993,6 +2011,8 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         const br = (v: number) => v.toFixed(2).replace('.', ',')
         throw new Error(`Os pagamentos somam ${br(soma)} e a nota é de ${br(n.valorTotal)}. Confira as parcelas.`)
       }
+      const mov = n.extratoMovimentoId ? extratoDemo.find((x) => x.id === n.extratoMovimentoId) : undefined
+      if (mov && mov.status !== 'pendente') throw new Error('O débito do extrato ligado a esta nota já foi conciliado.')
       n.centroCustoId = l.centroCustoId
       for (const it of l.itens) {
         const x = n.itens?.find((y) => y.id === it.id)
@@ -2010,14 +2030,18 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         }
       }
       const forn = fornecedoresDemo.find((f) => f.id === n.fornecedorId)
+      let ultima = ''
       l.parcelas.forEach((p, k) => {
-        contasPagarDemo.push(contaDemo(novoId('cp'), {
+        ultima = novoId('cp')
+        contasPagarDemo.push(contaDemo(ultima, {
           centroCustoId: l.centroCustoId, contaId: l.contaId, fornecedorId: n.fornecedorId, favorecido: n.fornecedorId ? null : n.emitenteNome,
           descricao: `NF ${n.numero ?? 's/n'} · ${forn?.nome ?? n.emitenteNome ?? 'fornecedor'}`, competencia: (l.competencia ?? n.emissao).slice(0, 8) + '01',
           vencimento: p.vencimento, valor: p.valor, forma: p.forma, parcela: l.parcelas.length > 1 ? k + 1 : null, parcelas: l.parcelas.length > 1 ? l.parcelas.length : null,
           documento: p.documento ?? null, notaId: n.id,
+          ...(mov ? { pagoEm: mov.data, valorPago: p.valor, conciliado: true, extratoMovimentoId: l.parcelas.length > 1 ? mov.id : null } : {}),
         }))
       })
+      if (mov) Object.assign(mov, { status: 'conciliado', contaPagarId: l.parcelas.length === 1 ? ultima : null })
       if (forn && l.contaId) forn.contaPadraoId = l.contaId
       Object.assign(n, { status: 'lancada', lancadaEm: agora() })
       return espera(undefined)

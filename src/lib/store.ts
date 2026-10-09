@@ -1,3 +1,4 @@
+import type { ItemNota, ItemRecibo } from './types'
 import type { CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
@@ -299,7 +300,11 @@ export interface Store {
   notasFiscais(): Promise<NotaFiscal[]>
   notaFiscal(id: string): Promise<NotaFiscal>
   importarNota(n: NotaImportada): Promise<string>
-  criarNotaManual(n: { numero: string | null; emissao: string; fornecedorId: string | null; emitenteNome: string | null; centroCustoId: string | null; valorTotal: number; observacao: string | null; arquivo?: File | null }): Promise<string>
+  criarNotaManual(n: { numero: string | null; emissao: string; fornecedorId: string | null; emitenteNome: string | null; centroCustoId: string | null; valorTotal: number; observacao: string | null; arquivo?: File | null; extratoMovimentoId?: string | null }): Promise<string>
+  // Recibo / nota sem XML: troca os itens (só antes de lançar). Devolve os itens salvos.
+  salvarItensNota(notaId: string, itens: ItemRecibo[]): Promise<ItemNota[]>
+  // Liga (ou desliga, com null) uma nota a um débito do extrato.
+  ligarNotaExtrato(notaId: string, movimentoId: string | null): Promise<void>
   linkArquivoNota(caminho: string): Promise<string>
   lancarNota(id: string, l: LancamentoNota): Promise<void>
   estornarNota(id: string): Promise<void>

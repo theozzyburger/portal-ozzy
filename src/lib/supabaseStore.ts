@@ -1084,10 +1084,10 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       else ok(await sb.from('plano_contas').insert(linha))
     },
     async notasFiscais() {
-      return (ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em').order('emissao', { ascending: false })) ?? []).map(paraNota)
+      return (ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, extrato_movimento_id').order('emissao', { ascending: false })) ?? []).map(paraNota)
     },
     async notaFiscal(id) {
-      return paraNota(ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, nota_itens(*)').eq('id', id).single()))
+      return paraNota(ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, extrato_movimento_id, nota_itens(*)').eq('id', id).single()))
     },
     async importarNota(n) {
       return ok(await sb.rpc('importar_nota', {
@@ -1110,8 +1110,21 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       const r = ok(await sb.from('notas_fiscais').insert({
         numero: texto(n.numero), emissao: n.emissao, fornecedor_id: n.fornecedorId, emitente_nome: texto(n.emitenteNome),
         centro_custo_id: n.centroCustoId, valor_total: n.valorTotal, observacao: texto(n.observacao), arquivo,
+        extrato_movimento_id: n.extratoMovimentoId ?? null,
       }).select('id').single())
       return r!.id
+    },
+    async salvarItensNota(notaId, itens) {
+      ok(await sb.from('nota_itens').delete().eq('nota_id', notaId))
+      if (!itens.length) return []
+      const linhas = ok(await sb.from('nota_itens').insert(itens.map((i, k) => ({
+        nota_id: notaId, ordem: k + 1, descricao: i.descricao.trim(), unidade: texto(i.unidade), quantidade: i.quantidade,
+        valor_unit: i.quantidade > 0 ? Math.round((i.valorTotal / i.quantidade) * 1e6) / 1e6 : null, valor_total: i.valorTotal, insumo_id: i.insumoId,
+      }))).select('*')) ?? []
+      return paraNota({ nota_itens: linhas } as any).itens ?? []
+    },
+    async ligarNotaExtrato(notaId, movimentoId) {
+      ok(await sb.from('notas_fiscais').update({ extrato_movimento_id: movimentoId }).eq('id', notaId).eq('status', 'conferir'))
     },
     async linkArquivoNota(caminho) {
       const { data } = await sb.storage.from('documentos').createSignedUrl(caminho, 300)
@@ -1298,6 +1311,7 @@ const paraNota = (r: any): NotaFiscal => ({
   pagamentoXml: (r.pagamento_xml ?? []).map((x: any) => ({ tPag: String(x.tPag ?? ''), valor: Number(x.valor ?? 0) })),
   duplicatas: (r.duplicatas ?? []).map((d: any) => ({ numero: d.numero ?? null, vencimento: d.vencimento, valor: Number(d.valor) })),
   arquivo: r.arquivo, observacao: r.observacao, status: r.status, lancadaEm: r.lancada_em, criadoEm: r.criado_em,
+  extratoMovimentoId: r.extrato_movimento_id ?? null,
   itens: r.nota_itens
     ? (r.nota_itens as any[]).sort((a, b) => a.ordem - b.ordem).map((i): ItemNota => ({
         id: i.id, ordem: i.ordem, codigo: i.codigo, ean: i.ean, descricao: i.descricao, ncm: i.ncm, cfop: i.cfop, unidade: i.unidade,

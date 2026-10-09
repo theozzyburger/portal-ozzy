@@ -6,12 +6,17 @@ import { type GrupoLote, candidatas, gruposLote, lotesPara, nomeLote, sugestoes,
 import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx } from '../lib/ofx'
 import { garantirFornecedor } from './LancarContas'
+import { EditarRecorrente } from './Recorrentes'
 import EscolherConta from '../components/EscolherConta'
+import type { NotaFiscal, FormaPagamento } from '../lib/types'
+import { FORMAS_PAGAMENTO } from '../lib/types'
+import { addMeses, mesDe } from '../lib/datas'
+import { ir } from '../lib/rota'
 import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
 
 interface Dados {
   movs: MovimentoExtrato[]; contas: ContaPagar[]; centros: CentroCusto[]; plano: ContaContabil[]; fornecedores: Fornecedor[]
-  regras: RegraExtrato[]; saldos: SaldoExtrato[]
+  regras: RegraExtrato[]; saldos: SaldoExtrato[]; notas: NotaFiscal[]
 }
 
 const FILTROS = [
@@ -36,11 +41,12 @@ export default function Conciliacao() {
   const [achar, setAchar] = useState<MovimentoExtrato | null>(null)
   const [lancar, setLancar] = useState<MovimentoExtrato | null>(null)
   const [ignorar, setIgnorar] = useState<MovimentoExtrato | null>(null)
+  const [recorrenteDe, setRecorrenteDe] = useState<ContaPagar | null>(null)
   const arquivo = useRef<HTMLInputElement>(null)
 
   const carregar = useCallback(
-    () => Promise.all([store.extrato(), store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores(), store.regrasExtrato(), store.saldosExtrato()])
-      .then(([movs, contas, centros, plano, fornecedores, regras, saldos]) => setD({ movs, contas, centros, plano, fornecedores, regras, saldos }), (e) => setErro(e.message)),
+    () => Promise.all([store.extrato(), store.contasPagar(), store.centrosCusto(), store.planoContas(), store.fornecedores(), store.regrasExtrato(), store.saldosExtrato(), store.notasFiscais()])
+      .then(([movs, contas, centros, plano, fornecedores, regras, saldos, notas]) => setD({ movs, contas, centros, plano, fornecedores, regras, saldos, notas }), (e) => setErro(e.message)),
     [store],
   )
   useEffect(() => {
@@ -98,6 +104,7 @@ export default function Conciliacao() {
       : filtro === 'conciliados' ? m.status === 'conciliado'
       : m.status === 'ignorado')
   const contaPorId = new Map(d.contas.map((c) => [c.id, c]))
+  const notaDe = (m: MovimentoExtrato) => d.notas.find((n) => n.extratoMovimentoId === m.id && n.status === 'conferir')
   const favorecido = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
   const saldo = [...d.saldos].sort((a, b) => b.data.localeCompare(a.data)).find((s) => !contaBanco || `${s.banco}|${s.agencia}|${s.conta}` === contaBanco)
 
@@ -200,6 +207,9 @@ export default function Conciliacao() {
                     {m.status === 'conciliado' && (
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <span><Selo cor="verde">Conciliado</Selo> {ligada ? `${ligada.descricao} · ${nomeCentro(d.centros.find((x) => x.id === ligada.centroCustoId))} · ${nomeConta(d.plano, ligada.contaId)}` : ''}
+                          {ligada && !ligada.recorrenteId && !ligada.origem && (
+                            <button className="ml-2 text-stone-500 underline" onClick={() => setRecorrenteDe(ligada)}>Repete todo mês?</button>
+                          )}
                           {!ligada && doLote.length > 0 && <>
                             {` ${doLote.length} contas juntas`}
                             <details className="mt-1"><summary className="cursor-pointer text-stone-500">Ver as contas</summary>
@@ -218,7 +228,12 @@ export default function Conciliacao() {
                     )}
                     {m.status === 'pendente' && m.valor < 0 && (
                       <>
-                        {sl ? (
+                        {notaDe(m) ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 p-2 text-sm">
+                            <span>Ligado à nota {notaDe(m)!.numero ? `NF ${notaDe(m)!.numero}` : 'sem número'} · {notaDe(m)!.emitenteNome ?? ''}: fica conciliado quando a nota for lançada.</span>
+                            <Botao className="py-1.5!" onClick={() => ir('estoque/nota/' + notaDe(m)!.id)}>Abrir a nota</Botao>
+                          </div>
+                        ) : sl ? (
                           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-green-50 p-2 text-sm">
                             <span>
                               É <b>{nomeLote(sl.lote)}</b>: {sl.contas.length} contas que somam {reais(sl.total)}
@@ -277,6 +292,19 @@ export default function Conciliacao() {
       {achar && <AcharConta d={d} m={achar} aoFechar={() => setAchar(null)} aoEscolher={(c) => { setAchar(null); acao(() => store.conciliarMovimento(achar.id, c.id)) }}
         aoEscolherLote={(ids, dif) => { setAchar(null); acao(() => store.conciliarLote(achar.id, ids, dif)) }} />}
       {lancar && <LancarDespesa d={d} m={lancar} aoFechar={() => setLancar(null)} aoSalvar={() => { setLancar(null); carregar() }} />}
+      {recorrenteDe && (
+        <EditarRecorrente
+          d={d} r={null}
+          modelo={{
+            descricao: recorrenteDe.descricao, fornecedorId: recorrenteDe.fornecedorId, fornecedorNome: favorecido(recorrenteDe) || null,
+            centroCustoId: recorrenteDe.centroCustoId, contaId: recorrenteDe.contaId, valor: recorrenteDe.valorPago ?? recorrenteDe.valor, variavel: false,
+            dia: Number(recorrenteDe.vencimento.slice(8, 10)), forma: recorrenteDe.forma, inicio: addMeses(mesDe(recorrenteDe.vencimento), 1), fim: null,
+            situacao: 'ativa', observacao: 'Cadastrada na conciliação',
+          }}
+          aoFechar={() => setRecorrenteDe(null)}
+          aoSalvar={() => { setRecorrenteDe(null); setAviso('Recorrente cadastrado. Aparece em Financeiro › Recorrentes.') }}
+        />
+      )}
       {ignorar && <Ignorar m={ignorar} aoFechar={() => setIgnorar(null)} aoSalvar={() => { setIgnorar(null); carregar() }} />}
     </div>
   )
@@ -340,56 +368,170 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
   )
 }
 
+type Comprovante = 'nao' | 'nota' | 'recibo'
+
+// Lançar uma saída do extrato (09/10): só a despesa, ou ligada a uma nota/recibo (entra no estoque e atualiza o preço do insumo).
+// Se repete todo mês, já cadastra o recorrente.
 function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExtrato; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
+  const valor = Math.abs(m.valor)
   const [v, setV] = useState({ centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: '', fornecedor: '', descricao: m.descricao })
+  const [comp, setComp] = useState<Comprovante>('nao')
+  const [numero, setNumero] = useState('')
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [rec, setRec] = useState({ ligado: false, dia: String(Number(m.data.slice(8, 10))), forma: 'debito_automatico' as FormaPagamento, variavel: false })
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
   const ativos = d.fornecedores.filter((f) => f.ativo)
+  // Notas importadas esperando lançamento, das mais parecidas com o valor para as menos.
+  const notasLivres = d.notas
+    .filter((n) => n.status === 'conferir' && !n.extratoMovimentoId)
+    .sort((a, b) => Math.abs(a.valorTotal - valor) - Math.abs(b.valorTotal - valor))
+    .slice(0, 12)
+  const nomeNota = (n: NotaFiscal) => d.fornecedores.find((f) => f.id === n.fornecedorId)?.nome ?? n.emitenteNome ?? 'Fornecedor'
   // Escolheu um fornecedor conhecido: já traz a conta de sempre dele.
   function mudarFornecedor(texto: string) {
     const f = ativos.find((x) => x.nome.toLowerCase() === texto.trim().toLowerCase())
     setV({ ...v, fornecedor: texto, conta: v.conta || f?.contaPadraoId || '' })
   }
+
+  async function recorrente(f: Fornecedor) {
+    if (!rec.ligado) return
+    await store.salvarRecorrente({
+      descricao: v.descricao.trim() || f.nome, fornecedorId: f.id, fornecedorNome: f.nome, centroCustoId: v.centro, contaId: v.conta || null, valor,
+      variavel: rec.variavel, dia: Number(rec.dia), forma: rec.forma, inicio: addMeses(mesDe(m.data), 1), fim: null, situacao: 'ativa',
+      observacao: 'Cadastrada na conciliação',
+    })
+  }
+
   async function salvar() {
+    setErro('')
     if (!v.fornecedor.trim()) return setErro('Escolha o fornecedor.')
     if (!v.centro) return setErro('Escolha a loja.')
-    if (!v.conta) return setErro('Escolha a conta contábil.')
+    if (comp === 'nao' && !v.conta) return setErro('Escolha a conta contábil.')
+    if (rec.ligado && !(Number(rec.dia) >= 1 && Number(rec.dia) <= 31)) return setErro('Dia do vencimento entre 1 e 31.')
+    if (rec.ligado && !v.conta) return setErro('Para o recorrente, escolha a conta contábil.')
     setSalvando(true)
     try {
       const f = await garantirFornecedor(store, d.fornecedores, v.fornecedor)
+      if (comp === 'recibo') {
+        const id = await store.criarNotaManual({
+          numero: numero || null, emissao: m.data, fornecedorId: f.id, emitenteNome: null, centroCustoId: v.centro, valorTotal: valor,
+          observacao: v.descricao !== m.descricao ? v.descricao : null, arquivo, extratoMovimentoId: m.id,
+        })
+        await recorrente(f)
+        return ir('estoque/nota/' + id)
+      }
       await store.registrarMovimento(m.id, { centroCustoId: v.centro, contaId: v.conta || null, favorecido: f.nome, fornecedorId: f.id, descricao: v.descricao, chave: chaveExtrato(m.descricao) })
+      await recorrente(f)
       aoSalvar()
     } catch (e) {
       setErro((e as Error).message)
       setSalvando(false)
     }
   }
+
+  async function ligarNota(n: NotaFiscal) {
+    try {
+      await store.ligarNotaExtrato(n.id, m.id)
+      ir('estoque/nota/' + n.id)
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }
+
   return (
     <Modal titulo="Lançar como despesa" aberto aoFechar={aoFechar}>
       <div className="space-y-3">
-        <p className="text-sm">{dataCurta(m.data)} · <b>{reais(m.valor)}</b>. Vira uma conta já paga e conciliada. Na próxima vez que esse texto aparecer no extrato, o portal sugere o mesmo.</p>
-        <Campo rotulo="Fornecedor">
-          <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
-          <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
-        </Campo>
-        {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
-          <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
+        <p className="text-sm">{dataCurta(m.data)} · <b>{reais(m.valor)}</b> · {m.descricao}</p>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-stone-700">Tem nota fiscal ou recibo?</p>
+          <div className="flex flex-wrap gap-2">
+            {([['nao', 'Não, só a despesa'], ['nota', 'Nota já importada'], ['recibo', 'Recibo ou nota de papel']] as const).map(([id, nome]) => (
+              <button key={id} onClick={() => setComp(id)}
+                className={`rounded-full px-3 py-1 text-sm font-semibold ring-1 ${comp === id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-600 ring-stone-300'}`}>
+                {nome}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {comp === 'nota' ? (
+          <div className="space-y-2">
+            <p className="text-sm text-stone-500">Notas importadas (XML) que ainda não foram lançadas, das de valor mais perto. Escolha e confira os itens: ao lançar, ela já fica paga por este débito.</p>
+            {notasLivres.length === 0 ? <Vazio>Nenhuma nota esperando. Importe o XML em Estoque › Notas fiscais, ou use "Recibo ou nota de papel".</Vazio> : (
+              <ul className="max-h-72 divide-y divide-stone-100 overflow-y-auto">
+                {notasLivres.map((n) => (
+                  <li key={n.id}>
+                    <button className="flex w-full items-center justify-between gap-2 py-2 text-left hover:bg-stone-50" onClick={() => ligarNota(n)}>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold break-words">{nomeNota(n)}</span>
+                        <span className="block text-stone-500">NF {n.numero ?? 's/n'} · {dataCurta(n.emissao)}</span>
+                      </span>
+                      <span className={`shrink-0 font-semibold ${Math.abs(n.valorTotal - valor) < 0.01 ? 'text-green-700' : ''}`}>{reais(n.valorTotal)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <>
+            <Campo rotulo="Fornecedor">
+              <input className={estiloEntrada} list="despesa-fornecedores" placeholder="Comece a digitar" value={v.fornecedor} onChange={(e) => mudarFornecedor(e.target.value)} autoFocus />
+              <datalist id="despesa-fornecedores">{ativos.map((f) => <option key={f.id} value={f.nome} />)}</datalist>
+            </Campo>
+            {v.fornecedor.trim() && !ativos.some((x) => x.nome.toLowerCase() === v.fornecedor.trim().toLowerCase()) && (
+              <p className="text-xs text-stone-500">Fornecedor novo: vai ser cadastrado com esse nome.</p>
+            )}
+            <Campo rotulo="Descrição"><input className={estiloEntrada} value={v.descricao} onChange={(e) => setV({ ...v, descricao: e.target.value })} /></Campo>
+            <Campo rotulo="Loja">
+              <select className={estiloEntrada} value={v.centro} onChange={(e) => setV({ ...v, centro: e.target.value })}>
+                <option value="">Escolher</option>
+                {d.centros.map((x) => <option key={x.id} value={x.id}>{nomeCentro(x)}</option>)}
+              </select>
+            </Campo>
+            <Campo rotulo={comp === 'recibo' ? 'Conta contábil (pode escolher na próxima tela)' : 'Conta contábil'}>
+              <EscolherConta plano={d.plano} valor={v.conta} aoMudar={(id) => setV({ ...v, conta: id })} />
+            </Campo>
+            {comp === 'recibo' && (
+              <div className="space-y-3 rounded-xl bg-stone-50 p-3">
+                <p className="text-sm text-stone-600">Na próxima tela você coloca os itens: os insumos entram no estoque e o preço deles é atualizado.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo rotulo="Número (se tiver)"><input className={estiloEntrada} value={numero} onChange={(e) => setNumero(e.target.value)} /></Campo>
+                  <Campo rotulo="Foto ou PDF"><input type="file" accept="application/pdf,image/*" capture="environment" className="text-sm" onChange={(e) => setArquivo(e.target.files?.[0] ?? null)} /></Campo>
+                </div>
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={rec.ligado} onChange={(e) => setRec({ ...rec, ligado: e.target.checked })} />
+              Repete todo mês: cadastrar como pagamento recorrente
+            </label>
+            {rec.ligado && (
+              <div className="space-y-2 rounded-xl bg-stone-50 p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Campo rotulo="Vence todo dia"><input className={estiloEntrada} inputMode="numeric" value={rec.dia} onChange={(e) => setRec({ ...rec, dia: e.target.value })} /></Campo>
+                  <Campo rotulo="Forma">
+                    <select className={estiloEntrada} value={rec.forma} onChange={(e) => setRec({ ...rec, forma: e.target.value as FormaPagamento })}>
+                      {FORMAS_PAGAMENTO.map((x) => <option key={x.valor} value={x.valor}>{x.nome}</option>)}
+                    </select>
+                  </Campo>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={rec.variavel} onChange={(e) => setRec({ ...rec, variavel: e.target.checked })} />
+                  O valor muda todo mês (lança {reais(valor)} como previsão)
+                </label>
+                <p className="text-xs text-stone-500">Começa em {addMeses(mesDe(m.data), 1).split('-').reverse().join('/')}; este mês já é este débito.</p>
+              </div>
+            )}
+          </>
         )}
-        <Campo rotulo="Descrição"><input className={estiloEntrada} value={v.descricao} onChange={(e) => setV({ ...v, descricao: e.target.value })} /></Campo>
-        <Campo rotulo="Loja">
-          <select className={estiloEntrada} value={v.centro} onChange={(e) => setV({ ...v, centro: e.target.value })}>
-            <option value="">Escolher</option>
-            {d.centros.map((x) => <option key={x.id} value={x.id}>{nomeCentro(x)}</option>)}
-          </select>
-        </Campo>
-        <Campo rotulo="Conta contábil">
-          <EscolherConta plano={d.plano} valor={v.conta} aoMudar={(id) => setV({ ...v, conta: id })} />
-        </Campo>
         {erro && <p className="text-sm text-red-700">{erro}</p>}
         <div className="flex justify-end gap-2">
           <Botao variante="secundario" onClick={aoFechar}>Cancelar</Botao>
-          <Botao onClick={salvar} disabled={salvando}>{salvando ? 'Lançando…' : 'Lançar'}</Botao>
+          {comp !== 'nota' && (
+            <Botao onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : comp === 'recibo' ? 'Continuar para os itens' : 'Lançar'}</Botao>
+          )}
         </div>
       </div>
     </Modal>
