@@ -20,6 +20,8 @@ export default function ImportarFornecedores({ fornecedores, plano, aoFechar, ao
   const [texto, setTexto] = useState('')
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState('')
+  // Substituir (Heitor, 09/10): a lista do arquivo vira a lista oficial; quem não está nela fica inativo (não some do histórico).
+  const [substituir, setSubstituir] = useState(true)
   const lanc = contasLancaveis(plano)
 
   const tabela = texto.trim() ? lerTabela(texto) : []
@@ -41,6 +43,8 @@ export default function ImportarFornecedores({ fornecedores, plano, aoFechar, ao
   })
   const boas = linhas.filter((l) => !l.erros.length)
   const novos = boas.filter((l) => !l.existe)
+  const naLista = new Set(boas.map((l) => l.existe?.id).filter(Boolean))
+  const sairao = linhas.length ? fornecedores.filter((f) => f.ativo && !naLista.has(f.id)) : []
 
   async function abrirArquivo(f: File | undefined) {
     if (!f) return
@@ -60,6 +64,16 @@ export default function ImportarFornecedores({ fornecedores, plano, aoFechar, ao
       try {
         if (!e) {
           await store.salvarFornecedor({ nome: l.nome, contato: null, telefone: l.telefone || null, observacao: l.observacao || null, ativo: true, cnpj: l.cnpj || null, contaPadraoId: l.contaId })
+        } else if (substituir) {
+          const dados = {
+            id: e.id, nome: l.nome, contato: e.contato, telefone: l.telefone || e.telefone || null, observacao: l.observacao || e.observacao, ativo: true,
+            cnpj: l.cnpj || e.cnpj || null, contaPadraoId: l.contaId || e.contaPadraoId || null,
+          }
+          // Se outro cadastro antigo já usa esse nome, mantém o nome antigo e atualiza o resto.
+          await store.salvarFornecedor(dados).catch((x) => {
+            if (!/duplicate|unique/i.test((x as Error).message) || e.nome === l.nome) throw x
+            return store.salvarFornecedor({ ...dados, nome: e.nome })
+          })
         } else if ((!e.cnpj && l.cnpj) || (!e.contaPadraoId && l.contaId) || (!e.telefone && l.telefone)) {
           await store.salvarFornecedor({
             id: e.id, nome: e.nome, contato: e.contato, telefone: e.telefone || l.telefone || null, observacao: e.observacao, ativo: e.ativo,
@@ -68,6 +82,15 @@ export default function ImportarFornecedores({ fornecedores, plano, aoFechar, ao
         }
       } catch (x) {
         falhas.push(`${l.nome}: ${/duplicate|unique/i.test((x as Error).message) ? 'CNPJ já usado por outro fornecedor' : (x as Error).message}`)
+      }
+    }
+    if (substituir) {
+      for (const f of sairao) {
+        try {
+          await store.salvarFornecedor({ ...f, ativo: false })
+        } catch (x) {
+          falhas.push(`${f.nome}: ${(x as Error).message}`)
+        }
       }
     }
     setSalvando('')
@@ -100,9 +123,13 @@ export default function ImportarFornecedores({ fornecedores, plano, aoFechar, ao
                 </li>
               ))}
             </ul>
-            <p className="text-sm">{novos.length} novos · {boas.length - novos.length} já cadastrados{boas.length < linhas.length && <span className="text-red-700"> · {linhas.length - boas.length} com erro ficam de fora</span>}</p>
+            <p className="text-sm">{novos.length} novos · {boas.length - novos.length} já cadastrados{substituir && sairao.length > 0 && ` · ${sairao.length} que não estão na lista ficam inativos`}{boas.length < linhas.length && <span className="text-red-700"> · {linhas.length - boas.length} com erro ficam de fora</span>}</p>
           </>
         )}
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={substituir} onChange={(e) => setSubstituir(e.target.checked)} />
+          <span>Substituir a lista atual: o nome, CNPJ e conta do arquivo valem; quem não está no arquivo fica inativo (some das escolhas, mas as notas e contas antigas continuam ligadas a ele).</span>
+        </label>
         {erro && <p className="text-sm text-red-700">{erro}</p>}
         <div className="flex justify-end gap-2">
           <Botao variante="secundario" onClick={aoFechar}>{erro ? 'Fechar' : 'Cancelar'}</Botao>

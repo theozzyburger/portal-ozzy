@@ -257,6 +257,7 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
   const [plano, setPlano] = useState<ContaContabil[]>([])
   const [importar, setImportar] = useState(false)
   const [busca, setBusca] = useState('')
+  const [inativos, setInativos] = useState(false)
   useEffect(() => {
     store.planoContas().then(setPlano, () => setPlano([]))
   }, [store])
@@ -288,7 +289,12 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-stone-600">{fornecedores.length} fornecedores</span>
+        <span className="text-sm text-stone-600">
+          {fornecedores.filter((x) => x.ativo).length} fornecedores
+          {fornecedores.some((x) => !x.ativo) && (
+            <button className="ml-2 underline" onClick={() => setInativos(!inativos)}>{inativos ? 'esconder inativos' : `ver ${fornecedores.filter((x) => !x.ativo).length} inativos`}</button>
+          )}
+        </span>
         <span className="flex gap-2">
           <Botao variante="secundario" onClick={() => setImportar(true)}>Importar</Botao>
           <Botao onClick={() => abrir('novo')}>+ Fornecedor</Botao>
@@ -300,7 +306,7 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
         <Vazio>Nenhum fornecedor cadastrado.</Vazio>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
-          {fornecedores.filter((x) => !busca || `${x.nome} ${x.cnpj ?? ''}`.toLowerCase().includes(busca.toLowerCase()) || (x.cnpj ?? '').includes(busca.replace(/\D/g, '') || '-')).map((x) => {
+          {fornecedores.filter((x) => inativos || x.ativo).filter((x) => !busca || `${x.nome} ${x.cnpj ?? ''}`.toLowerCase().includes(busca.toLowerCase()) || (x.cnpj ?? '').includes(busca.replace(/\D/g, '') || '-')).map((x) => {
             const n = insumos.filter((i) => i.fornecedorId === x.id && i.ativo).length
             return (
               <li key={x.id}>
