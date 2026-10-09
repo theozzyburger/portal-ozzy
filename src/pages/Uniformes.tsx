@@ -7,7 +7,7 @@ import { podeGerenciar, possoAlterar } from '../lib/permissoes'
 import { FotoTroca } from './Compras'
 import { ir } from '../lib/rota'
 import DevolucaoUniformes from '../components/DevolucaoUniformes'
-import { PECAS, corCamiseta } from '../lib/uniformes'
+import { PECAS, chaveVariante, corCamiseta, saldosUniforme, varianteDaEntrega } from '../lib/uniformes'
 import { ITENS_TROCA, type SolicitacaoUniforme, ITENS_UNIFORME, TAMANHOS, termoUniforme, type EntregaUniforme, type Funcionario, type ItemUniforme } from '../lib/types'
 
 const resumoItens = (itens: ItemUniforme[]) => itens.map((i) => `${i.quantidade}x ${i.item}${i.tamanho ? ` ${i.tamanho}` : ''}`).join(' · ')
@@ -102,12 +102,29 @@ function NovaEntrega({ pessoa, aoFechar, aoSalvar }: { pessoa: Funcionario; aoFe
   const [etapa, setEtapa] = useState<'itens' | 'assinar'>('itens')
   const [assinatura, setAssinatura] = useState<string | null>(null)
   const [erro, setErro] = useState('')
+  // Estoque (09/10): a entrega tira as peças do estoque de uniformes.
+  const [saldos, setSaldos] = useState<Map<string, number> | null>(null)
+  const [tirar, setTirar] = useState(true)
+  useEffect(() => {
+    store.movimentosUniforme().then((m) => setSaldos(saldosUniforme(m))).catch(() => setSaldos(null))
+  }, [store])
+  const noEstoque = (x: ItemUniforme) => {
+    const v = varianteDaEntrega(x.item, x.tamanho, pessoa)
+    return v && saldos ? saldos.get(chaveVariante(v)) ?? 0 : null
+  }
 
   const mudar = (i: number, p: Partial<ItemUniforme>) => setItens(itens.map((x, k) => (k === i ? { ...x, ...p } : x)))
   const salvar = async (comAssinatura: boolean) => {
     if (itens.some((x) => !x.item.trim())) return setErro('Preencha o nome de cada item (ou tire a linha vazia).')
     try {
-      await store.registrarUniforme({ funcionarioId: pessoa.id, data, itens, observacao, assinatura: comAssinatura ? assinatura! : undefined })
+      const nova = await store.registrarUniforme({ funcionarioId: pessoa.id, data, itens, observacao, assinatura: comAssinatura ? assinatura! : undefined })
+      if (tirar && saldos) {
+        const linhas = itens.flatMap((x) => {
+          const v = varianteDaEntrega(x.item, x.tamanho, pessoa)
+          return v ? [{ ...v, tipo: 'entrega' as const, quantidade: -x.quantidade, referencia: `entrega:${nova.id}`, observacao: pessoa.nome, data }] : []
+        })
+        await store.movimentarUniformes(linhas)
+      }
       aoSalvar(comAssinatura)
     } catch (err) {
       setErro((err as Error).message)
@@ -131,6 +148,14 @@ function NovaEntrega({ pessoa, aoFechar, aoSalvar }: { pessoa: Funcionario; aoFe
                 <button type="button" onClick={() => setItens(itens.filter((_, k) => k !== i))} disabled={itens.length === 1} className="px-1 text-lg text-stone-400 disabled:opacity-30" aria-label="Remover item">
                   ×
                 </button>
+                {saldos && tirar && x.item.trim() && (() => {
+                  const q = noEstoque(x)
+                  return (
+                    <span className={`col-span-4 -mt-1 text-xs ${q === null ? 'text-stone-400' : q < x.quantidade ? 'text-red-600' : 'text-stone-500'}`}>
+                      {q === null ? 'Sem tamanho: não sai do estoque' : `No estoque: ${q}${q < x.quantidade ? ' (vai ficar negativo)' : ''}`}
+                    </span>
+                  )
+                })()}
               </div>
             ))}
             <datalist id="itens-uniforme">
@@ -148,6 +173,12 @@ function NovaEntrega({ pessoa, aoFechar, aoSalvar }: { pessoa: Funcionario; aoFe
               </button>
             </div>
           </div>
+          {saldos && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={tirar} onChange={(e) => setTirar(e.target.checked)} />
+              Tirar estas peças do estoque de uniformes
+            </label>
+          )}
           <Campo rotulo="Observação (opcional)">
             <input className={estiloEntrada} value={observacao} onChange={(e) => setObservacao(e.target.value)} placeholder="Ex.: troca da camiseta gasta" />
           </Campo>

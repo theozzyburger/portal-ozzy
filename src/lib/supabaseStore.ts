@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
 import { hoje } from './datas'
-import type { NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -425,6 +425,28 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         ok(await sb.from('uniforme_pedido_itens').insert(itens.map((i) => ({
           pedido_id: pid, funcionario_id: fid, item: i.item, cor: i.cor, modelagem: i.modelagem, tamanho: i.tamanho, quantidade: i.quantidade,
         }))))
+    },
+    async movimentosUniforme() {
+      const rs: any[] = []
+      for (let de = 0; ; de += 1000) {
+        const bloco = ok(await sb.from('uniforme_estoque').select('*').order('criado_em').range(de, de + 999)) ?? []
+        rs.push(...bloco)
+        if (bloco.length < 1000) break
+      }
+      return rs.map((r): MovimentoUniforme => ({
+        id: r.id, data: r.data, item: r.item, cor: r.cor, modelagem: r.modelagem, tamanho: r.tamanho, tipo: r.tipo, quantidade: r.quantidade,
+        referencia: r.referencia, observacao: r.observacao, criadoPor: r.criado_por, criadoEm: r.criado_em,
+      }))
+    },
+    async movimentarUniformes(linhas) {
+      if (!linhas.length) return
+      ok(await sb.from('uniforme_estoque').insert(linhas.map((l) => ({
+        data: l.data ?? undefined, item: l.item, cor: l.cor, modelagem: l.modelagem, tamanho: l.tamanho, tipo: l.tipo, quantidade: l.quantidade,
+        referencia: l.referencia, observacao: l.observacao?.trim() || null,
+      }))))
+    },
+    async desfazerMovimentoUniforme(ref) {
+      ok(await sb.from('uniforme_estoque').delete().eq('referencia', ref))
     },
     async equipamentos() {
       return (ok(await sb.from('equipamentos').select('*').order('nome')) ?? []).map(paraEquipamento)

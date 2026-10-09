@@ -1,4 +1,4 @@
-import type { Funcionario, ItemPedidoUniforme, Modelagem } from './types'
+import { TAMANHOS_CALCA, TAMANHOS_CALCADO, TAMANHOS_CAMISETA, type Funcionario, type ItemPedidoUniforme, type Modelagem, type MovimentoUniforme, type VarianteUniforme } from './types'
 
 // Padrão da casa (07/10): supervisores (e quem está acima) usam camiseta branca; funcionários, preta.
 // Modelagem feminina ou masculina conforme o sexo do cadastro. Tudo pode ser trocado na linha do pedido.
@@ -49,4 +49,55 @@ export function consolidado(itens: ItemPedidoUniforme[]) {
   return [...mapa.values()].sort(
     (a, b) => a.item.localeCompare(b.item) || (a.cor ?? '').localeCompare(b.cor ?? '') || (a.modelagem ?? '').localeCompare(b.modelagem ?? '') || ordemTam(a.tamanho) - ordemTam(b.tamanho),
   )
+}
+
+// ---------- Estoque (09/10) ----------
+
+// Linhas e tamanhos da grade do estoque. Camiseta por cor e modelagem; calça por modelagem.
+export interface GradePeca {
+  item: string
+  tamanhos: string[]
+  linhas: { cor: string | null; modelagem: Modelagem | null }[]
+}
+export const GRADE: GradePeca[] = [
+  {
+    item: 'Camiseta', tamanhos: TAMANHOS_CAMISETA,
+    linhas: CORES_CAMISETA.flatMap((cor) => (['feminina', 'masculina'] as const).map((modelagem) => ({ cor, modelagem }))),
+  },
+  { item: 'Calça', tamanhos: TAMANHOS_CALCA, linhas: [{ cor: null, modelagem: 'feminina' }, { cor: null, modelagem: 'masculina' }] },
+  { item: 'Sapato', tamanhos: TAMANHOS_CALCADO.map(String), linhas: [{ cor: null, modelagem: null }] },
+  { item: 'Avental', tamanhos: ['Único'], linhas: [{ cor: null, modelagem: null }] },
+  { item: 'Boné', tamanhos: ['Único'], linhas: [{ cor: null, modelagem: null }] },
+]
+
+export const chaveVariante = (v: VarianteUniforme) => [v.item, v.cor ?? '', v.modelagem ?? '', v.tamanho].join('|')
+export const nomeLinha = (l: { cor: string | null; modelagem: Modelagem | null }) =>
+  [l.cor, l.modelagem && l.modelagem !== 'unissex' ? l.modelagem : l.modelagem ? 'unissex' : null].filter(Boolean).join(' ') || ''
+export const descricaoVariante = (v: VarianteUniforme) =>
+  [v.item, v.cor?.toLowerCase(), v.modelagem && v.modelagem !== 'unissex' ? v.modelagem : null].filter(Boolean).join(' ') + (v.tamanho !== 'Único' ? ` ${v.tamanho}` : '')
+
+// Saldo de cada peça: a última contagem vale como ponto de partida e os movimentos depois dela somam ou tiram.
+export function saldosUniforme(movs: MovimentoUniforme[]) {
+  const saldo = new Map<string, number>()
+  for (const m of [...movs].sort((a, b) => a.criadoEm.localeCompare(b.criadoEm))) {
+    const k = chaveVariante(m)
+    saldo.set(k, m.tipo === 'contagem' ? m.quantidade : (saldo.get(k) ?? 0) + m.quantidade)
+  }
+  return saldo
+}
+
+const simples = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+// Item escrito na entrega ("Camiseta preta", "Calça") → peça do estoque, com a modelagem pelo sexo da pessoa.
+// Peças fora da grade (dólmã, luva…) contam no estoque com o nome como foi escrito.
+export function varianteDaEntrega(texto: string, tamanho: string | undefined, p: Funcionario): VarianteUniforme | null {
+  const t = simples(texto)
+  if (!t) return null
+  const g = GRADE.find((x) => t.startsWith(simples(x.item)) || (x.item === 'Boné' && t.startsWith('bone')))
+  if (!g) return { item: texto.trim(), cor: null, modelagem: null, tamanho: tamanho?.trim() || 'Único' }
+  const tam = g.tamanhos.length === 1 ? 'Único' : tamanho?.trim().toUpperCase()
+  if (!tam || !g.tamanhos.includes(tam)) return null
+  const cor = g.item === 'Camiseta' ? (t.includes('branca') ? 'Branca' : t.includes('preta') ? 'Preta' : corCamiseta(p)) : null
+  const mod = g.linhas.some((l) => l.modelagem) ? modelagemDe(p) : null
+  return { item: g.item, cor, modelagem: mod, tamanho: tam }
 }

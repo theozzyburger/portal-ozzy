@@ -754,6 +754,27 @@ export interface ItemPedidoUniforme {
   quantidade: number
 }
 
+// Estoque de uniformes (09/10): cada movimento muda o saldo de uma peça (item + cor + modelagem + tamanho).
+export type TipoMovUniforme = 'contagem' | 'entrada' | 'entrega' | 'devolucao' | 'baixa'
+export interface VarianteUniforme {
+  item: string
+  cor: string | null
+  modelagem: Modelagem | null
+  tamanho: string
+}
+export interface MovimentoUniforme extends VarianteUniforme {
+  id: string
+  data: string
+  tipo: TipoMovUniforme
+  // Contagem: quanto tem. Entrada e devolução: positivo. Entrega e baixa: negativo.
+  quantidade: number
+  referencia: string
+  observacao: string | null
+  criadoPor: string | null
+  criadoEm: string
+}
+export type NovoMovimentoUniforme = VarianteUniforme & Pick<MovimentoUniforme, 'tipo' | 'quantidade' | 'referencia'> & { data?: string; observacao?: string | null }
+
 // Eventos (Entrega 1, 08/10): cadastro do evento. Produtos, previsão, insumos e simulador vêm nas próximas entregas.
 export type StatusEvento = 'negociacao' | 'planejamento' | 'aprovado' | 'preparacao' | 'execucao' | 'finalizado' | 'cancelado'
 export const STATUS_EVENTO: { valor: StatusEvento; nome: string; cor: 'cinza' | 'ambar' | 'verde' | 'vermelho' | 'azul' }[] = [

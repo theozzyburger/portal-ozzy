@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Impressao from '../components/Impressao'
+import EstoqueUniformes from './EstoqueUniformes'
 import { Botao, Campo, Modal, Selo, Titulo, Vazio, estiloEntrada } from '../components/ui'
 import logo from '../assets/logo.png'
 import { useApp } from '../lib/contexto'
@@ -23,18 +24,18 @@ export const tamanhosDe = (p: Funcionario) =>
 
 // Compras: por enquanto, uniformes (pedidos de troca da equipe e pedidos de compra por leva).
 export default function Compras() {
-  const [aba, setAba] = useState<'trocas' | 'pedidos' | 'valores'>('trocas')
+  const [aba, setAba] = useState<'trocas' | 'estoque' | 'pedidos' | 'valores'>('trocas')
   return (
     <div className="space-y-4">
       <Titulo>Compras · Uniformes</Titulo>
       <div className="flex gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
-        {([['trocas', 'Pedidos de troca'], ['pedidos', 'Pedidos de compra'], ['valores', 'Valores']] as const).map(([a, nome]) => (
+        {([['trocas', 'Trocas'], ['estoque', 'Estoque'], ['pedidos', 'Pedidos de compra'], ['valores', 'Valores']] as const).map(([a, nome]) => (
           <button key={a} onClick={() => setAba(a)} className={`flex-1 rounded-lg px-3 py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
             {nome}
           </button>
         ))}
       </div>
-      {aba === 'trocas' ? <Trocas /> : aba === 'pedidos' ? <Pedidos /> : <ValoresUniforme />}
+      {aba === 'trocas' ? <Trocas /> : aba === 'estoque' ? <EstoqueUniformes /> : aba === 'pedidos' ? <Pedidos /> : <ValoresUniforme />}
     </div>
   )
 }
@@ -304,10 +305,35 @@ function DetalhePedido({ pedido, aoVoltar, aoMudar }: { pedido: PedidoUniforme; 
   const [dados, setDados] = useState(false)
   const [relatorio, setRelatorio] = useState(false)
   const [apagar, setApagar] = useState(false)
-  const carregar = useCallback(() => store.itensPedidoUniforme(pedido.id).then(setItens), [store, pedido.id])
+  const [entrada, setEntrada] = useState<string | null>(null)
+  const [confirmarEntrada, setConfirmarEntrada] = useState(false)
+  const carregar = useCallback(async () => {
+    setItens(await store.itensPedidoUniforme(pedido.id))
+    setEntrada((await store.movimentosUniforme()).find((m) => m.referencia === `pedido:${pedido.id}`)?.data ?? null)
+  }, [store, pedido.id])
   useEffect(() => {
     carregar()
   }, [carregar])
+  const semTamanho = itens.filter((i) => !i.tamanho && !['Avental', 'Boné'].includes(i.item)).reduce((s, i) => s + i.quantidade, 0)
+  // Pedido que chegou: as peças entram no estoque de uma vez (e dá para desfazer pelo histórico do estoque).
+  const darEntrada = async () => {
+    const linhas = consolidado(itens)
+      .filter((c) => c.tamanho || ['Avental', 'Boné'].includes(c.item))
+      .map((c) => ({
+        item: c.item, cor: c.cor, modelagem: c.modelagem, tamanho: c.tamanho || 'Único', tipo: 'entrada' as const, quantidade: c.quantidade,
+        referencia: `pedido:${pedido.id}`, observacao: `Pedido #${pedido.numero} · ${pedido.titulo}`, data: hoje(),
+      }))
+    try {
+      await store.movimentarUniformes(linhas)
+      if (pedido.status !== 'recebido') await store.salvarPedidoUniforme({ ...pedido, status: 'recebido' })
+      setConfirmarEntrada(false)
+      await carregar()
+      await aoMudar()
+      avisar(`${linhas.reduce((s, l) => s + l.quantidade, 0)} peças entraram no estoque`)
+    } catch (e) {
+      avisar((e as Error).message)
+    }
+  }
 
   const pessoas = [...new Set(itens.map((i) => i.funcionarioId).filter((x): x is string => !!x))]
     .map((id) => equipe.find((f) => f.id === id))
@@ -354,6 +380,26 @@ function DetalhePedido({ pedido, aoVoltar, aoMudar }: { pedido: PedidoUniforme; 
           <Botao variante="secundario" onClick={() => setDados(true)}>Editar dados</Botao>
           <Botao variante="secundario" onClick={trazerTrocas}>Trazer quem pediu troca</Botao>
         </div>
+        {total > 0 && (pedido.status === 'pedido' || pedido.status === 'recebido') && (
+          <div className="mt-3 rounded-xl bg-stone-50 p-3 text-sm">
+            {entrada ? (
+              <span className="text-stone-600">✓ Entrada no estoque feita em {dataLonga(entrada)}.</span>
+            ) : confirmarEntrada ? (
+              <div className="space-y-2">
+                <p>Entram no estoque: {consolidado(itens).map((c) => `${c.quantidade}x ${descricaoPeca(c)}`).join(' · ')}</p>
+                {semTamanho > 0 && <p className="text-red-600">{semTamanho} peça{semTamanho > 1 ? 's' : ''} sem tamanho fica{semTamanho > 1 ? 'm' : ''} de fora.</p>}
+                <div className="flex gap-2">
+                  <Botao onClick={darEntrada}>Confirmar entrada</Botao>
+                  <Botao variante="secundario" onClick={() => setConfirmarEntrada(false)}>Cancelar</Botao>
+                </div>
+              </div>
+            ) : (
+              <button className="font-semibold underline decoration-ozzy-500 decoration-2 underline-offset-4" onClick={() => setConfirmarEntrada(true)}>
+                Chegou? Dar entrada destas peças no estoque
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

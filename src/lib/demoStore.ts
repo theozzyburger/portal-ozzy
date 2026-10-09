@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -562,6 +562,17 @@ const vinculosDemo: VinculoAnterior[] = [
   { id: 'va1', funcionarioId: 'p-dora-ramos', admissao: '2023-02-01', desligamento: '2023-11-20', tipoDesligamento: 'pedido', cargo: 'Atendente', observacao: null },
 ]
 const itensPedidoDemo: ItemPedidoUniforme[] = []
+// Contagem de EXEMPLO do estoque de uniformes.
+const movUniformeDemo: MovimentoUniforme[] = [
+  ...([
+    ['Camiseta', 'Preta', 'masculina', 'M', 6], ['Camiseta', 'Preta', 'masculina', 'G', 4], ['Camiseta', 'Preta', 'feminina', 'P', 3], ['Camiseta', 'Preta', 'feminina', 'M', 2],
+    ['Camiseta', 'Branca', 'masculina', 'G', 2], ['Camiseta', 'Branca', 'feminina', 'M', 1], ['Calça', null, 'masculina', '40', 3], ['Calça', null, 'masculina', '42', 2],
+    ['Calça', null, 'feminina', '38', 2], ['Sapato', null, null, '39', 1], ['Sapato', null, null, '41', 2], ['Avental', null, null, 'Único', 10], ['Boné', null, null, 'Único', 8],
+  ] as const).map(([item, cor, modelagem, tamanho, q], i): MovimentoUniforme => ({
+    id: `mu${i}`, data: addDias(hoje(), -5), item, cor, modelagem, tamanho, tipo: 'contagem', quantidade: q, referencia: 'manual:demo',
+    observacao: 'Contagem inicial', criadoPor: 'f1', criadoEm: haHoras(24 * 5),
+  })),
+]
 // Conta de EXEMPLO (a de verdade a gestão cadastra no portal).
 const contasDemo: ContaPagamento[] = [
   {
@@ -1324,6 +1335,20 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeGestao()
       for (const i of itensPedidoDemo.filter((x) => x.pedidoId === pid && x.funcionarioId === fid)) tira(itensPedidoDemo, i.id)
       for (const i of itens) itensPedidoDemo.push({ ...i, id: novoId('ip'), pedidoId: pid, funcionarioId: fid })
+    },
+    async movimentosUniforme() {
+      exigeGestao()
+      return espera(movUniformeDemo.map((m) => ({ ...m })))
+    },
+    async movimentarUniformes(linhas) {
+      const u = exigeGestao()
+      const agora = new Date().toISOString()
+      for (const l of linhas)
+        movUniformeDemo.push({ ...l, id: novoId('mu'), data: l.data ?? hoje(), observacao: l.observacao ?? null, criadoPor: u.id, criadoEm: agora })
+    },
+    async desfazerMovimentoUniforme(ref) {
+      exigeGestao()
+      for (const m of movUniformeDemo.filter((x) => x.referencia === ref)) tira(movUniformeDemo, m.id)
     },
     async equipamentos() {
       exigeManutencao()

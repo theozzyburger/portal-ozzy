@@ -1,5 +1,5 @@
 import type { ItemNota, ItemRecibo } from './types'
-import type { CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, NovoMovimentoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
@@ -109,6 +109,10 @@ export interface Store {
   itensPedidoUniforme(pedidoId: string): Promise<ItemPedidoUniforme[]>
   // Troca todas as peças de uma pessoa (ou avulsas, funcionarioId null) dentro do pedido.
   definirItensPedido(pedidoId: string, funcionarioId: string | null, itens: Omit<ItemPedidoUniforme, 'id' | 'pedidoId' | 'funcionarioId'>[]): Promise<void>
+  // Estoque de uniformes (só a gestão). Desfazer apaga todos os movimentos da mesma referência.
+  movimentosUniforme(): Promise<MovimentoUniforme[]>
+  movimentarUniformes(linhas: NovoMovimentoUniforme[]): Promise<void>
+  desfazerMovimentoUniforme(referencia: string): Promise<void>
 
   ocorrencias(funcionarioId: string): Promise<Ocorrencia[]>
   // Para o painel da gestão: tudo que eu posso ver num período.
