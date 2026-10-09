@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
+import EscolherConta from '../components/EscolherConta'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { ir } from '../lib/rota'
 import { vejoResultado } from '../lib/permissoes'
 import { formaDoTPag, formatarCnpj, lerXmlNfe } from '../lib/nfe'
-import { dividir, gruposDoPlano, lerValor, mostrarQtd, mostrarValor, nomeCentro, nomeForma, r2, reais, somarMeses } from '../lib/financeiro'
+import { dividir, lerValor, mostrarQtd, mostrarValor, nomeCentro, nomeForma, r2, reais, somarMeses } from '../lib/financeiro'
 import {
   FORMAS_PAGAMENTO,
   type CentroCusto, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor, type Insumo, type MovimentoEstoque, type NotaFiscal,
@@ -342,7 +343,6 @@ function DetalheNota({ id }: { id: string }) {
     }
   }
 
-  const grupos = gruposDoPlano(c.plano)
   const insumosAtivos = c.insumos.filter((i) => i.ativo)
   return (
     <div className="space-y-4">
@@ -381,14 +381,7 @@ function DetalheNota({ id }: { id: string }) {
             </select>
           </Campo>
           <Campo rotulo="Conta contábil" dica={aberta && conta && conta === c.fornecedores.find((f) => f.id === n.fornecedorId)?.contaPadraoId ? 'A mesma da última nota deste fornecedor.' : undefined}>
-            <select className={estiloEntrada} value={conta} disabled={!aberta} onChange={(e) => setConta(e.target.value)}>
-              <option value="" disabled>Escolher</option>
-              {grupos.map((g) => (
-                <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
-                  {g.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}
-                </optgroup>
-              ))}
-            </select>
+            <EscolherConta plano={c.plano} valor={conta} aoMudar={setConta} desativado={!aberta} />
           </Campo>
         </div>
       </Cartao>

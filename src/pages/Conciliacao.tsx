@@ -3,9 +3,10 @@ import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../comp
 import { useApp } from '../lib/contexto'
 import { dataCurta, diaSemana } from '../lib/datas'
 import { type GrupoLote, candidatas, gruposLote, lotesPara, nomeLote, sugestoes, sugestoesLote } from '../lib/conciliacao'
-import { gruposDoPlano, nomeCentro, nomeConta, reais } from '../lib/financeiro'
+import { nomeCentro, nomeConta, reais } from '../lib/financeiro'
 import { chaveExtrato, lerArquivoOfx } from '../lib/ofx'
 import { garantirFornecedor } from './LancarContas'
+import EscolherConta from '../components/EscolherConta'
 import type { CentroCusto, ContaContabil, ContaPagar, Fornecedor, MovimentoExtrato, RegraExtrato, SaldoExtrato } from '../lib/types'
 
 interface Dados {
@@ -290,7 +291,6 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
   const usadas = new Set(d.movs.map((x) => x.contaPagarId).filter((x): x is string => !!x))
   const perto = candidatas(m, d.contas, d.fornecedores, usadas)
   const lotes = lotesPara(m, gruposLote(d.contas, usadas))
-  const grupos = gruposDoPlano(d.plano)
   const nome = (c: ContaPagar) => d.fornecedores.find((f) => f.id === c.fornecedorId)?.nome ?? c.favorecido ?? ''
   const todas = busca
     ? d.contas.filter((c) => !c.conciliado && !usadas.has(c.id) && `${c.descricao} ${nome(c)}`.toLowerCase().includes(busca.toLowerCase()))
@@ -308,14 +308,7 @@ function AcharConta({ d, m, aoFechar, aoEscolher, aoEscolherLote }: {
                 <p><b>{nomeLote(g.lote)}</b>: {g.contas.length} contas, {reais(g.total)}{diferenca > 0 ? <> · <span className="text-amber-700">faltam {reais(diferenca)}</span></> : ' · bate certinho'}</p>
                 {diferenca > 0 && (
                   <Campo rotulo="Lançar a diferença em (juros, tarifa, item que faltou)">
-                    <select className={estiloEntrada} value={contaDif} onChange={(e) => setContaDif(e.target.value)}>
-                      <option value="" disabled>Escolher</option>
-                      {grupos.map((gr) => (
-                        <optgroup key={gr.mae.id} label={`${gr.mae.codigo} ${gr.mae.nome}`}>
-                          {gr.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
+                    <EscolherConta plano={d.plano} valor={contaDif} aoMudar={setContaDif} />
                   </Campo>
                 )}
                 <Botao className="py-1.5!" disabled={diferenca > 0 && !contaDif} onClick={() => aoEscolherLote(g.contas.map((c) => c.id), diferenca > 0 ? contaDif : null)}>
@@ -352,7 +345,6 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
   const [v, setV] = useState({ centro: d.centros.some((x) => x.id === 'central') ? 'central' : '', conta: '', fornecedor: '', descricao: m.descricao })
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
-  const grupos = gruposDoPlano(d.plano)
   const ativos = d.fornecedores.filter((f) => f.ativo)
   // Escolheu um fornecedor conhecido: já traz a conta de sempre dele.
   function mudarFornecedor(texto: string) {
@@ -392,14 +384,7 @@ function LancarDespesa({ d, m, aoFechar, aoSalvar }: { d: Dados; m: MovimentoExt
           </select>
         </Campo>
         <Campo rotulo="Conta contábil">
-          <select className={estiloEntrada} value={v.conta} onChange={(e) => setV({ ...v, conta: e.target.value })}>
-            <option value="" disabled>Escolher</option>
-            {grupos.map((g) => (
-              <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
-                {g.contas.map((x) => <option key={x.id} value={x.id}>{x.codigo} {x.nome}</option>)}
-              </optgroup>
-            ))}
-          </select>
+          <EscolherConta plano={d.plano} valor={v.conta} aoMudar={(id) => setV({ ...v, conta: id })} />
         </Campo>
         {erro && <p className="text-sm text-red-700">{erro}</p>}
         <div className="flex justify-end gap-2">

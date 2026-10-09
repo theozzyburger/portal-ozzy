@@ -4,7 +4,8 @@ import { useApp } from '../lib/contexto'
 import { addMeses, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { lerValor, mostrarValor, nomeCentro, nomeConta, nomeForma, reais } from '../lib/financeiro'
 import { FORMAS_PAGAMENTO, type ContaRecorrente, type FormaPagamento, type SituacaoRecorrente } from '../lib/types'
-import { OpcoesConta, garantirFornecedor, lojaPadrao, type Dados } from './LancarContas'
+import { garantirFornecedor, lojaPadrao, type Dados } from './LancarContas'
+import EscolherConta from '../components/EscolherConta'
 
 interface D extends Dados { recs: ContaRecorrente[] }
 
@@ -188,10 +189,7 @@ function EditarRecorrente({ d, r, aoFechar, aoSalvar }: { d: D; r: ContaRecorren
             </select>
           </Campo>
           <Campo rotulo="Conta contábil">
-            <select className={estiloEntrada} value={v.contaId} onChange={(e) => set({ contaId: e.target.value })}>
-              <option value="" disabled>Escolher</option>
-              <OpcoesConta plano={d.plano} />
-            </select>
+            <EscolherConta plano={d.plano} valor={v.contaId} aoMudar={(id) => set({ contaId: id })} />
           </Campo>
           <Campo rotulo={v.variavel ? 'Valor médio' : 'Valor'}><input className={estiloEntrada} inputMode="decimal" value={v.valor} onChange={(e) => set({ valor: e.target.value })} /></Campo>
           <Campo rotulo="Vence todo dia"><input className={estiloEntrada} inputMode="numeric" value={v.dia} onChange={(e) => set({ dia: e.target.value })} /></Campo>

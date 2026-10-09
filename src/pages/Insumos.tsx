@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
+import EscolherConta from '../components/EscolherConta'
 import { useApp } from '../lib/contexto'
 import { montarCatalogo, nomeUnidade, reais, usadoEm, type Catalogo } from '../lib/custos'
 import { dataLonga } from '../lib/datas'
 import { ir } from '../lib/rota'
 import { formatarCnpj } from '../lib/nfe'
-import { gruposDoPlano } from '../lib/financeiro'
+
 import ImportarFornecedores from './ImportarFornecedores'
 import type { ContaContabil, Fornecedor, Insumo, PrecoInsumo, UnidadeMedida } from '../lib/types'
 
@@ -326,14 +327,7 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
             <div className="grid grid-cols-2 gap-3">
               <Campo rotulo="CNPJ" dica="Liga as notas fiscais a este fornecedor."><input inputMode="numeric" className={estiloEntrada} value={f.cnpj} onChange={mudar('cnpj')} /></Campo>
               <Campo rotulo="Conta contábil de sempre">
-                <select className={estiloEntrada} value={f.contaPadraoId} onChange={mudar('contaPadraoId')}>
-                  <option value="">Nenhuma</option>
-                  {gruposDoPlano(plano).map((g) => (
-                    <optgroup key={g.mae.id} label={`${g.mae.codigo} ${g.mae.nome}`}>
-                      {g.contas.map((c) => <option key={c.id} value={c.id}>{c.codigo} {c.nome}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
+                <EscolherConta plano={plano} valor={f.contaPadraoId} aoMudar={(id) => setF({ ...f, contaPadraoId: id })} vazio="Nenhuma" />
               </Campo>
             </div>
             <div className="grid grid-cols-2 gap-3">

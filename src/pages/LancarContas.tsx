@@ -6,6 +6,7 @@ import { contasLancaveis, dividir, lerValor, mostrarValor, nomeCentro, r2, reais
 import { ir } from '../lib/rota'
 import { soDigitos, type Store } from '../lib/store'
 import { FORMAS_PAGAMENTO, type CentroCusto, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor, type NovaContaPagar } from '../lib/types'
+import EscolherConta from '../components/EscolherConta'
 
 export interface Dados { contas: ContaPagar[]; centros: CentroCusto[]; plano: ContaContabil[]; fornecedores: Fornecedor[] }
 
@@ -24,12 +25,6 @@ export async function garantirFornecedor(store: Store, lista: Fornecedor[], text
   const novo = await store.salvarFornecedor({ nome: texto.trim(), contato: null, telefone: null, observacao: null, ativo: true, cnpj: dig || null })
   lista.push(novo)
   return novo
-}
-
-// Conta contábil: nome primeiro para dar para achar digitando no select ("alu" → Aluguel).
-export function OpcoesConta({ plano }: { plano: ContaContabil[] }) {
-  const lanc = contasLancaveis(plano).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  return <>{lanc.map((x) => <option key={x.id} value={x.id}>{x.nome} · {x.codigo}</option>)}</>
 }
 
 interface Parcela { vencimento: string; valor: string }
@@ -198,10 +193,7 @@ export function EditarConta({ d, conta, aoFechar, aoSalvar }: { d: Dados; conta:
           </datalist>
         </Campo>
         <Campo rotulo="Conta contábil">
-          <select className={estiloEntrada} value={v.contaId} onChange={(e) => setV({ ...v, contaId: e.target.value })}>
-            <option value="" disabled>Escolher (digite o nome)</option>
-            <OpcoesConta plano={d.plano} />
-          </select>
+          <EscolherConta plano={d.plano} valor={v.contaId} aoMudar={(id) => setV({ ...v, contaId: id })} />
         </Campo>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo={v.repeticao === 'parcelada' && !conta ? 'Valor total (R$)' : 'Valor (R$)'}>
