@@ -42,10 +42,11 @@ const tipoDia = (data: string) => {
 }
 export const NOME_TIPO_DIA: Record<string, string> = { sexta: 'sexta-feira', sabado: 'sábado', domingo: 'domingo', semana: 'dia de semana' }
 
-// Eventos parecidos para servir de base: finalizados, com vendas, da mesma gastronomia (se houver), mais recentes primeiro.
+// Eventos parecidos para servir de base: finalizados, com vendas, que não estão marcados como fora da média,
+// da mesma gastronomia (se houver), mais recentes primeiro.
 export function referenciasPadrao(alvo: Evento, eventos: Evento[], vendas: VendaEvento[]) {
   const comVenda = new Set(vendas.map((v) => v.eventoId))
-  const fim = eventos.filter((e) => e.id !== alvo.id && e.status === 'finalizado' && comVenda.has(e.id))
+  const fim = eventos.filter((e) => e.id !== alvo.id && e.status === 'finalizado' && !e.foraDaMedia && comVenda.has(e.id))
   const mesma = alvo.gastronomia ? fim.filter((e) => e.gastronomia === alvo.gastronomia) : []
   return (mesma.length ? mesma : fim).sort((a, b) => (b.dias[0]?.data ?? '').localeCompare(a.dias[0]?.data ?? '')).slice(0, 5)
 }

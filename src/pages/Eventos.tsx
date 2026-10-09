@@ -37,7 +37,7 @@ const CAMPOS: Record<string, string> = {
   desmontagem_inicio: 'início da desmontagem', desmontagem_fim: 'fim da desmontagem', taxa_organizador_pct: 'taxa do organizador',
   valor_fixo: 'valor fixo', condicoes: 'condições', quem_recebe: 'quem recebe as vendas', repasse_prazo_dias: 'prazo do repasse',
   repasse_obs: 'observação do repasse', infraestrutura: 'infraestrutura', observacao: 'observações',
-  cidade: 'cidade', gastronomia: 'gastronomia', barracas: 'barracas', margem_seguranca_pct: 'folga da separação', diaria_freela: 'diária do freela', latitude: 'local no mapa', longitude: 'local no mapa',
+  cidade: 'cidade', gastronomia: 'gastronomia', barracas: 'barracas', margem_seguranca_pct: 'folga da separação', diaria_freela: 'diária do freela', latitude: 'local no mapa', longitude: 'local no mapa', fora_da_media: 'fora da média',
 }
 
 // O que ainda falta definir no evento, para a gestão não esquecer (não impede salvar).
@@ -448,7 +448,7 @@ const emBranco: NovoEvento = {
   nome: '', status: 'negociacao', statusMotivo: null, tipo: null, organizador: null, organizadorContato: null, local: null, endereco: null,
   publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null, taxaOrganizadorPct: null,
   valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null, infraestrutura: null, observacao: null,
-  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null, foraDaMedia: false,
   dias: [], operacoes: [], responsaveis: [],
 }
 

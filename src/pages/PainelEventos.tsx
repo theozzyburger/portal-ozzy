@@ -3,7 +3,7 @@ import { Cartao, Vazio } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { montarCatalogo, reais, type Catalogo } from '../lib/custos'
 import { addDias, dataCurta, hoje } from '../lib/datas'
-import { montarPainel, type ResumoProduto } from '../lib/painelEventos'
+import { montarPainel, posicaoEventos, type PosicaoEvento, type ResumoProduto } from '../lib/painelEventos'
 import { ir } from '../lib/rota'
 import type { Evento, VendaEvento } from '../lib/types'
 
@@ -63,7 +63,7 @@ type OrdemProduto = 'fat' | 'itens' | 'porDia' | 'margem'
 
 // Painel de eventos (pedido de 08/10): o que faturou mais, gastronomias, dias da semana, ano a ano e produtos.
 export default function PainelEventos() {
-  const { store } = useApp()
+  const { store, avisar } = useApp()
   const [dados, setDados] = useState<{ eventos: Evento[]; vendas: VendaEvento[]; cat: Catalogo | null } | null>(null)
   const [erro, setErro] = useState('')
   const [periodo, setPeriodo] = useState<Periodo>('tudo')
@@ -71,6 +71,7 @@ export default function PainelEventos() {
   const [eventoPor, setEventoPor] = useState<'fat' | 'porDia'>('fat')
   const [ordemProd, setOrdemProd] = useState<OrdemProduto>('fat')
   const [todosProdutos, setTodosProdutos] = useState(false)
+  const [escolher, setEscolher] = useState(false)
 
   useEffect(() => {
     Promise.all([store.eventos(), store.vendasEventos(), store.insumos(), store.receitas(), store.versoesReceitas()])
@@ -84,13 +85,27 @@ export default function PainelEventos() {
     () => [...new Set((dados?.eventos ?? []).filter((e) => comVendas.has(e.id)).map((e) => e.gastronomia).filter(Boolean))].sort() as string[],
     [dados, comVendas],
   )
+  const posicao = useMemo(() => (dados ? posicaoEventos(dados.eventos, dados.vendas) : new Map<string, PosicaoEvento>()), [dados])
   const painel = useMemo(() => {
     if (!dados) return null
     const desde = addDias(hoje(), -365)
     const vendas = dados.vendas.filter((v) => (periodo === 'tudo' ? true : periodo === '12m' ? v.data >= desde : v.data.startsWith(periodo)))
-    const eventos = dados.eventos.filter((e) => !gastro || e.gastronomia === gastro)
+    // Eventos marcados como fora da média não entram em nenhuma conta do painel.
+    const eventos = dados.eventos.filter((e) => !e.foraDaMedia && (!gastro || e.gastronomia === gastro))
     return montarPainel(eventos, vendas, dados.cat)
   }, [dados, periodo, gastro])
+
+  // A escolha fica salva no evento: vale para o painel e para a sugestão da previsão dos próximos eventos.
+  const alternar = async (e: Evento) => {
+    const fora = !e.foraDaMedia
+    setDados((d) => d && { ...d, eventos: d.eventos.map((x) => (x.id === e.id ? { ...x, foraDaMedia: fora } : x)) })
+    try {
+      await store.marcarForaDaMedia(e.id, fora)
+    } catch (err) {
+      setDados((d) => d && { ...d, eventos: d.eventos.map((x) => (x.id === e.id ? { ...x, foraDaMedia: !fora } : x)) })
+      avisar((err as Error).message)
+    }
+  }
 
   if (erro) return <p className="text-red-600">{erro}</p>
   if (!dados || !painel) return <p className="text-stone-400">Carregando…</p>
@@ -109,6 +124,14 @@ export default function PainelEventos() {
         <Opcoes valor={periodo} aoMudar={setPeriodo} opcoes={[['tudo', 'Tudo'], ...anos.map((a) => [a, a] as [string, string]), ['12m', 'Últimos 12 meses']]} />
         <Opcoes valor={gastro} aoMudar={setGastro} opcoes={[['', 'Todas as gastronomias'], ...gastronomias.map((g) => [g, g] as [string, string])]} />
       </div>
+
+      <EventosNaConta
+        eventos={dados.eventos.filter((e) => comVendas.has(e.id))}
+        posicao={posicao}
+        aberto={escolher}
+        aoAbrir={() => setEscolher((x) => !x)}
+        aoAlternar={alternar}
+      />
 
       {!p.eventos.length ? (
         <Vazio>Nenhum evento com vendas nesse filtro.</Vazio>
@@ -269,5 +292,61 @@ export default function PainelEventos() {
         </>
       )}
     </div>
+  )
+}
+
+// Quais eventos entram nas médias. Marca sozinho nada: só avisa os que estão muito longe do normal da gastronomia.
+function EventosNaConta({ eventos, posicao, aberto, aoAbrir, aoAlternar }: {
+  eventos: Evento[]
+  posicao: Map<string, PosicaoEvento>
+  aberto: boolean
+  aoAbrir: () => void
+  aoAlternar: (e: Evento) => void
+}) {
+  const fora = eventos.filter((e) => e.foraDaMedia)
+  const avisos = eventos.filter((e) => !e.foraDaMedia && posicao.get(e.id)?.aviso)
+  const ordenados = [...eventos].sort((a, b) => (b.dias[0]?.data ?? '').localeCompare(a.dias[0]?.data ?? ''))
+  return (
+    <Cartao>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1 text-sm">
+          <span className="font-semibold">{eventos.length - fora.length} de {eventos.length} eventos na conta</span>
+          {fora.length > 0 && <span className="text-stone-500"> · fora da média: {fora.map((e) => e.nome).join(', ')}</span>}
+          {avisos.length > 0 && !aberto && <span className="block text-xs text-amber-800">{avisos.length} {avisos.length === 1 ? 'evento está' : 'eventos estão'} bem longe do normal da gastronomia.</span>}
+        </div>
+        <button onClick={aoAbrir} className="rounded-lg bg-stone-100 px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-200">
+          {aberto ? 'Fechar' : 'Escolher eventos'}
+        </button>
+      </div>
+      {aberto && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-stone-500">
+            Desmarque os eventos fora da média. A escolha fica salva e vale para todo o painel e para a sugestão da previsão dos próximos eventos (lá ainda dá para marcar de novo na hora).
+          </p>
+          <div className="divide-y divide-stone-100 rounded-xl ring-1 ring-stone-200">
+            {ordenados.map((e) => {
+              const pos = posicao.get(e.id)
+              return (
+                <label key={e.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-stone-50">
+                  <input type="checkbox" className="size-4" checked={!e.foraDaMedia} onChange={() => aoAlternar(e)} aria-label={`Incluir ${e.nome} na média`} />
+                  <div className="min-w-0 flex-1">
+                    <div className={`font-semibold ${e.foraDaMedia ? 'text-stone-400 line-through' : ''}`}>{e.nome}</div>
+                    <div className="text-xs text-stone-500">
+                      {[e.dias[0] && dataCurta(e.dias[0].data), e.gastronomia, pos && `${curto(pos.porDia)} por dia`].filter(Boolean).join(' · ')}
+                    </div>
+                  </div>
+                  {pos?.aviso && (
+                    <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${pos.aviso === 'acima' ? 'bg-sky-50 text-sky-800' : 'bg-amber-50 text-amber-800'}`}
+                      title={`Faturamento por dia ${pos.relacao!.toFixed(1).replace('.', ',')} vezes o normal de ${e.gastronomia}`}>
+                      {pos.aviso === 'acima' ? '▲ muito acima' : '▼ muito abaixo'} do normal
+                    </span>
+                  )}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </Cartao>
   )
 }

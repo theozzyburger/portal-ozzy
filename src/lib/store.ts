@@ -290,6 +290,7 @@ export interface Store {
   excluirDiariaFreelaEvento(id: string): Promise<void>
   marcarPagoFreelaEvento(eventoId: string, freelaId: string, pago: boolean): Promise<void>
   definirLocalEvento(eventoId: string, lat: number, lng: number): Promise<void>
+  marcarForaDaMedia(eventoId: string, fora: boolean): Promise<void>
   // Link dos freelas de evento (sem login).
   eventosAbertosDiaria(): Promise<EventoAberto[]>
   freelaEventoQuemSou(cpf: string, celular: string): Promise<QuemSouFreela>

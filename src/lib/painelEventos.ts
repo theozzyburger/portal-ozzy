@@ -229,3 +229,37 @@ export function montarPainel(eventos: Evento[], vendas: VendaEvento[], cat: Cata
     linhas: [...linhas.entries()].map(([nome, l]) => ({ nome, ...l })).sort((a, b) => b.fat - a.fat),
   }
 }
+
+export interface PosicaoEvento {
+  porDia: number
+  // Faturamento por dia ÷ mediana da mesma gastronomia (null quando a gastronomia tem menos de 3 eventos).
+  relacao: number | null
+  // 'acima' ou 'abaixo' quando o evento está muito longe do normal da gastronomia (sugestão para tirar da média).
+  aviso: 'acima' | 'abaixo' | null
+}
+
+// Onde cada evento com vendas fica em relação aos parecidos: ajuda a decidir o que tirar da média.
+export function posicaoEventos(eventos: Evento[], vendas: VendaEvento[]): Map<string, PosicaoEvento> {
+  const fat = new Map<string, number>()
+  const dias = new Map<string, Set<string>>()
+  for (const v of vendas) {
+    fat.set(v.eventoId, (fat.get(v.eventoId) ?? 0) + (v.total ?? 0))
+    dias.set(v.eventoId, (dias.get(v.eventoId) ?? new Set()).add(v.data))
+  }
+  const porDia = new Map([...fat.entries()].map(([id, f]) => [id, f / dias.get(id)!.size]))
+  const grupos = new Map<string, number[]>()
+  for (const e of eventos) if (porDia.has(e.id)) grupos.set(e.gastronomia ?? '', [...(grupos.get(e.gastronomia ?? '') ?? []), porDia.get(e.id)!])
+  const mediana = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b)
+    return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2
+  }
+  const r = new Map<string, PosicaoEvento>()
+  for (const e of eventos) {
+    const pd = porDia.get(e.id)
+    if (pd === undefined) continue
+    const g = grupos.get(e.gastronomia ?? '') ?? []
+    const relacao = e.gastronomia && g.length >= 3 ? pd / mediana(g) : null
+    r.set(e.id, { porDia: pd, relacao, aviso: relacao === null ? null : relacao >= 1.6 ? 'acima' : relacao <= 0.6 ? 'abaixo' : null })
+  }
+  return r
+}

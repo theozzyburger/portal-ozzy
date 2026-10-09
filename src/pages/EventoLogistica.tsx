@@ -4,6 +4,7 @@ import { useApp } from '../lib/contexto'
 import { cmv, custoFicha, montarCatalogo, nomeUnidade, qtd, reais, type Catalogo } from '../lib/custos'
 import { dataCurta, diaSemana, hoje, tempoDesde } from '../lib/datas'
 import { arredondarPara, consumoEvento, estoqueBase, quantoLevar, referenciasPadrao, semFicha, sugerirVendas, type LinhaLevar } from '../lib/logistica'
+import { posicaoEventos } from '../lib/painelEventos'
 import { ir } from '../lib/rota'
 import { criarReconhecedor, lerContagem } from '../lib/voz'
 import {
@@ -109,6 +110,7 @@ export function CardapioPrevisao({ e, eventos, d, aoMudar }: { e: Evento; evento
   const receita = (id: string) => g.receitas.find((r) => r.id === id)
   const q = (r: string, dia: string) => numero(grade[`${r}|${dia}`] ?? '') ?? 0
   const finalizados = eventos.filter((x) => x.id !== e.id && x.status === 'finalizado' && g.vendas.some((v) => v.eventoId === x.id))
+  const posicao = useMemo(() => posicaoEventos(eventos, g.vendas), [eventos, g.vendas])
 
   const totalDia = (dia: string) => cardapio.reduce((s, c) => s + q(c.receitaId, dia), 0)
   const fatDia = (dia: string) => cardapio.reduce((s, c) => s + q(c.receitaId, dia) * (c.preco ?? 0), 0)
@@ -165,7 +167,8 @@ export function CardapioPrevisao({ e, eventos, d, aoMudar }: { e: Evento; evento
           <h3 className="font-bold">Sugerir pelo histórico</h3>
           <p className="mt-1 text-sm text-stone-600">
             Média de vendas por dia de cada produto nos eventos marcados. Sexta, sábado e domingo usam a média do mesmo dia da semana.
-            {e.gastronomia && ` Já marquei os mais recentes de gastronomia ${e.gastronomia}.`}
+            {e.gastronomia && ` Já marquei os mais recentes de gastronomia ${e.gastronomia}`}{e.gastronomia ? ', menos os que estão fora da média.' : ' Os que estão fora da média começam desmarcados.'}
+            {' '}Desmarque o que for muito diferente do evento que vem.
           </p>
           <div className="mt-3 max-h-56 space-y-1 overflow-y-auto">
             {finalizados.length === 0 && <p className="text-sm text-stone-500">Nenhum evento finalizado com vendas.</p>}
@@ -173,7 +176,12 @@ export function CardapioPrevisao({ e, eventos, d, aoMudar }: { e: Evento; evento
               <label key={x.id} className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={refs.includes(x.id)} onChange={(ev) => setRefs((r) => (ev.target.checked ? [...r, x.id] : r.filter((y) => y !== x.id)))} />
                 <span>{x.nome}</span>
-                <span className="text-xs text-stone-500">{x.dias[0] && dataCurta(x.dias[0].data)}{x.gastronomia && ` · ${x.gastronomia}`}{x.barracas !== null && ` · ${doNumero(x.barracas)} barraca(s)`}</span>
+                <span className="text-xs text-stone-500">
+                  {x.dias[0] && dataCurta(x.dias[0].data)}{x.gastronomia && ` · ${x.gastronomia}`}{x.barracas !== null && ` · ${doNumero(x.barracas)} barraca(s)`}
+                  {posicao.get(x.id) && ` · ${reais(posicao.get(x.id)!.porDia, 0)} por dia`}
+                </span>
+                {x.foraDaMedia ? <span className="rounded-md bg-stone-100 px-1.5 text-xs font-semibold text-stone-600">fora da média</span>
+                  : posicao.get(x.id)?.aviso && <span className="rounded-md bg-amber-50 px-1.5 text-xs font-semibold text-amber-800">{posicao.get(x.id)!.aviso === 'acima' ? 'muito acima' : 'muito abaixo'} do normal</span>}
               </label>
             ))}
           </div>

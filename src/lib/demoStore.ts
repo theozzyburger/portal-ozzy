@@ -135,7 +135,7 @@ const eventoDemo = (n: number, dias: number[], extra: Partial<Evento>): Evento =
   local: null, endereco: null, publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null,
   taxaOrganizadorPct: null, valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null,
   infraestrutura: null, observacao: null, operacoes: [], responsaveis: [],
-  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null, foraDaMedia: false,
   dias: dias.map((d) => ({ data: addDias(hoje(), d), abre: '12:00', fecha: '22:00' })),
   criadoPor: 'f1', criadoEm: haHoras(24 * 30), atualizadoPor: 'f1', atualizadoEm: haHoras(24 * 2), ...extra,
 })
@@ -176,6 +176,10 @@ const eventosDemo: Evento[] = [
   eventoDemo(7, [-425, -424, -423], {
     nome: 'Festival Italiano Interior 2025 (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Shopping Exemplo',
     cidade: 'Sorocaba', gastronomia: 'Italiano', barracas: 2, taxaOrganizadorPct: 21, quemRecebe: 'organizador',
+  }),
+  eventoDemo(9, [-300, -299], {
+    nome: 'Festival Italiano Capital (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Parque Exemplo',
+    cidade: 'São Paulo', gastronomia: 'Italiano', barracas: 4, taxaOrganizadorPct: 21, quemRecebe: 'organizador', foraDaMedia: true,
   }),
   eventoDemo(8, [-150, -149], {
     nome: 'Festival Árabe (exemplo)', status: 'finalizado', tipo: 'Festival gastronômico', organizador: 'Produtora Exemplo', local: 'Praça Exemplo',
@@ -230,6 +234,7 @@ const vendasEventosDemo: VendaEvento[] = [
   ...[[-60, 180, 200, 150], [-59, 420, 470, 330], [-58, 360, 390, 280]].flatMap(([d, a, b, c]) => [vendaDemo('ev5', d, 're2', a, 55), vendaDemo('ev5', d, 're3', b, 9), vendaDemo('ev5', d, 're4', c, 50)]),
   ...[[-425, 150, 180, 120], [-424, 300, 330, 220], [-423, 260, 280, 190]].flatMap(([d, a, b, c]) => [vendaDemo('ev7', d, 're2', a, 50), vendaDemo('ev7', d, 're3', b, 8), vendaDemo('ev7', d, 're4', c, 45)]),
   ...[[-150, 140, 160, 60], [-149, 190, 220, 80]].flatMap(([d, a, b, c]) => [vendaDemo('ev8', d, 're2', a, 55), vendaDemo('ev8', d, 're3', b, 9), vendaDemo('ev8', d, 're5', c, 25)]),
+  ...[[-300, 1300, 1500, 1100], [-299, 1600, 1800, 1300]].flatMap(([d, a, b, c]) => [vendaDemo('ev9', d, 're2', a, 55), vendaDemo('ev9', d, 're3', b, 9), vendaDemo('ev9', d, 're4', c, 50)]),
   vendaDemo('ev5', -59, 're5', 90, 25), vendaDemo('ev5', -58, 're5', 70, 25),
   vendaDemo('ev6', -1, 're2', 260, 55), vendaDemo('ev6', -1, 're3', 300, 9), vendaDemo('ev6', -1, 're4', 210, 50),
 ]
@@ -1610,6 +1615,10 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async definirLocalEvento(eventoId, lat, lng) {
       exigeGestao()
       Object.assign(eventosDemo.find((e) => e.id === eventoId)!, { latitude: lat, longitude: lng })
+    },
+    async marcarForaDaMedia(eventoId, fora) {
+      exigeGestao()
+      eventosDemo.find((e) => e.id === eventoId)!.foraDaMedia = fora
     },
     async eventosAbertosDiaria() {
       const ini = addDias(hoje(), -13)

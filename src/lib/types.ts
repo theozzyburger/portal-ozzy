@@ -814,6 +814,8 @@ export interface Evento {
   margemSegurancaPct: number
   // Valor padrão da diária de freelancer neste evento.
   diariaFreela: number | null
+  // Fica fora das médias do painel e da sugestão da previsão (a gestão escolhe).
+  foraDaMedia: boolean
   // Local do evento, para a diária mandada de lá valer como presença.
   latitude: number | null
   longitude: number | null

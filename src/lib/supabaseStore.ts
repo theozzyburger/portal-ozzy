@@ -1030,6 +1030,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async definirLocalEvento(eventoId, lat, lng) {
       ok(await sb.rpc('definir_local_evento', { p_evento: eventoId, p_lat: lat, p_lng: lng }))
     },
+    async marcarForaDaMedia(eventoId, fora) {
+      ok(await sb.from('eventos').update({ fora_da_media: fora }).eq('id', eventoId))
+    },
     async eventosAbertosDiaria() {
       return (ok(await sb.rpc('freela_eventos_abertos')) ?? []).map((r: any) => ({ id: r.id, nome: r.nome, dias: r.dias ?? [] }))
     },
@@ -1079,7 +1082,7 @@ const paraEvento = (r: any): Evento => ({
   taxaOrganizadorPct: numeroOuNulo(r.taxa_organizador_pct), valorFixo: numeroOuNulo(r.valor_fixo), condicoes: r.condicoes, quemRecebe: r.quem_recebe,
   repassePrazoDias: r.repasse_prazo_dias, repasseObs: r.repasse_obs, infraestrutura: r.infraestrutura, observacao: r.observacao,
   cidade: r.cidade ?? null, gastronomia: r.gastronomia ?? null, barracas: numeroOuNulo(r.barracas), margemSegurancaPct: Number(r.margem_seguranca_pct ?? 10),
-  diariaFreela: numeroOuNulo(r.diaria_freela), latitude: r.latitude ?? null, longitude: r.longitude ?? null,
+  diariaFreela: numeroOuNulo(r.diaria_freela), latitude: r.latitude ?? null, longitude: r.longitude ?? null, foraDaMedia: r.fora_da_media ?? false,
   dias: (r.evento_dias ?? [])
     .map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null }))
     .sort((a: DiaEvento, b: DiaEvento) => a.data.localeCompare(b.data)),
