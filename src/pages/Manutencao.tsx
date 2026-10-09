@@ -141,6 +141,7 @@ function Chamados() {
                   <span className="flex flex-wrap items-center gap-1.5">
                     {chamadoEmAberto(c.status) && <Selo cor={SELO_GRAVIDADE[c.gravidade]}>{nomeGravidade(c.gravidade)}</Selo>}
                     <Selo cor={SELO_STATUS[c.status]}>{nomeStatus(c.status)}</Selo>
+                    {c.aguardandoId && chamadoEmAberto(c.status) && <Selo cor="ambar">Aguardando {nomeCurto(nomeDe(c.aguardandoId))}</Selo>}
                     <span className="text-xs text-stone-500">#{c.numero}</span>
                   </span>
                   <span className="mt-1 block font-semibold">{c.titulo}</span>
@@ -282,9 +283,14 @@ function NovoChamado({ aoFechar, aoSalvar }: { aoFechar: () => void; aoSalvar: (
   )
 }
 
-function Detalhe({ chamado: c, aoFechar, aoMudar }: { chamado: Chamado; aoFechar: () => void; aoMudar: () => Promise<unknown> }) {
+export function Detalhe({ chamado: c, aoFechar, aoMudar }: { chamado: Chamado; aoFechar: () => void; aoMudar: () => Promise<unknown> }) {
   const { eu, store, unidades, nomeDe, avisar } = useApp()
   const atende = atendeChamados(eu.nivel)
+  const [esperar, setEsperar] = useState<{ pessoa: string; motivo: string } | null>(null)
+  const [pessoas, setPessoas] = useState<{ id: string; nome: string; cargo: string | null }[]>([])
+  useEffect(() => {
+    if (esperar && !pessoas.length) store.pessoasAtivas().then((ps) => setPessoas(ps.filter((p) => p.id !== eu.id)))
+  }, [esperar, pessoas.length, store, eu.id])
   const [foto, setFoto] = useState<string | null>(null)
   const [texto, setTexto] = useState('')
   const [erro, setErro] = useState('')
@@ -302,6 +308,21 @@ function Detalhe({ chamado: c, aoFechar, aoMudar }: { chamado: Chamado; aoFechar
       setTexto('')
       await aoMudar()
       avisar(status ? `Chamado #${c.numero}: ${nomeStatus(status).toLowerCase()}` : 'Comentário enviado')
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }
+
+  // Esperando alguém (Heitor, 09/10): a pessoa vê na página inicial o que depende dela.
+  const aguardar = async (pessoa: string | null, motivo: string) => {
+    if (pessoa === '') return setErro('Escolha quem você está esperando.')
+    try {
+      setErro('')
+      await store.aguardarChamado(c.id, pessoa, motivo)
+      setEsperar(null)
+      setTexto('')
+      await aoMudar()
+      avisar(pessoa ? `${nomeCurto(nomeDe(pessoa))} vai ver na página inicial dele(a)` : 'Pronto, saiu da espera')
     } catch (e) {
       setErro((e as Error).message)
     }
@@ -343,6 +364,44 @@ function Detalhe({ chamado: c, aoFechar, aoMudar }: { chamado: Chamado; aoFechar
             </>
           )}
         </dl>
+
+        {c.aguardandoId && chamadoEmAberto(c.status) && (
+          <div className="space-y-2 rounded-xl bg-amber-50 p-3 text-sm ring-1 ring-amber-200">
+            <p>
+              <b>Aguardando {c.aguardandoId === eu.id ? 'você' : nomeDe(c.aguardandoId)}</b>
+              {c.aguardandoDesde && <span className="text-stone-500"> · {haQuanto(c.aguardandoDesde)}</span>}
+            </p>
+            {c.aguardandoMotivo && <p className="text-stone-700">{c.aguardandoMotivo}</p>}
+            <div className="flex flex-wrap gap-2">
+              {c.aguardandoId === eu.id && <Botao className="py-1.5!" onClick={() => aguardar(null, texto)}>Fiz a minha parte</Botao>}
+              {atende && c.aguardandoId !== eu.id && <Botao variante="secundario" className="py-1.5!" onClick={() => aguardar(null, texto)}>Não está mais esperando</Botao>}
+            </div>
+            {c.aguardandoId === eu.id && <p className="text-xs text-stone-500">Se quiser, escreva abaixo o que você decidiu antes de clicar.</p>}
+          </div>
+        )}
+
+        {atende && chamadoEmAberto(c.status) && (esperar ? (
+          <div className="space-y-2 rounded-xl bg-stone-50 p-3">
+            <Campo rotulo="Esperando quem?">
+              <select className={estiloEntrada} value={esperar.pessoa} onChange={(e) => setEsperar({ ...esperar, pessoa: e.target.value })} aria-label="Esperando quem">
+                <option value="">Escolher</option>
+                {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.cargo ? ` (${p.cargo})` : ''}</option>)}
+              </select>
+            </Campo>
+            <Campo rotulo="O que depende da pessoa">
+              <input className={estiloEntrada} placeholder="Ex.: aprovar o orçamento, liberar o pagamento da peça" value={esperar.motivo}
+                onChange={(e) => setEsperar({ ...esperar, motivo: e.target.value })} />
+            </Campo>
+            <div className="flex gap-2">
+              <Botao className="py-1.5!" onClick={() => aguardar(esperar.pessoa, esperar.motivo)}>Marcar</Botao>
+              <Botao variante="fantasma" className="py-1.5!" onClick={() => setEsperar(null)}>Cancelar</Botao>
+            </div>
+          </div>
+        ) : (
+          <button className="text-sm font-semibold underline" onClick={() => setEsperar({ pessoa: '', motivo: '' })}>
+            {c.aguardandoId ? 'Mudar quem está sendo esperado' : 'Depende de alguém? Marcar quem está esperando'}
+          </button>
+        ))}
 
         {c.eventos.length > 0 && (
           <ol className="space-y-3 border-l-2 border-stone-200 pl-4">

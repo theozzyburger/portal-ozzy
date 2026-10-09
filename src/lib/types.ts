@@ -393,6 +393,10 @@ export interface Chamado {
   abertoEm: string
   responsavelId: string | null
   fechadoEm: string | null
+  // Quem a manutenção está esperando para seguir (0057): aparece na página inicial dessa pessoa.
+  aguardandoId?: string | null
+  aguardandoDesde?: string | null
+  aguardandoMotivo?: string | null
   eventos: EventoChamado[]
 }
 

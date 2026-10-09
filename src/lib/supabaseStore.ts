@@ -69,6 +69,7 @@ const paraChamado = (r: any): Chamado => ({
   id: r.id, numero: r.numero, unidadeId: r.unidade_id, categoria: r.categoria, gravidade: r.gravidade, titulo: r.titulo,
   descricao: r.descricao, local: r.local, foto: r.foto, status: r.status, abertoPor: r.aberto_por, abertoEm: r.aberto_em,
   responsavelId: r.responsavel_id, fechadoEm: r.fechado_em,
+  aguardandoId: r.aguardando_id ?? null, aguardandoDesde: r.aguardando_desde ?? null, aguardandoMotivo: r.aguardando_motivo ?? null,
   eventos: (r.chamado_eventos ?? [])
     .map((e: any) => ({ id: e.id, autorId: e.autor_id, em: e.em, texto: e.texto, status: e.status }))
     .sort((a: any, b: any) => a.em.localeCompare(b.em)),
@@ -168,6 +169,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async unidades() {
       return ok(await sb.from('unidades').select('id, nome').order('nome')) ?? []
+    },
+    async pessoasAtivas() {
+      return ok(await sb.rpc('pessoas_ativas')) ?? []
     },
     async nomes() {
       return ok(await sb.rpc('nomes_funcionarios')) ?? []
@@ -649,6 +653,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     },
     async atualizarChamado(id, m) {
       ok(await sb.rpc('atualizar_chamado', { chamado: id, novo_status: m.status ?? null, comentario: m.texto?.trim() || null }))
+    },
+    async aguardarChamado(id, pessoaId, motivo) {
+      ok(await sb.rpc('aguardar_chamado', { p_chamado: id, p_pessoa: pessoaId, p_motivo: motivo.trim() || null }))
     },
     async fotoChamado(c) {
       if (!c.foto) return null

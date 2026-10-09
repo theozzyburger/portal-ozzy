@@ -2,6 +2,7 @@ import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, pod
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
 import type { Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import { chamadoEmAberto } from './types'
 import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -109,7 +110,11 @@ const chamados: Chamado[] = [
     id: 'ch3', numero: 3, unidadeId: 'pizza', categoria: 'computador', gravidade: 'importante', titulo: 'Impressora de pedidos falhando',
     descricao: 'A impressora térmica para de imprimir no meio do pedido. Desligar e ligar resolve por um tempo.', local: 'Balcão',
     foto: null, status: 'aguardando', abertoPor: 'p-maria-costa', abertoEm: haHoras(70), responsavelId: 'p-vanderlei', fechadoEm: null,
-    eventos: [{ id: 'e2', autorId: 'p-vanderlei', em: haHoras(50), texto: 'Cabo com mau contato. Pedi um cabo novo, chega quinta.', status: 'aguardando' }],
+    aguardandoId: 'f1', aguardandoDesde: haHoras(48), aguardandoMotivo: 'Aprovar a compra da impressora nova (R$ 890), o cabo não resolveu',
+    eventos: [
+      { id: 'e2', autorId: 'p-vanderlei', em: haHoras(50), texto: 'Cabo com mau contato. Pedi um cabo novo, chega quinta.', status: 'aguardando' },
+      { id: 'e2b', autorId: 'p-vanderlei', em: haHoras(48), texto: 'Aguardando Heitor: Aprovar a compra da impressora nova (R$ 890), o cabo não resolveu', status: null },
+    ],
   },
   {
     id: 'ch4', numero: 4, unidadeId: 'burger-psd', categoria: 'reforma', gravidade: 'simples', titulo: 'Pintura descascando no banheiro dos clientes',
@@ -1251,7 +1256,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async chamados() {
       const u = exigeEu()
-      const ver = (c: Chamado) => atendeChamados(u.nivel) || c.abertoPor === u.id || c.unidadeId === u.unidadeId
+      const ver = (c: Chamado) => atendeChamados(u.nivel) || c.abertoPor === u.id || c.unidadeId === u.unidadeId || c.aguardandoId === u.id
       return espera(chamados.filter(ver).map((c) => ({ ...c, eventos: [...c.eventos] })).sort((a, b) => b.abertoEm.localeCompare(a.abertoEm)))
     },
     async abrirChamado(n) {
@@ -1274,8 +1279,34 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         c.status = m.status
         if (!c.responsavelId && u.nivel === 'manutencao') c.responsavelId = u.id
         c.fechadoEm = m.status === 'resolvido' || m.status === 'cancelado' ? agora() : null
+        if (c.fechadoEm) Object.assign(c, { aguardandoId: null, aguardandoDesde: null, aguardandoMotivo: null })
       }
       c.eventos.push({ id: novoId('e'), autorId: u.id, em: agora(), texto: m.texto?.trim() || null, status: m.status ?? null })
+    },
+    async pessoasAtivas() {
+      exigeEu()
+      return espera(funcionarios.filter((f) => f.status === 'ativo').map((f) => ({ id: f.id, nome: f.nome, cargo: f.cargo ?? null })).sort((a, b) => a.nome.localeCompare(b.nome)))
+    },
+    async aguardarChamado(id, pessoaId, motivo) {
+      const u = exigeEu()
+      const c = chamados.find((x) => x.id === id)
+      if (!c) throw new Error('Chamado não encontrado.')
+      if (!chamadoEmAberto(c.status)) throw new Error('Este chamado já foi encerrado.')
+      const m = motivo.trim()
+      if (pessoaId) {
+        if (!atendeChamados(u.nivel)) throw new Error('Só a manutenção e a gestão marcam quem estão esperando.')
+        const p = funcionarios.find((x) => x.id === pessoaId)
+        if (!p) throw new Error('Pessoa não encontrada.')
+        Object.assign(c, { aguardandoId: p.id, aguardandoDesde: agora(), aguardandoMotivo: m || null })
+        c.eventos.push({ id: novoId('e'), autorId: u.id, em: agora(), texto: `Aguardando ${p.nome}${m ? ': ' + m : ''}`, status: null })
+      } else if (c.aguardandoId) {
+        if (!atendeChamados(u.nivel) && c.aguardandoId !== u.id) throw new Error('Só a manutenção, a gestão ou quem está sendo esperado tiram a espera.')
+        const nome = funcionarios.find((x) => x.id === c.aguardandoId)?.nome ?? ''
+        const eu = c.aguardandoId === u.id
+        Object.assign(c, { aguardandoId: null, aguardandoDesde: null, aguardandoMotivo: null })
+        c.eventos.push({ id: novoId('e'), autorId: u.id, em: agora(), texto: `${eu ? 'Fiz a minha parte' : 'Não está mais aguardando ' + nome}${m ? ': ' + m : ''}`, status: null })
+      }
+      return espera(undefined)
     },
     async solicitacoesUniforme(fid) {
       const u = exigeEu()

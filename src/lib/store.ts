@@ -65,6 +65,8 @@ export interface Store {
   unidades(): Promise<Unidade[]>
   // Só id e nome de todos (inclusive inativos), para mostrar quem publicou um aviso ou registrou algo.
   nomes(): Promise<{ id: string; nome: string }[]>
+  // Só quem está ativo, com o cargo (para quem não vê o cadastro da equipe, como a manutenção).
+  pessoasAtivas(): Promise<{ id: string; nome: string; cargo: string | null }[]>
   funcionarios(): Promise<Funcionario[]>
   salvarFuncionario(f: NovoFuncionario, senhaInicial?: string): Promise<Funcionario>
   // Foto de perfil (já recortada e reduzida). A própria pessoa ou a gestão.
@@ -189,6 +191,8 @@ export interface Store {
   // Só manutenção e gestão mudam o status; qualquer um que vê o chamado pode comentar.
   atualizarChamado(id: string, mudanca: { status?: StatusChamado; texto?: string }): Promise<void>
   fotoChamado(c: Chamado): Promise<string | null>
+  // Marca quem a manutenção está esperando (pessoaId) ou tira a espera (null; vale também para a própria pessoa).
+  aguardarChamado(id: string, pessoaId: string | null, motivo: string): Promise<void>
   assinarRegulamento(versaoId: string, assinatura: string): Promise<void>
 
   // Equipamentos e manutenção preventiva (manutenção e gestão).

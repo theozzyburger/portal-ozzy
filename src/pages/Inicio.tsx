@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { atendeChamados } from '../lib/permissoes'
-import { chamadoEmAberto, type Chamado } from '../lib/types'
-import { haQuanto } from './Manutencao'
+import { chamadoEmAberto, nomeCurto, type Chamado } from '../lib/types'
+import { Detalhe, haQuanto } from './Manutencao'
 import { tarefasPreventiva, textoPrazo, type TarefaPreventiva } from '../lib/preventiva'
 import { Avatar, Cartao, Selo, Titulo } from '../components/ui'
 import arte from '../assets/banner-ozzy.jpg'
@@ -74,7 +74,8 @@ export default function Inicio() {
 
       <MeusAvisos docs={isentoDeRotinas(eu.nivel) ? null : meusDocs} uniformes={meusUniformes} regulamento={!assinouRegulamento && !isentoDeRotinas(eu.nivel)} />
 
-      {atendeChamados(eu.nivel) && <ResumoChamados />}
+      <DependeDeMim />
+      {eu.nivel === 'manutencao' && <ResumoChamados />}
       {atendeChamados(eu.nivel) && <ResumoPreventiva />}
 
       {gestao && <AlertaEquipe pend={pendencias(equipe, docsEquipe)} />}
@@ -337,6 +338,42 @@ function AlertaEquipe({ pend }: { pend: Pendencia[] }) {
       </span>
       <span className="text-sm font-semibold text-ozzy-400">Ver ›</span>
     </button>
+  )
+}
+
+// O que a manutenção está esperando de mim (Heitor, 09/10). Só aparece quando tem algo.
+function DependeDeMim() {
+  const { store, eu, nomeDe } = useApp()
+  const [chamados, setChamados] = useState<Chamado[]>([])
+  const [aberto, setAberto] = useState<string | null>(null)
+  const carregar = useCallback(() => store.chamados().then(setChamados), [store])
+  useEffect(() => { carregar() }, [carregar])
+  const meus = chamados.filter((c) => c.aguardandoId === eu.id && chamadoEmAberto(c.status))
+  const sel = chamados.find((c) => c.id === aberto)
+  const modal = sel && <Detalhe chamado={sel} aoFechar={() => setAberto(null)} aoMudar={carregar} />
+  if (!meus.length) return modal || null
+  return (
+    <div className="space-y-2 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+      <p className="font-semibold">Depende de você ({meus.length})</p>
+      <ul className="divide-y divide-amber-200">
+        {meus.map((c) => (
+          <li key={c.id}>
+            <button onClick={() => setAberto(c.id)} className="flex w-full items-center gap-3 py-2 text-left">
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">Chamado #{c.numero} · {c.titulo}</span>
+                <span className="block text-sm text-stone-600">{c.aguardandoMotivo ?? 'A manutenção está esperando você'}</span>
+                <span className="block text-xs text-stone-500">
+                  {(() => { const quem = [...c.eventos].reverse().find((e) => e.texto?.startsWith('Aguardando'))?.autorId; return quem ? `${nomeCurto(nomeDe(quem))} marcou ` : '' })()}
+                  {c.aguardandoDesde ? haQuanto(c.aguardandoDesde) : ''}
+                </span>
+              </span>
+              <span className="text-sm font-semibold">Ver ›</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {modal}
+    </div>
   )
 }
 
