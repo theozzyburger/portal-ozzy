@@ -312,7 +312,7 @@ export function diaDoExame(de: string) {
   return { data: d, texto: d === addDias(de, 1) ? `amanhã, ${nome}, ${dataCurta(d)}` : `na ${nome}, ${dataCurta(d)}` }
 }
 
-function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string, linkGuia?: string | null) {
+function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string, linkGuia?: string | null, sexoResp?: Funcionario['sexo']) {
   const d = p.celular.replace(/\D/g, '')
   if (d.length < 10) return null
   const nomeExame = TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()
@@ -321,7 +321,7 @@ function linkWhatsApp(p: Funcionario, tipo: TipoExame, responsavel: string, link
     'Olá, tudo bem?',
     '',
     // Heitor (09/10): sem "me chamo", porque pode ser alguém da casa só renovando o exame.
-    `Aqui é o ${responsavel.split(' ')[0]}, da administração da The Ozzy Burger.`,
+    `Aqui é ${sexoResp === 'feminino' ? 'a ' : sexoResp === 'masculino' ? 'o ' : ''}${responsavel.split(' ')[0]}, da administração da The Ozzy Burger.`,
     '',
     `Segue a carta de encaminhamento para o exame ${nomeExame}. A clínica funciona das 08h às 11h. É necessário levar uma amostra de fezes e o RG.`,
     '',
@@ -356,7 +356,8 @@ function FolhaGuia({
   )
   const linhas = [...extras]
   while (linhas.length < 4) linhas.push('')
-  const { store, avisar } = useApp()
+  const { store, avisar, equipe } = useApp()
+  const sexoResp = equipe.find((f) => f.nome.trim().toLowerCase() === responsavel.trim().toLowerCase())?.sexo
   const [enviando, setEnviando] = useState(false)
   const [linkPronto, setLinkPronto] = useState<string | null>(null)
   const [erro, setErro] = useState('')
@@ -385,7 +386,7 @@ function FolhaGuia({
         observacao: `Guia de encaminhamento para exame ${TIPOS_EXAME.find((t) => t.valor === tipo)!.nome.toLowerCase()}`,
       })
       const url = await store.publicarGuia(pessoa.id, arquivo)
-      const link = linkWhatsApp(pessoa, tipo, responsavel, url)!
+      const link = linkWhatsApp(pessoa, tipo, responsavel, url, sexoResp)!
       if (janela) janela.location.href = link
       // Sempre deixa o link na tela também: celular e app instalado às vezes não abrem a aba nova.
       setLinkPronto(link)
@@ -401,7 +402,7 @@ function FolhaGuia({
     setEnviando(true)
     try {
       const arquivo = await gerarPdf()
-      const texto = decodeURIComponent(linkWhatsApp(pessoa, tipo, responsavel)!.split('text=')[1])
+      const texto = decodeURIComponent(linkWhatsApp(pessoa, tipo, responsavel, null, sexoResp)!.split('text=')[1])
       await navigator.share({ files: [arquivo], text: texto })
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setErro(mensagemErro(e))
