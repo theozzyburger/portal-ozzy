@@ -245,15 +245,18 @@ function Listas() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <select value={loja} onChange={(e) => setLoja(e.target.value)} className={`${estiloEntrada} w-auto!`}>
-          {LOJAS_FECHAMENTO.map((u) => <option key={u} value={u}>{u === 'burger-psd' ? 'Parque São Domingos' : 'Vila Anastácio'}</option>)}
+        <select value={setor} onChange={(e) => setSetor(e.target.value as SetorFechamento)} className={`${estiloEntrada} w-auto!`} aria-label="Lista">
+          <option value="cozinha">Lista da cozinha</option><option value="atendimento">Lista do atendimento</option>
         </select>
-        <select value={setor} onChange={(e) => setSetor(e.target.value as SetorFechamento)} className={`${estiloEntrada} w-auto!`}>
-          <option value="cozinha">Cozinha</option><option value="atendimento">Atendimento</option>
-        </select>
+        <label className="flex items-center gap-2 text-sm text-stone-600">
+          Estoque ideal de
+          <select value={loja} onChange={(e) => setLoja(e.target.value)} className={`${estiloEntrada} w-auto!`} aria-label="Estoque ideal de">
+            {LOJAS_FECHAMENTO.map((u) => <option key={u} value={u}>{u === 'burger-psd' ? 'Parque São Domingos' : 'Vila Anastácio'}</option>)}
+          </select>
+        </label>
         <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Procurar item" className={`${estiloEntrada} max-w-xs`} />
       </div>
-      <p className="text-xs text-stone-500">Estoque ideal: quanto a loja precisa ter no começo de cada dia, na unidade em que conta. Em branco = sem sugestão. “Preparo” marca o que a Central prepara (entra na lista de preparo).</p>
+      <p className="text-xs text-stone-500">A lista é a mesma nas duas lojas: adicionar, tirar (Ativo), unidade e “Preparo” valem para as duas. Só o estoque ideal é de cada loja: quanto ela precisa ter no começo de cada dia, na unidade em que conta (em branco = sem sugestão). “Preparo” marca o que a Central prepara.</p>
       {!itens ? <p className="text-stone-400">Carregando…</p> : (
         <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-stone-200">
           <table className="w-full text-sm">

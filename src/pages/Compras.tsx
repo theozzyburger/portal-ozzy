@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Impressao from '../components/Impressao'
 import EstoqueUniformes from './EstoqueUniformes'
+import { PedidosCompra, SemanaCompras } from './ComprasPedidos'
 import { Botao, Campo, Modal, Selo, Titulo, Vazio, estiloEntrada } from '../components/ui'
 import logo from '../assets/logo.png'
 import { useApp } from '../lib/contexto'
@@ -22,15 +23,29 @@ const PECA_DA_TROCA: Record<string, string> = { Camiseta: 'Camiseta', Calça: 'C
 export const tamanhosDe = (p: Funcionario) =>
   [p.tamCamiseta && `camiseta ${p.tamCamiseta}`, p.tamCalca && `calça ${p.tamCalca}`, p.tamCalcado && `calçado ${p.tamCalcado}`].filter(Boolean).join(' · ') || 'tamanhos não cadastrados'
 
-// Compras: por enquanto, uniformes (pedidos de troca da equipe e pedidos de compra por leva).
+// Compras: pedidos de compra aos fornecedores, entregas da semana e uniformes.
 export default function Compras() {
+  const [area, setArea] = useState<'pedidos' | 'semana' | 'uniformes'>('pedidos')
+  return (
+    <div className="space-y-4">
+      <Titulo>Compras</Titulo>
+      <div className="grid grid-cols-3 gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold print:hidden">
+        {([['pedidos', 'Pedidos de compra'], ['semana', 'Entregas da semana'], ['uniformes', 'Uniformes']] as const).map(([a, nome]) => (
+          <button key={a} onClick={() => setArea(a)} className={`rounded-lg px-2 py-2 ${area === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>{nome}</button>
+        ))}
+      </div>
+      {area === 'pedidos' ? <PedidosCompra /> : area === 'semana' ? <SemanaCompras /> : <Uniformes />}
+    </div>
+  )
+}
+
+function Uniformes() {
   const [aba, setAba] = useState<'trocas' | 'estoque' | 'pedidos' | 'valores'>('trocas')
   return (
     <div className="space-y-4">
-      <Titulo>Compras · Uniformes</Titulo>
-      <div className="flex gap-1 rounded-xl bg-stone-200 p-1 text-sm font-semibold">
-        {([['trocas', 'Trocas'], ['estoque', 'Estoque'], ['pedidos', 'Pedidos de compra'], ['valores', 'Valores']] as const).map(([a, nome]) => (
-          <button key={a} onClick={() => setAba(a)} className={`flex-1 rounded-lg px-3 py-2 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-stone-100 p-1 text-sm font-semibold">
+        {([['trocas', 'Trocas'], ['estoque', 'Estoque'], ['pedidos', 'Pedidos'], ['valores', 'Valores']] as const).map(([a, nome]) => (
+          <button key={a} onClick={() => setAba(a)} className={`flex-1 rounded-lg px-3 py-1.5 ${aba === a ? 'bg-white shadow-sm' : 'text-stone-600'}`}>
             {nome}
           </button>
         ))}

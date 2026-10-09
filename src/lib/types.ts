@@ -911,6 +911,8 @@ export interface Fornecedor {
   contaPadraoId?: string | null
   // Como aparece no banco e nas notas, quando é diferente do nome fantasia (0055).
   razaoSocial?: string | null
+  // Dias entre o pedido e a entrega (sugere a previsão no pedido de compra; 0061).
+  prazoEntregaDias?: number | null
 }
 export interface Insumo {
   id: string
@@ -1432,4 +1434,44 @@ export interface ItemListaFechamento {
   ideal: (number | null)[]
   prePreparo: boolean
   ativo: boolean
+}
+
+// Compras (09/10): pedido de compra ao fornecedor com previsão de entrega.
+export type CategoriaCompra = 'insumos' | 'embalagens' | 'limpeza' | 'outros'
+export const CATEGORIAS_COMPRA: { valor: CategoriaCompra; nome: string }[] = [
+  { valor: 'insumos', nome: 'Insumos e produtos' }, { valor: 'embalagens', nome: 'Embalagens' }, { valor: 'limpeza', nome: 'Limpeza' }, { valor: 'outros', nome: 'Outros' },
+]
+export type StatusCompra = 'rascunho' | 'pedido' | 'recebido' | 'cancelado'
+export const STATUS_COMPRA: { valor: StatusCompra; nome: string }[] = [
+  { valor: 'rascunho', nome: 'Rascunho' }, { valor: 'pedido', nome: 'Pedido feito' }, { valor: 'recebido', nome: 'Recebido' }, { valor: 'cancelado', nome: 'Cancelado' },
+]
+export interface ItemCompra {
+  insumoId: string
+  quantidade: number
+  unidade: string
+  preco: number | null
+}
+export interface PedidoCompra {
+  id: string
+  numero: number
+  fornecedorId: string
+  centroCustoId: string
+  categoria: CategoriaCompra
+  status: StatusCompra
+  dataPedido: string
+  previsaoEntrega: string
+  itens: ItemCompra[]
+  total: number
+  formaPagamento: string | null
+  observacao: string | null
+  recebidoEm: string | null
+  criadoEm: string
+  criadoPor: string | null
+}
+export type NovoPedidoCompra = Omit<PedidoCompra, 'id' | 'numero' | 'total' | 'criadoEm' | 'criadoPor' | 'recebidoEm'> & { id?: string }
+export interface PrecoFornecedor {
+  insumoId: string
+  preco: number
+  em: string
+  origem: 'pedido' | 'nota'
 }
