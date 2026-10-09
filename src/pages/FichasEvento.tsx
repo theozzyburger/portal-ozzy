@@ -469,6 +469,7 @@ interface Linha {
   ref: string // 'i:<id>' insumo, 'r:<id>' pré-preparo
   quantidade: string
   aproveitamento: string // em %
+  texto?: string // o que está digitado no campo (enquanto não casa com um item)
 }
 
 function EditarComposicao({ r, d, aoFechar, aoSalvar }: { r: Receita; d: Dados; aoFechar: () => void; aoSalvar: (numero: number) => void }) {
@@ -496,11 +497,19 @@ function EditarComposicao({ r, d, aoFechar, aoSalvar }: { r: Receita; d: Dados; 
   const previa = useMemo(() => custoItens(d.cat, itens, rend || 1, [r.id]), [d.cat, JSON.stringify(itens), rend, r.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const insumos = d.insumos.filter((i) => i.ativo || linhas.some((l) => l.ref === 'i:' + i.id))
   const preparos = d.receitas.filter((x) => x.tipo === 'preparo' && x.id !== r.id && (x.ativo || linhas.some((l) => l.ref === 'r:' + x.id)))
+  // Busca digitando (pedido de 09/10): a lista com 40 pré-preparos em cima escondia os insumos.
+  const opcoes = [
+    ...insumos.map((x) => ({ ref: 'i:' + x.id, nome: x.nome })),
+    ...preparos.map((p) => ({ ref: 'r:' + p.id, nome: p.nome + ' (pré-preparo)' })),
+  ]
+  const porNome = new Map(opcoes.map((o) => [o.nome.toLowerCase(), o.ref]))
+  const nomeDe = (ref: string) => opcoes.find((o) => o.ref === ref)?.nome ?? ''
   const unidadeDe = (ref: string) =>
     ref.startsWith('i:') ? nomeUnidade(d.cat.insumos.get(ref.slice(2))?.unidade ?? '') : ref.startsWith('r:') ? nomeUnidade(d.cat.receitas.get(ref.slice(2))?.unidade ?? '') : ''
   const mudar = (i: number, m: Partial<Linha>) => setLinhas(linhas.map((l, j) => (j === i ? { ...l, ...m } : l)))
 
   const salvar = async () => {
+    if (linhas.some((l) => l.texto && !l.ref)) return setErro('Há item que não está na lista. Escolha da lista ou cadastre em Insumos.')
     if (!itens.length) return setErro('Inclua pelo menos um item com quantidade.')
     if (linhas.some((l) => l.ref && !((numero(l.quantidade) ?? 0) > 0))) return setErro('Há item sem quantidade.')
     if (!(rend > 0)) return setErro('O rendimento precisa ser maior que zero.')
@@ -521,15 +530,15 @@ function EditarComposicao({ r, d, aoFechar, aoSalvar }: { r: Receita; d: Dados; 
         {linhas.map((l, i) => (
           <div key={i} className="grid grid-cols-[1fr_5.5rem_4.5rem_auto] items-end gap-2">
             <Campo rotulo={i === 0 ? 'Item' : ' '}>
-              <select className={`${estiloEntrada} py-2!`} value={l.ref} onChange={(e) => mudar(i, { ref: e.target.value })} aria-label={`Item ${i + 1}`}>
-                <option value="">Escolha…</option>
-                <optgroup label="Pré-preparos">
-                  {preparos.map((p) => <option key={p.id} value={'r:' + p.id}>{p.nome}</option>)}
-                </optgroup>
-                <optgroup label="Insumos">
-                  {insumos.map((x) => <option key={x.id} value={'i:' + x.id}>{x.nome}</option>)}
-                </optgroup>
-              </select>
+              <input
+                list="itens-composicao"
+                className={`${estiloEntrada} py-2!`}
+                value={l.texto ?? nomeDe(l.ref)}
+                placeholder="Digite o insumo ou pré-preparo"
+                onChange={(e) => mudar(i, { texto: e.target.value, ref: porNome.get(e.target.value.trim().toLowerCase()) ?? '' })}
+                onBlur={() => l.ref && mudar(i, { texto: undefined })}
+                aria-label={`Item ${i + 1}`}
+              />
             </Campo>
             <Campo rotulo={i === 0 ? 'Qtd' : ' '}>
               <div className="relative">
@@ -543,6 +552,8 @@ function EditarComposicao({ r, d, aoFechar, aoSalvar }: { r: Receita; d: Dados; 
             <button type="button" onClick={() => setLinhas(linhas.filter((_, j) => j !== i))} className="mb-1 rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-red-600" aria-label={`Tirar item ${i + 1}`}>✕</button>
           </div>
         ))}
+        <datalist id="itens-composicao">{opcoes.map((o) => <option key={o.ref} value={o.nome} />)}</datalist>
+        {linhas.some((l) => l.texto && !l.ref) && <p className="text-xs text-amber-700">Algum item digitado não está cadastrado. Escolha da lista ou cadastre em Insumos.</p>}
         <Botao type="button" variante="secundario" onClick={() => setLinhas([...linhas, { ref: '', quantidade: '', aproveitamento: '100' }])}>+ Item</Botao>
         <div className="grid grid-cols-2 gap-3">
           <Campo rotulo={`Rende (${nomeUnidade(r.unidade)})`} dica={r.tipo === 'produto' ? 'Normalmente 1 unidade.' : 'Quanto sai de uma receita.'}>

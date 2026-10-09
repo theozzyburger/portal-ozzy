@@ -1,38 +1,38 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
-import type { Evento, FreelaEvento, Funcionario, MembroEquipeEvento } from '../lib/types'
+import type { Evento, FreelaEvento, Funcionario, MembroEquipeEvento, Operacao } from '../lib/types'
 import { FUNCOES_EVENTO } from './FreelasEventos'
 
-// Equipe do evento (pedido de 09/10): quem trabalha e onde fica. Duas vistas: lista e a barraca 3x3 desenhada,
-// com a frente (clientes) em cima. Para mudar alguém de lugar: toque na pessoa e depois no quadrado (ou arraste).
+// Equipe do evento (pedido de 09/10): quem trabalha e onde fica. Uma barraca por operação que vai ao evento
+// (The Ozzy Pizza, Foca…), cada uma com três lugares: Caixa na frente, Operação e Apoio atrás.
+// Para mudar alguém de lugar: toque na pessoa e depois no lugar (ou arraste).
 
 const FUNCOES = ['Responsável', ...FUNCOES_EVENTO]
-const LINHAS = ['Frente', 'Meio', 'Fundo']
-const COLUNAS = ['esquerda', 'centro', 'direita']
-export const nomeQuadrado = (pos: number) => `${LINHAS[Math.floor(pos / 3)]} ${COLUNAS[pos % 3]}`
+// No banco a posição continua 0 a 8 (a grade antiga): 0-2 = Caixa, 3-5 = Operação, 6-8 = Apoio.
+const AREAS = [{ nome: 'Caixa', pos: 0 }, { nome: 'Operação', pos: 3 }, { nome: 'Apoio', pos: 6 }]
+export const nomeQuadrado = (pos: number) => AREAS[Math.min(2, Math.floor(pos / 3))].nome
+const areaDe = (pos: number | null) => (pos === null ? null : Math.min(2, Math.floor(pos / 3)))
 
 interface Dados {
   equipe: MembroEquipeEvento[]
   funcionarios: Funcionario[]
   freelas: FreelaEvento[]
+  operacoes: Operacao[]
 }
 
-export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarEvento: () => Promise<void> }) {
+export default function EquipeEvento({ e }: { e: Evento; aoMudarEvento?: () => Promise<void> }) {
   const { store, avisar } = useApp()
   const [d, setD] = useState<Dados | null>(null)
   const [erro, setErro] = useState('')
   const [vista, setVista] = useState<'barraca' | 'lista'>('barraca')
-  const [barraca, setBarraca] = useState(1)
   const [editando, setEditando] = useState<MembroEquipeEvento | 'novo' | null>(null)
   const [escolhido, setEscolhido] = useState<string | null>(null)
-  const [layout, setLayout] = useState(e.layoutBarracas)
-  const [nomeando, setNomeando] = useState<number | null>(null)
 
   const carregar = useCallback(async () => {
     try {
-      const [equipe, funcionarios, freelas] = await Promise.all([store.equipeEvento(e.id), store.funcionarios(), store.freelasEvento()])
-      setD({ equipe, funcionarios, freelas })
+      const [equipe, funcionarios, freelas, operacoes] = await Promise.all([store.equipeEvento(e.id), store.funcionarios(), store.freelasEvento(), store.operacoes()])
+      setD({ equipe, funcionarios, freelas, operacoes })
     } catch (err) {
       setErro((err as Error).message)
     }
@@ -40,7 +40,6 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
   useEffect(() => {
     carregar()
   }, [carregar])
-  useEffect(() => setLayout(e.layoutBarracas), [e.layoutBarracas])
 
   if (erro) return <p className="text-red-600">{erro}</p>
   if (!d) return <p className="text-stone-400">Carregando…</p>
@@ -54,8 +53,11 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
     return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0]
   }
   const origem = (m: MembroEquipeEvento) => (m.funcionarioId ? 'Equipe' : m.freelaId ? 'Freela' : 'Sem cadastro')
-  const qtdBarracas = Math.max(1, Math.ceil(e.barracas ?? 1), ...d.equipe.map((m) => m.barraca))
-  const rotulo = (b: number, pos: number) => layout[String(b)]?.[String(pos)] || nomeQuadrado(pos)
+  // Barraca n = n-ésima operação do evento.
+  const nomesOperacoes = e.operacoes.map((id) => d.operacoes.find((o) => o.id === id)?.nome ?? 'Operação')
+  const qtdBarracas = Math.max(1, nomesOperacoes.length, ...d.equipe.map((m) => m.barraca))
+  const nomeBarraca = (b: number) => nomesOperacoes[b - 1] ?? `Barraca ${b}`
+  const rotulo = (_b: number, pos: number) => nomeQuadrado(pos)
 
   const mover = async (id: string, b: number, pos: number | null) => {
     const m = d.equipe.find((x) => x.id === id)
@@ -70,26 +72,16 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
       await carregar()
     }
   }
-  const nomearQuadrado = async (pos: number, texto: string) => {
-    const novo = { ...layout, [String(barraca)]: { ...(layout[String(barraca)] ?? {}), [String(pos)]: texto.trim() } }
-    if (!texto.trim()) delete novo[String(barraca)][String(pos)]
-    setLayout(novo)
-    setNomeando(null)
-    try {
-      await store.salvarLayoutBarracas(e.id, novo)
-      await aoMudarEvento()
-    } catch (err) {
-      avisar((err as Error).message)
-    }
-  }
   const copiar = async () => {
     const linhas = [`*Equipe · ${e.nome}*`]
     for (let b = 1; b <= qtdBarracas; b++) {
       const doB = d.equipe.filter((m) => m.barraca === b)
       if (!doB.length) continue
-      if (qtdBarracas > 1) linhas.push('', `*Barraca ${b}*`)
-      for (const m of [...doB].sort((x, y) => (x.posicao ?? 99) - (y.posicao ?? 99)))
-        linhas.push(`• ${nome(m)}${m.funcao ? ` (${m.funcao})` : ''}${m.posicao !== null ? ` · ${rotulo(b, m.posicao)}` : ''}`)
+      linhas.push('', `*${nomeBarraca(b)}*`)
+      for (const [i, area] of [...AREAS.map((x) => x.nome), 'Sem lugar'].entries()) {
+        const aqui = doB.filter((m) => (areaDe(m.posicao) ?? 3) === i)
+        if (aqui.length) linhas.push(`${area}: ${aqui.map((m) => nome(m) + (m.funcao ? ` (${m.funcao})` : '')).join(', ')}`)
+      }
     }
     try {
       await navigator.clipboard.writeText(linhas.join('\n'))
@@ -99,8 +91,7 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
     }
   }
 
-  const doBarraca = d.equipe.filter((m) => m.barraca === barraca)
-  const semLugar = doBarraca.filter((m) => m.posicao === null)
+  const semLugar = d.equipe.filter((m) => m.posicao === null)
 
   const Pessoa = ({ m }: { m: MembroEquipeEvento }) => (
     <button
@@ -115,7 +106,7 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
       title={`${nome(m)}${m.funcao ? ` · ${m.funcao}` : ''}`}
       className={`w-full rounded-lg px-2 py-1 text-left text-xs leading-tight shadow-sm ring-1 ${escolhido === m.id ? 'bg-carvao text-white ring-carvao' : 'bg-white text-stone-800 ring-stone-200 hover:ring-stone-400'}`}
     >
-      <span className="block font-semibold break-words">{curto(m)}</span>
+      <span className="block font-semibold break-words">{curto(m)}{m.posicao === null && qtdBarracas > 1 && <span className="font-normal opacity-60"> · {nomeBarraca(m.barraca)}</span>}</span>
       {m.funcao && <span className={`block truncate ${escolhido === m.id ? 'text-ozzy-400' : 'text-stone-500'}`}>{m.funcao}</span>}
     </button>
   )
@@ -146,7 +137,7 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
             if (!lista.length) return null
             return (
               <Cartao key={b}>
-                {qtdBarracas > 1 && <h3 className="mb-2 font-bold">Barraca {b}</h3>}
+                <h3 className="mb-2 font-bold">{nomeBarraca(b)}</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="text-left text-xs text-stone-500">
@@ -159,7 +150,7 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
                       </tr>
                     </thead>
                     <tbody>
-                      {[...lista].sort((x, y) => (x.posicao ?? 99) - (y.posicao ?? 99)).map((m) => (
+                      {[...lista].sort((x, y) => (areaDe(x.posicao) ?? 9) - (areaDe(y.posicao) ?? 9)).map((m) => (
                         <tr key={m.id} className="border-t border-stone-100">
                           <td className="py-1.5 pr-2 font-semibold">{nome(m)}{m.observacao && <span className="block text-xs font-normal text-stone-500">{m.observacao}</span>}</td>
                           <td className="px-2 py-1.5">{m.funcao ?? '—'}</td>
@@ -177,95 +168,75 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
         </div>
       ) : (
         <Cartao>
-          {qtdBarracas > 1 && (
-            <div className="mb-3 flex flex-wrap gap-1">
-              {Array.from({ length: qtdBarracas }, (_, i) => i + 1).map((b) => (
-                <button key={b} onClick={() => setBarraca(b)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${barraca === b ? 'bg-carvao text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
-                  Barraca {b} <span className="opacity-60">{d.equipe.filter((m) => m.barraca === b).length}</span>
-                </button>
-              ))}
-            </div>
-          )}
           <p className="mb-3 text-xs text-stone-500">
-            {escolhido ? 'Agora toque no quadrado para onde a pessoa vai.' : 'Toque numa pessoa e depois no quadrado (no computador, dá para arrastar). Toque no nome do quadrado para mudar (ex.: Caixa, Forno).'}
+            {escolhido ? 'Agora toque no lugar para onde a pessoa vai (pode ser em outra barraca).' : 'Toque numa pessoa e depois no lugar (no computador, dá para arrastar).'}
           </p>
-          <div className="mx-auto max-w-xl">
-            <div className="rounded-t-xl bg-stone-100 py-1.5 text-center text-xs font-bold tracking-wide text-stone-500 uppercase">Clientes</div>
-            <div className="bg-ozzy-400 py-1 text-center text-xs font-bold tracking-wide text-carvao uppercase">Balcão · frente da barraca</div>
-            <div className="grid grid-cols-3 gap-1.5 rounded-b-xl border-4 border-t-0 border-carvao bg-stone-50 p-1.5">
-              {Array.from({ length: 9 }, (_, pos) => {
-                const aqui = doBarraca.filter((m) => m.posicao === pos)
+          <div className="overflow-x-auto">
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${qtdBarracas}, minmax(15rem, 1fr))` }}>
+              {Array.from({ length: qtdBarracas }, (_, i) => i + 1).map((b) => {
+                const doB = d.equipe.filter((m) => m.barraca === b)
                 return (
-                  <div
-                    key={pos}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Quadrado ${rotulo(barraca, pos)}`}
-                    onClick={() => escolhido && mover(escolhido, barraca, pos)}
-                    onKeyDown={(ev) => ev.key === 'Enter' && escolhido && mover(escolhido, barraca, pos)}
-                    onDragOver={(ev) => ev.preventDefault()}
-                    onDrop={(ev) => {
-                      ev.preventDefault()
-                      mover(ev.dataTransfer.getData('text/plain'), barraca, pos)
-                    }}
-                    className={`flex min-h-28 flex-col gap-1 rounded-lg border-2 border-dashed p-1.5 sm:min-h-32 ${escolhido ? 'cursor-pointer border-sky-400 bg-sky-50/60' : 'border-stone-200 bg-white'}`}
-                  >
-                    {nomeando === pos ? (
-                      <input
-                        autoFocus
-                        className="w-full rounded border border-stone-300 px-1 text-xs"
-                        defaultValue={layout[String(barraca)]?.[String(pos)] ?? ''}
-                        placeholder={nomeQuadrado(pos)}
-                        onClick={(ev) => ev.stopPropagation()}
-                        onBlur={(ev) => nomearQuadrado(pos, ev.target.value)}
-                        onKeyDown={(ev) => ev.key === 'Enter' && (ev.target as HTMLInputElement).blur()}
-                        aria-label="Nome do quadrado"
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(ev) => {
-                          ev.stopPropagation()
-                          if (escolhido) mover(escolhido, barraca, pos)
-                          else setNomeando(pos)
-                        }}
-                        className={`truncate text-left text-[11px] font-bold tracking-wide uppercase ${layout[String(barraca)]?.[String(pos)] ? 'text-carvao' : 'text-stone-400'}`}
-                      >
-                        {rotulo(barraca, pos)}
-                      </button>
-                    )}
-                    {aqui.map((m) => <Pessoa key={m.id} m={m} />)}
+                  <div key={b}>
+                    <div className="rounded-t-xl bg-stone-100 py-1.5 text-center text-xs font-bold tracking-wide text-stone-500 uppercase">Clientes</div>
+                    <div className="bg-ozzy-400 py-1 text-center text-xs font-bold tracking-wide text-carvao uppercase">{nomeBarraca(b)} · balcão</div>
+                    <div className="grid grid-cols-2 gap-1.5 rounded-b-xl border-4 border-t-0 border-carvao bg-stone-50 p-1.5">
+                      {AREAS.map((area, i) => {
+                        const aqui = doB.filter((m) => areaDe(m.posicao) === i)
+                        return (
+                          <div
+                            key={area.nome}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`${nomeBarraca(b)}: ${area.nome}`}
+                            onClick={() => escolhido && mover(escolhido, b, area.pos)}
+                            onKeyDown={(ev) => ev.key === 'Enter' && escolhido && mover(escolhido, b, area.pos)}
+                            onDragOver={(ev) => ev.preventDefault()}
+                            onDrop={(ev) => {
+                              ev.preventDefault()
+                              mover(ev.dataTransfer.getData('text/plain'), b, area.pos)
+                            }}
+                            className={`flex min-h-24 flex-col gap-1 rounded-lg border-2 border-dashed p-1.5 ${i === 0 ? 'col-span-2' : ''} ${escolhido ? 'cursor-pointer border-sky-400 bg-sky-50/60' : 'border-stone-200 bg-white'}`}
+                          >
+                            <span className="text-[11px] font-bold tracking-wide text-carvao uppercase">
+                              {area.nome} <span className="font-normal text-stone-400">{i === 0 ? '· frente' : '· atrás'}</span>
+                            </span>
+                            <div className={`grid gap-1 ${i === 0 ? 'grid-cols-2' : ''}`}>{aqui.map((m) => <Pessoa key={m.id} m={m} />)}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-1 text-center text-xs font-bold tracking-wide text-stone-400 uppercase">Fundo</div>
                   </div>
                 )
               })}
             </div>
-            <div className="mt-1 text-center text-xs font-bold tracking-wide text-stone-400 uppercase">Fundo</div>
           </div>
 
           <div
             className="mt-4 rounded-xl bg-stone-100 p-2"
-            onClick={() => escolhido && mover(escolhido, barraca, null)}
+            onClick={() => {
+              const m = escolhido && d.equipe.find((x) => x.id === escolhido)
+              if (m) mover(m.id, m.barraca, null)
+            }}
             onDragOver={(ev) => ev.preventDefault()}
             onDrop={(ev) => {
               ev.preventDefault()
-              mover(ev.dataTransfer.getData('text/plain'), barraca, null)
+              const m = d.equipe.find((x) => x.id === ev.dataTransfer.getData('text/plain'))
+              if (m) mover(m.id, m.barraca, null)
             }}
           >
             <div className="mb-1.5 text-xs font-semibold text-stone-600">
-              Sem lugar {escolhido && doBarraca.some((m) => m.id === escolhido && m.posicao !== null) && '· toque aqui para tirar do lugar'}
+              Sem lugar {escolhido && d.equipe.some((m) => m.id === escolhido && m.posicao !== null) && '· toque aqui para tirar do lugar'}
             </div>
             {semLugar.length ? (
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">{semLugar.map((m) => <Pessoa key={m.id} m={m} />)}</div>
             ) : (
-              <p className="text-xs text-stone-500">Todo mundo desta barraca já tem lugar.</p>
+              <p className="text-xs text-stone-500">Todo mundo já tem lugar.</p>
             )}
           </div>
           {escolhido && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Botao variante="secundario" onClick={() => setEditando(d.equipe.find((m) => m.id === escolhido) ?? null)}>Editar {curto(d.equipe.find((m) => m.id === escolhido)!)}</Botao>
-              {qtdBarracas > 1 && Array.from({ length: qtdBarracas }, (_, i) => i + 1).filter((b) => b !== barraca).map((b) => (
-                <Botao key={b} variante="secundario" onClick={() => mover(escolhido, b, null)}>Passar para a barraca {b}</Botao>
-              ))}
               <Botao variante="secundario" onClick={() => setEscolhido(null)}>Cancelar</Botao>
             </div>
           )}
@@ -277,8 +248,9 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
           e={e}
           m={editando === 'novo' ? null : editando}
           d={d}
-          barraca={barraca}
+          barraca={1}
           qtdBarracas={qtdBarracas}
+          nomeBarraca={nomeBarraca}
           aoFechar={() => setEditando(null)}
           aoSalvar={async () => {
             setEditando(null)
@@ -291,12 +263,13 @@ export default function EquipeEvento({ e, aoMudarEvento }: { e: Evento; aoMudarE
   )
 }
 
-function EditarMembro({ e, m, d, barraca, qtdBarracas, aoFechar, aoSalvar }: {
+function EditarMembro({ e, m, d, barraca, qtdBarracas, nomeBarraca, aoFechar, aoSalvar }: {
   e: Evento
   m: MembroEquipeEvento | null
   d: Dados
   barraca: number
   qtdBarracas: number
+  nomeBarraca: (b: number) => string
   aoFechar: () => void
   aoSalvar: () => Promise<void>
 }) {
@@ -379,7 +352,7 @@ function EditarMembro({ e, m, d, barraca, qtdBarracas, aoFechar, aoSalvar }: {
           </Campo>
           <Campo rotulo="Barraca">
             <select className={estiloEntrada} value={b} onChange={(ev) => setB(Number(ev.target.value))}>
-              {Array.from({ length: Math.max(qtdBarracas, b) + 1 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>Barraca {n}</option>)}
+              {Array.from({ length: Math.max(qtdBarracas, b) }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{nomeBarraca(n)}</option>)}
             </select>
           </Campo>
         </div>
