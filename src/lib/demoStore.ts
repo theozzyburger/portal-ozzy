@@ -2048,8 +2048,9 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
         if (!(c.valor > 0)) throw new Error('O valor precisa ser maior que zero.')
         const { id, ...dados } = c
         const i = id ? contasPagarDemo.findIndex((x) => x.id === id) : -1
+        if (i < 0 && c.origem && contasPagarDemo.some((x) => x.origem === c.origem)) continue
         if (i >= 0) Object.assign(contasPagarDemo[i], { ...dados, descricao: c.descricao.trim() })
-        else contasPagarDemo.push(contaDemo(novoId('cp'), { ...dados, descricao: c.descricao.trim() }))
+        else contasPagarDemo.push(contaDemo(novoId('cp'), { ...dados, descricao: c.descricao.trim(), pagoEm: c.pagoEm ?? null, valorPago: c.pagoEm ? c.valorPago ?? c.valor : null }))
       }
       return espera(undefined)
     },

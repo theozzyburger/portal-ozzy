@@ -1188,10 +1188,17 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         centro_custo_id: c.centroCustoId, conta_id: c.contaId, fornecedor_id: c.fornecedorId, favorecido: texto(c.favorecido), descricao: c.descricao.trim(),
         competencia: c.competencia, vencimento: c.vencimento, valor: c.valor, forma: c.forma, parcela: c.parcela, parcelas: c.parcelas,
         documento: texto(c.documento), nota_id: c.notaId, observacao: texto(c.observacao),
+        ...(c.origem ? { origem: c.origem } : {}),
+        ...(c.pagoEm ? { pago_em: c.pagoEm, valor_pago: c.valorPago ?? c.valor, pago_por: exigeEu().id } : {}),
       }))
       const novas = linhas.filter((l) => !('id' in l))
       const editadas = linhas.filter((l) => 'id' in l)
-      if (novas.length) ok(await sb.from('contas_pagar').insert(novas))
+      // Em blocos; com origem, o que já foi importado antes fica de fora (importar o mesmo arquivo duas vezes não duplica).
+      for (let i = 0; i < novas.length; i += 500) {
+        const bloco = novas.slice(i, i + 500)
+        if (bloco.some((l) => 'origem' in l)) ok(await sb.from('contas_pagar').upsert(bloco, { onConflict: 'origem', ignoreDuplicates: true }))
+        else ok(await sb.from('contas_pagar').insert(bloco))
+      }
       for (const l of editadas) ok(await sb.from('contas_pagar').update(l).eq('id', (l as { id: string }).id))
     },
     async pagarConta(id, p) {

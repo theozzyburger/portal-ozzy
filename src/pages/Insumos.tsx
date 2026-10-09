@@ -6,6 +6,7 @@ import { dataLonga } from '../lib/datas'
 import { ir } from '../lib/rota'
 import { formatarCnpj } from '../lib/nfe'
 import { gruposDoPlano } from '../lib/financeiro'
+import ImportarFornecedores from './ImportarFornecedores'
 import type { ContaContabil, Fornecedor, Insumo, PrecoInsumo, UnidadeMedida } from '../lib/types'
 
 const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
@@ -254,6 +255,8 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
   const [ativo, setAtivo] = useState(true)
   const [erro, setErro] = useState('')
   const [plano, setPlano] = useState<ContaContabil[]>([])
+  const [importar, setImportar] = useState(false)
+  const [busca, setBusca] = useState('')
   useEffect(() => {
     store.planoContas().then(setPlano, () => setPlano([]))
   }, [store])
@@ -286,13 +289,18 @@ function ListaFornecedores({ insumos, fornecedores, aoMudar }: { insumos: Insumo
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm text-stone-600">{fornecedores.length} fornecedores</span>
-        <Botao onClick={() => abrir('novo')}>+ Fornecedor</Botao>
+        <span className="flex gap-2">
+          <Botao variante="secundario" onClick={() => setImportar(true)}>Importar</Botao>
+          <Botao onClick={() => abrir('novo')}>+ Fornecedor</Botao>
+        </span>
       </div>
+      {fornecedores.length > 8 && <input className={estiloEntrada} placeholder="Buscar por nome ou CNPJ" value={busca} onChange={(e) => setBusca(e.target.value)} />}
+      {importar && <ImportarFornecedores fornecedores={fornecedores} plano={plano} aoFechar={() => setImportar(false)} aoSalvar={async () => { setImportar(false); await aoMudar(); avisar('Fornecedores importados') }} />}
       {fornecedores.length === 0 ? (
         <Vazio>Nenhum fornecedor cadastrado.</Vazio>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
-          {fornecedores.map((x) => {
+          {fornecedores.filter((x) => !busca || `${x.nome} ${x.cnpj ?? ''}`.toLowerCase().includes(busca.toLowerCase()) || (x.cnpj ?? '').includes(busca.replace(/\D/g, '') || '-')).map((x) => {
             const n = insumos.filter((i) => i.fornecedorId === x.id && i.ativo).length
             return (
               <li key={x.id}>

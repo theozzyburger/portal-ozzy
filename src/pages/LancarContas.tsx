@@ -278,7 +278,7 @@ export function EditarConta({ d, conta, aoFechar, aoSalvar }: { d: Dados; conta:
 
 // ---------- Importar em lote ----------
 
-export const COLUNAS_LOTE = ['Descrição', 'Fornecedor', 'Loja', 'Conta contábil', 'Valor', 'Vencimento', 'Forma', 'Documento'] as const
+export const COLUNAS_LOTE = ['Descrição', 'Fornecedor', 'Loja', 'Conta contábil', 'Valor', 'Vencimento', 'Forma', 'Documento', 'Pago em', 'Pessoa', 'Código'] as const
 
 const APELIDOS_LOJA: Record<string, string> = {
   psd: 'burger-psd', 'parque sao domingos': 'burger-psd', un1: 'burger-psd',
@@ -330,6 +330,9 @@ interface LinhaLote {
   vencimento: string
   forma: FormaPagamento
   documento: string | null
+  pagoEm: string | null
+  pessoa: string
+  codigo: string
   erros: string[]
 }
 
@@ -337,7 +340,7 @@ function validarLote(tabela: string[][], d: Dados): LinhaLote[] {
   const temCabecalho = tabela.length && /descri/i.test(tabela[0][0] ?? '')
   const lanc = contasLancaveis(d.plano)
   return tabela.slice(temCabecalho ? 1 : 0).map((c, i) => {
-    const [desc = '', forn = '', loja = '', conta = '', valor = '', venc = '', forma = '', doc = ''] = c
+    const [desc = '', forn = '', loja = '', conta = '', valor = '', venc = '', forma = '', doc = '', pago = '', pessoa = '', codigo = ''] = c
     const erros: string[] = []
     const lojaS = simples(loja)
     const centro = !lojaS ? lojaPadrao(d.centros)
@@ -356,10 +359,13 @@ function validarLote(tabela: string[][], d: Dados): LinhaLote[] {
     const fp = !formaS ? 'boleto' : FORMAS_PAGAMENTO.find((f) => simples(f.nome) === formaS || f.valor === formaS || simples(f.nome).startsWith(formaS))?.valor
     if (!fp) erros.push(`forma "${forma}" não existe`)
     if (!desc.trim()) erros.push('falta a descrição')
-    if (!forn.trim()) erros.push('falta o fornecedor')
+    if (!forn.trim() && !pessoa.trim()) erros.push('falta o fornecedor')
+    const pagoEm = pago.trim() ? lerData(pago) : null
+    if (pago.trim() && !pagoEm) erros.push('data do pagamento inválida (dd/mm/aaaa)')
     return {
       n: i + 1 + (temCabecalho ? 1 : 0), descricao: desc.trim(), fornecedor: forn.trim(), centroCustoId: centro, contaId: cc?.id ?? '',
-      valor: v ?? 0, vencimento: vencimento ?? '', forma: fp ?? 'boleto', documento: doc.trim() || null, erros,
+      valor: v ?? 0, vencimento: vencimento ?? '', forma: fp ?? 'boleto', documento: doc.trim() || null,
+      pagoEm, pessoa: pessoa.trim(), codigo: codigo.trim(), erros,
     }
   })
 }
@@ -381,7 +387,8 @@ export function ImportarLote({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: ()
   const [salvando, setSalvando] = useState(false)
   const linhas = texto.trim() ? validarLote(lerTabela(texto), d) : []
   const boas = linhas.filter((l) => !l.erros.length)
-  const novos = [...new Set(boas.map((l) => l.fornecedor).filter((f) => !d.fornecedores.some((x) => simples(x.nome) === simples(f) || (x.cnpj && soDigitos(f) && soDigitos(x.cnpj) === soDigitos(f)))))]
+  const pagas = boas.filter((l) => l.pagoEm).length
+  const novos = [...new Set(boas.map((l) => l.fornecedor).filter((f) => f && !d.fornecedores.some((x) => simples(x.nome) === simples(f) || (x.cnpj && soDigitos(f) && soDigitos(x.cnpj) === soDigitos(f)))))]
 
   async function abrirArquivo(f: File | undefined) {
     if (!f) return
@@ -398,11 +405,13 @@ export function ImportarLote({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: ()
     try {
       const lista: NovaContaPagar[] = []
       for (const l of boas) {
-        const forn = await garantirFornecedor(store, d.fornecedores, l.fornecedor)
+        // Pessoa (funcionário, motoboy) não vira fornecedor: fica só o nome em "para quem".
+        const forn = l.fornecedor ? await garantirFornecedor(store, d.fornecedores, l.fornecedor) : null
         lista.push({
-          centroCustoId: l.centroCustoId, contaId: l.contaId, fornecedorId: forn.id, favorecido: null, descricao: l.descricao,
+          centroCustoId: l.centroCustoId, contaId: l.contaId, fornecedorId: forn?.id ?? null, favorecido: forn ? null : l.pessoa, descricao: l.descricao,
           competencia: competenciaDe(l.vencimento), vencimento: l.vencimento, valor: l.valor, forma: l.forma, parcela: null, parcelas: null,
-          documento: l.documento, notaId: null, observacao: 'Importada em lote',
+          documento: l.documento, notaId: null, observacao: 'Importada em lote', pagoEm: l.pagoEm, valorPago: l.pagoEm ? l.valor : null,
+          origem: l.codigo ? 'imp:' + l.codigo : null,
         })
       }
       await store.salvarContasPagar(lista)
@@ -425,6 +434,7 @@ export function ImportarLote({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: ()
           <br />
           Loja: PSD, VA, Pizza, Central ou Eventos (vazio = Central). Conta: o código (ex.: 5.22) ou o nome. Vencimento: dd/mm/aaaa.
           Forma vazia = Boleto. Documento é opcional. Fornecedor novo é cadastrado sozinho.
+          Opcionais: Pago em (a conta já entra paga), Pessoa (funcionário ou motoboy: deixe o fornecedor vazio) e Código (importar o mesmo código de novo não duplica).
         </p>
         <details className="text-xs">
           <summary className="cursor-pointer font-semibold text-stone-600">Ver os códigos das contas</summary>
@@ -452,11 +462,11 @@ export function ImportarLote({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: ()
                     <td className="px-2 py-1 align-top text-stone-400">{l.n}</td>
                     <td className="px-2 py-1">
                       <p className="font-semibold">{l.descricao || '—'}</p>
-                      <p className="text-stone-500">{[l.fornecedor, nomeCentro(d.centros.find((x) => x.id === l.centroCustoId)), d.plano.find((x) => x.id === l.contaId)?.nome].filter(Boolean).join(' · ')}</p>
+                      <p className="text-stone-500">{[l.fornecedor || l.pessoa, nomeCentro(d.centros.find((x) => x.id === l.centroCustoId)), d.plano.find((x) => x.id === l.contaId)?.nome].filter(Boolean).join(' · ')}</p>
                       {l.erros.length > 0 && <p className="font-semibold text-red-700">{l.erros.join('; ')}</p>}
                     </td>
                     <td className="px-2 py-1 text-right align-top whitespace-nowrap">{l.valor ? reais(l.valor) : ''}</td>
-                    <td className="px-2 py-1 align-top whitespace-nowrap">{l.vencimento ? dataCurta(l.vencimento) : ''}</td>
+                    <td className="px-2 py-1 align-top whitespace-nowrap">{l.vencimento ? dataCurta(l.vencimento) : ''}{l.pagoEm ? <span className="block text-green-700">paga {dataCurta(l.pagoEm)}</span> : null}</td>
                   </tr>
                 ))}
               </tbody>
@@ -467,6 +477,7 @@ export function ImportarLote({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: ()
           <p className="text-sm">
             {boas.length} de {linhas.length} {linhas.length === 1 ? 'linha pronta' : 'linhas prontas'} · {reais(boas.reduce((s, l) => s + l.valor, 0))}
             {boas.length < linhas.length && <span className="text-red-700"> · as linhas em vermelho ficam de fora</span>}
+            {pagas > 0 && <span className="text-stone-500"> · {pagas} já {pagas === 1 ? 'paga' : 'pagas'}</span>}
             {novos.length > 0 && <span className="text-stone-500"> · {novos.length} {novos.length === 1 ? 'fornecedor novo' : 'fornecedores novos'}</span>}
           </p>
         )}

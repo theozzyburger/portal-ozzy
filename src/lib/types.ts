@@ -1191,7 +1191,8 @@ export interface ContaPagar {
   lote?: string | null
   extratoMovimentoId?: string | null
 }
-export type NovaContaPagar = Omit<ContaPagar, 'id' | 'pagoEm' | 'valorPago' | 'conciliado'> & { id?: string }
+// pagoEm/valorPago: conta que já entra paga (importação do histórico).
+export type NovaContaPagar = Omit<ContaPagar, 'id' | 'pagoEm' | 'valorPago' | 'conciliado'> & { id?: string; pagoEm?: string | null; valorPago?: number | null }
 export type SituacaoRecorrente = 'a_confirmar' | 'ativa' | 'pausada' | 'encerrada'
 // Conta que se repete todo mês (aluguel, sistema…). Ativa = lança a conta de cada mês sozinha.
 export interface ContaRecorrente {
