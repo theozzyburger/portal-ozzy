@@ -4,7 +4,7 @@ import { useApp } from '../lib/contexto'
 import { nomeUnidade, qtd } from '../lib/custos'
 import { hoje, tempoDesde } from '../lib/datas'
 import { estoqueBase } from '../lib/logistica'
-import type { EnvioEvento, Inventario, ItemContagem, ItemModeloChecklist } from '../lib/types'
+import type { EnvioEvento, Inventario, ItemContagem, ItemModeloChecklist, Operacao } from '../lib/types'
 import { Contagem } from './EventoLogistica'
 
 interface Dados {
@@ -12,6 +12,7 @@ interface Dados {
   contagens: Inventario[]
   envios: EnvioEvento[]
   modelo: ItemModeloChecklist[]
+  operacoes: Operacao[]
 }
 
 // Estoque da base (Central) e itens fixos do checklist de eventos.
@@ -22,10 +23,11 @@ export default function EstoqueBase() {
   const [contando, setContando] = useState(false)
   const [busca, setBusca] = useState('')
   const [editando, setEditando] = useState<ItemModeloChecklist | 'novo' | null>(null)
+  const [filtroOp, setFiltroOp] = useState('')
   const carregar = useCallback(async () => {
     try {
-      const [itens, contagens, envios, modelo] = await Promise.all([store.itensContagem(), store.inventarios({ local: 'base' }), store.envios(), store.modeloChecklist()])
-      setD({ itens, contagens, envios, modelo })
+      const [itens, contagens, envios, modelo, operacoes] = await Promise.all([store.itensContagem(), store.inventarios({ local: 'base' }), store.envios(), store.modeloChecklist(), store.operacoes()])
+      setD({ itens, contagens, envios, modelo, operacoes })
     } catch (e) {
       setErro((e as Error).message)
     }
@@ -57,6 +59,8 @@ export default function EstoqueBase() {
     .filter((i) => saldo.has(i.chave))
     .filter((i) => !busca || i.nome.toLowerCase().includes(busca.toLowerCase()))
   const categorias = [...new Set(d.modelo.map((m) => m.categoria))]
+  const nomeOp = (id: string | null) => (id ? d.operacoes.find((o) => o.id === id)?.nome ?? id : 'Todas as operações')
+  const doFiltro = (m: ItemModeloChecklist) => !filtroOp || (filtroOp === '-' ? !m.operacaoId : m.operacaoId === filtroOp)
 
   return (
     <div className="space-y-6">
@@ -122,19 +126,30 @@ export default function EstoqueBase() {
         <div className="flex flex-wrap items-center gap-2">
           <div>
             <h2 className="text-lg font-bold">Itens fixos do checklist</h2>
-            <p className="text-sm text-stone-600">Vão na primeira separação de todo evento (equipamentos, utensílios, embalagens, limpeza…). Alimentos e bebidas não entram aqui: saem da previsão × fichas.</p>
+            <p className="text-sm text-stone-600">
+              Vão na primeira separação do evento (equipamentos, utensílios, embalagens, limpeza…). Cada item é de uma operação: o evento só leva os itens das operações que vão para ele, mais os de todas as operações. Alimentos e bebidas não entram aqui: saem da previsão × fichas.
+            </p>
           </div>
           <Botao variante="secundario" className="sm:ml-auto" onClick={() => setEditando('novo')}>+ Item</Botao>
         </div>
-        {categorias.map((c) => (
+        <div className="flex flex-wrap gap-1">
+          {[['', 'Tudo'], ...d.operacoes.filter((o) => o.ativa).map((o) => [o.id, o.nome]), ['-', 'Todas as operações']].map(([id, nome]) => (
+            <button key={id} onClick={() => setFiltroOp(id)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${filtroOp === id ? 'bg-carvao text-white' : 'text-stone-600 hover:bg-stone-200'}`}>
+              {nome} <span className="opacity-60">{d.modelo.filter((m) => (!id ? true : id === '-' ? !m.operacaoId : m.operacaoId === id)).length}</span>
+            </button>
+          ))}
+        </div>
+        {categorias.filter((c) => d.modelo.some((m) => m.categoria === c && doFiltro(m))).map((c) => (
           <Cartao key={c}>
             <h3 className="mb-1 text-xs font-bold tracking-wide text-stone-500 uppercase">{c}</h3>
             <ul className="divide-y divide-stone-100 text-sm">
-              {d.modelo.filter((m) => m.categoria === c).map((m) => (
+              {d.modelo.filter((m) => m.categoria === c && doFiltro(m)).map((m) => (
                 <li key={m.id} className={`flex items-center gap-2 py-1.5 ${m.ativo ? '' : 'opacity-50'}`}>
                   <span className="flex-1">
                     <b>{m.item}</b>
-                    {m.operacao && <span className="ml-1.5 rounded bg-stone-100 px-1.5 text-xs text-stone-600">{m.operacao}</span>}
+                    <span className={`ml-1.5 rounded px-1.5 text-xs ${m.operacaoId ? 'bg-ozzy-100 text-stone-800' : 'bg-stone-100 text-stone-600'}`}>{nomeOp(m.operacaoId)}</span>
+                    {m.operacao && <span className="ml-1 rounded bg-stone-100 px-1.5 text-xs text-stone-600">{m.operacao}</span>}
                     {!m.ativo && <span className="ml-1.5 text-xs">(não vai)</span>}
                   </span>
                   <span className="text-stone-600">{m.quantidade}</span>
@@ -150,6 +165,7 @@ export default function EstoqueBase() {
         <EditarItemModelo
           m={editando === 'novo' ? null : editando}
           categorias={categorias}
+          operacoes={d.operacoes}
           proximaOrdem={Math.max(0, ...d.modelo.map((m) => m.ordem)) + 1}
           aoFechar={() => setEditando(null)}
           aoSalvar={async () => {
@@ -163,21 +179,22 @@ export default function EstoqueBase() {
   )
 }
 
-function EditarItemModelo({ m, categorias, proximaOrdem, aoFechar, aoSalvar }: {
+function EditarItemModelo({ m, categorias, operacoes, proximaOrdem, aoFechar, aoSalvar }: {
   m: ItemModeloChecklist | null
   categorias: string[]
+  operacoes: Operacao[]
   proximaOrdem: number
   aoFechar: () => void
   aoSalvar: () => void
 }) {
   const { store } = useApp()
-  const [f, setF] = useState({ categoria: m?.categoria ?? '', item: m?.item ?? '', operacao: m?.operacao ?? '', quantidade: m?.quantidade ?? '', ativo: m?.ativo ?? true })
+  const [f, setF] = useState({ categoria: m?.categoria ?? '', item: m?.item ?? '', operacao: m?.operacao ?? '', operacaoId: m?.operacaoId ?? '', quantidade: m?.quantidade ?? '', ativo: m?.ativo ?? true })
   const [erro, setErro] = useState('')
   const salvar = async (ev: React.FormEvent) => {
     ev.preventDefault()
     if (!f.item.trim() || !f.categoria.trim()) return setErro('Preencha o item e a categoria.')
     try {
-      await store.salvarItemModelo({ id: m?.id, categoria: f.categoria, item: f.item, operacao: f.operacao || null, quantidade: f.quantidade || null, ordem: m?.ordem ?? proximaOrdem, ativo: f.ativo })
+      await store.salvarItemModelo({ id: m?.id, categoria: f.categoria, item: f.item, operacao: f.operacao || null, operacaoId: f.operacaoId || null, quantidade: f.quantidade || null, ordem: m?.ordem ?? proximaOrdem, ativo: f.ativo })
       aoSalvar()
     } catch (err) {
       setErro((err as Error).message)
@@ -199,6 +216,12 @@ function EditarItemModelo({ m, categorias, proximaOrdem, aoFechar, aoSalvar }: {
             <datalist id="pracas">{['Foca', 'Pizza', 'Romana'].map((c) => <option key={c} value={c} />)}</datalist>
           </Campo>
         </div>
+        <Campo rotulo="Operação" dica="O evento só leva os itens das operações que vão para ele.">
+          <select className={estiloEntrada} value={f.operacaoId} onChange={(ev) => setF({ ...f, operacaoId: ev.target.value })}>
+            <option value="">Todas as operações (vai sempre)</option>
+            {operacoes.filter((o) => o.ativa || o.id === f.operacaoId).map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+          </select>
+        </Campo>
         <Campo rotulo="Quantidade" dica="Livre: 2, 3 caixas, Todas">
           <input className={estiloEntrada} value={f.quantidade} onChange={(ev) => setF({ ...f, quantidade: ev.target.value })} />
         </Campo>

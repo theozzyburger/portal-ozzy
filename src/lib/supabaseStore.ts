@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, type Store } from './store'
 import { chaveDe, daChave } from './types'
-import type { FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -916,11 +916,11 @@ export function criarSupabaseStore(url: string, chave: string): Store {
 
     async modeloChecklist() {
       return (ok(await sb.from('checklist_evento_modelo').select('*').order('ordem')) ?? []).map((r: any): ItemModeloChecklist => ({
-        id: r.id, categoria: r.categoria, item: r.item, operacao: r.operacao, quantidade: r.quantidade, ordem: r.ordem, ativo: r.ativo,
+        id: r.id, categoria: r.categoria, item: r.item, operacao: r.operacao, operacaoId: r.operacao_id ?? null, quantidade: r.quantidade, ordem: r.ordem, ativo: r.ativo,
       }))
     },
     async salvarItemModelo(i) {
-      const linha = { categoria: i.categoria.trim(), item: i.item.trim(), operacao: texto(i.operacao), quantidade: texto(i.quantidade), ordem: i.ordem, ativo: i.ativo }
+      const linha = { categoria: i.categoria.trim(), item: i.item.trim(), operacao: texto(i.operacao), operacao_id: i.operacaoId, quantidade: texto(i.quantidade), ordem: i.ordem, ativo: i.ativo }
       ok(i.id ? await sb.from('checklist_evento_modelo').update(linha).eq('id', i.id) : await sb.from('checklist_evento_modelo').insert(linha))
     },
     async envios(eventoId) {
@@ -1030,6 +1030,25 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async definirLocalEvento(eventoId, lat, lng) {
       ok(await sb.rpc('definir_local_evento', { p_evento: eventoId, p_lat: lat, p_lng: lng }))
     },
+    async equipeEvento(eventoId) {
+      return (ok(await sb.from('evento_equipe').select('*').eq('evento_id', eventoId).order('ordem').order('criado_em')) ?? []).map(paraMembroEquipe)
+    },
+    async salvarMembroEquipe(m) {
+      const linha = {
+        evento_id: m.eventoId, funcionario_id: m.funcionarioId, freela_id: m.freelaId, nome: m.nome?.trim() || null, funcao: m.funcao?.trim() || null,
+        barraca: m.barraca, posicao: m.posicao, observacao: m.observacao?.trim() || null, ordem: m.ordem,
+      }
+      const r = m.id
+        ? ok(await sb.from('evento_equipe').update(linha).eq('id', m.id).select().single())
+        : ok(await sb.from('evento_equipe').insert(linha).select().single())
+      return paraMembroEquipe(r)
+    },
+    async excluirMembroEquipe(id) {
+      ok(await sb.from('evento_equipe').delete().eq('id', id))
+    },
+    async salvarLayoutBarracas(eventoId, layout) {
+      ok(await sb.from('eventos').update({ layout_barracas: layout }).eq('id', eventoId))
+    },
     async marcarForaDaMedia(eventoId, fora) {
       ok(await sb.from('eventos').update({ fora_da_media: fora }).eq('id', eventoId))
     },
@@ -1082,7 +1101,7 @@ const paraEvento = (r: any): Evento => ({
   taxaOrganizadorPct: numeroOuNulo(r.taxa_organizador_pct), valorFixo: numeroOuNulo(r.valor_fixo), condicoes: r.condicoes, quemRecebe: r.quem_recebe,
   repassePrazoDias: r.repasse_prazo_dias, repasseObs: r.repasse_obs, infraestrutura: r.infraestrutura, observacao: r.observacao,
   cidade: r.cidade ?? null, gastronomia: r.gastronomia ?? null, barracas: numeroOuNulo(r.barracas), margemSegurancaPct: Number(r.margem_seguranca_pct ?? 10),
-  diariaFreela: numeroOuNulo(r.diaria_freela), latitude: r.latitude ?? null, longitude: r.longitude ?? null, foraDaMedia: r.fora_da_media ?? false,
+  diariaFreela: numeroOuNulo(r.diaria_freela), latitude: r.latitude ?? null, longitude: r.longitude ?? null, foraDaMedia: r.fora_da_media ?? false, layoutBarracas: r.layout_barracas ?? {},
   dias: (r.evento_dias ?? [])
     .map((d: any) => ({ data: d.data, abre: d.abre?.slice(0, 5) ?? null, fecha: d.fecha?.slice(0, 5) ?? null }))
     .sort((a: DiaEvento, b: DiaEvento) => a.data.localeCompare(b.data)),
@@ -1120,4 +1139,9 @@ const paraSalario = (r: any): Salario => ({
   funcionarioId: r.funcionario_id, mes: r.mes, tipo: r.tipo ?? 'salario', descAdiantamento: Number(r.desc_adiantamento ?? 0), salario: Number(r.salario), caixinha: Number(r.caixinha), bonusCaixinha: Number(r.bonus_caixinha),
   bonusConclui: Number(r.bonus_conclui), descFaltas: Number(r.desc_faltas), descAtrasos: Number(r.desc_atrasos), inss: Number(r.inss),
   descVt: Number(r.desc_vt), outrosCreditos: Number(r.outros_creditos ?? 0), outrosDescontos: Number(r.outros_descontos ?? 0), rubricas: r.rubricas ?? null, observacao: r.observacao, liberado: r.liberado, holerite: r.holerite ?? null,
+})
+
+const paraMembroEquipe = (r: any): MembroEquipeEvento => ({
+  id: r.id, eventoId: r.evento_id, funcionarioId: r.funcionario_id, freelaId: r.freela_id, nome: r.nome, funcao: r.funcao,
+  barraca: r.barraca, posicao: r.posicao, observacao: r.observacao, ordem: r.ordem,
 })

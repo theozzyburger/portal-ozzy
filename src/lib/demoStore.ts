@@ -1,7 +1,7 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { addDias, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
@@ -129,13 +129,14 @@ const novoId = (p: string) => `${p}${++seq}`
 const operacoesDemo: Operacao[] = [
   { id: 'burger', nome: 'The Ozzy Burger', ativa: true },
   { id: 'pizza', nome: 'The Ozzy Pizza', ativa: true },
+  { id: 'foca', nome: 'Foca', ativa: true },
 ]
 const eventoDemo = (n: number, dias: number[], extra: Partial<Evento>): Evento => ({
   id: `ev${n}`, numero: n, nome: '', status: 'negociacao', statusMotivo: null, tipo: null, organizador: null, organizadorContato: null,
   local: null, endereco: null, publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null,
   taxaOrganizadorPct: null, valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null,
   infraestrutura: null, observacao: null, operacoes: [], responsaveis: [],
-  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null, foraDaMedia: false,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null, foraDaMedia: false, layoutBarracas: {},
   dias: dias.map((d) => ({ data: addDias(hoje(), d), abre: '12:00', fecha: '22:00' })),
   criadoPor: 'f1', criadoEm: haHoras(24 * 30), atualizadoPor: 'f1', atualizadoEm: haHoras(24 * 2), ...extra,
 })
@@ -256,7 +257,9 @@ const modeloChecklistDemo: ItemModeloChecklist[] = [
   ['Equipamentos', 'Chapa de pão', 'Foca', '2'], ['Equipamentos', 'Extintor', null, '2'], ['Equipamentos', 'Fornos', 'Pizza', 'Grande e médio'],
   ['Utensílios', 'Cortador de pizza', 'Pizza', '4'], ['Utensílios', 'GNs', 'Foca', 'Todas'], ['Embalagens', 'Pratos pizza', 'Pizza', '1000'],
   ['Prod. Limpeza', 'Álcool gel', null, '3'], ['Decoração', 'Cardápios', null, 'Todos'],
-].map(([categoria, item, operacao, quantidade], i) => ({ id: 'mc' + i, categoria: categoria!, item: item!, operacao, quantidade, ordem: i, ativo: true }))
+].map(([categoria, item, operacao, quantidade], i) => ({
+  id: 'mc' + i, categoria: categoria!, item: item!, operacao, operacaoId: operacao === 'Pizza' ? 'pizza' : operacao === 'Foca' ? 'foca' : null, quantidade, ordem: i, ativo: true,
+}))
 const itemEnvioDemo = (id: string, categoria: string, chave: string | null, item: string | null, previsto: number | null, unidade: string | null, extra: Partial<ItemEnvio> = {}): ItemEnvio => ({
   id, ordem: 0, categoria, operacao: null, insumoId: chave?.startsWith('i:') ? chave.slice(2) : null, receitaId: chave?.startsWith('r:') ? chave.slice(2) : null, item,
   previsto, quantidade: previsto, quantidadeTexto: null, unidade, conferido: true, conferidoPor: 'p-maria-costa', conferidoEm: haHoras(30),
@@ -273,6 +276,17 @@ const enviosDemo: EnvioEvento[] = [
       itemEnvioDemo('ei9', 'Utensílios', null, 'GNs', null, null, { operacao: 'Foca', quantidadeTexto: 'Todas' }),
     ].map((x, i) => ({ ...x, ordem: i + 1 })),
   },
+]
+// Equipe do evento em andamento (EXEMPLO).
+const membroDemo = (id: string, eventoId: string, quem: Partial<MembroEquipeEvento>, funcao: string, barraca: number, posicao: number | null, ordem: number): MembroEquipeEvento => ({
+  id, eventoId, funcionarioId: null, freelaId: null, nome: null, funcao, barraca, posicao, observacao: null, ordem, ...quem,
+})
+const equipeEventoDemo: MembroEquipeEvento[] = [
+  membroDemo('eq1', 'ev6', { funcionarioId: 'p-maria-costa' }, 'Responsável', 1, 1, 1),
+  membroDemo('eq2', 'ev6', { funcionarioId: 'p-cibeli-costa' }, 'Caixa', 1, 0, 2),
+  membroDemo('eq3', 'ev6', { freelaId: 'fe1' }, 'Pizzaiolo', 1, 7, 3),
+  membroDemo('eq4', 'ev6', { freelaId: 'fe2' }, 'Forno', 1, 8, 4),
+  membroDemo('eq5', 'ev6', { nome: 'Pessoa Sem Cadastro (exemplo)' }, 'Montagem', 2, null, 5),
 ]
 // Freelancers de eventos (EXEMPLO, nomes e CPFs fictícios).
 const freelasEventoDemo: FreelaEvento[] = [
@@ -1615,6 +1629,30 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async definirLocalEvento(eventoId, lat, lng) {
       exigeGestao()
       Object.assign(eventosDemo.find((e) => e.id === eventoId)!, { latitude: lat, longitude: lng })
+    },
+    async equipeEvento(eventoId) {
+      exigeGestao()
+      return espera(structuredClone(equipeEventoDemo.filter((m) => m.eventoId === eventoId)).sort((a, b) => a.ordem - b.ordem))
+    },
+    async salvarMembroEquipe(m) {
+      exigeGestao()
+      const repetido = equipeEventoDemo.find((x) => x.id !== m.id && x.eventoId === m.eventoId &&
+        ((m.funcionarioId && x.funcionarioId === m.funcionarioId) || (m.freelaId && x.freelaId === m.freelaId)))
+      if (repetido) throw new Error('Essa pessoa já está na equipe do evento.')
+      const novo: MembroEquipeEvento = { ...m, id: m.id ?? novoId('eq'), nome: m.nome?.trim() || null, funcao: m.funcao?.trim() || null }
+      const i = equipeEventoDemo.findIndex((x) => x.id === novo.id)
+      if (i >= 0) equipeEventoDemo[i] = novo
+      else equipeEventoDemo.push(novo)
+      return structuredClone(novo)
+    },
+    async excluirMembroEquipe(id) {
+      exigeGestao()
+      const i = equipeEventoDemo.findIndex((x) => x.id === id)
+      if (i >= 0) equipeEventoDemo.splice(i, 1)
+    },
+    async salvarLayoutBarracas(eventoId, layout) {
+      exigeGestao()
+      eventosDemo.find((e) => e.id === eventoId)!.layoutBarracas = structuredClone(layout)
     },
     async marcarForaDaMedia(eventoId, fora) {
       exigeGestao()

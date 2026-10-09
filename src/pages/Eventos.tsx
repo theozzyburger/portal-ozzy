@@ -8,6 +8,7 @@ import Insumos from './Insumos'
 import EstoqueBase from './EstoqueBase'
 import ComparativoEventos from './ComparativoEventos'
 import PainelEventos from './PainelEventos'
+import EquipeEvento from './EquipeEvento'
 import FreelasEventos, { FreelasDoEvento } from './FreelasEventos'
 import { AbasEvento, CardapioPrevisao, Separacao, Sobras, VendasEvento, useDadosLogistica } from './EventoLogistica'
 import { STATUS_EVENTO, nomeStatusEvento, type DiaEvento, type Evento, type HistoricoEvento, type NovoEvento, type Operacao, type StatusEvento } from '../lib/types'
@@ -234,6 +235,7 @@ function PaginaEvento({ e, eventos, operacoes, aoMudar, aba }: { e: Evento; even
       <AbasEvento id={e.id} aba={aba} />
       {aba === '' ? <ResumoEvento e={e} operacoes={operacoes} aoMudar={aoMudar} />
         : aba === 'freelas' ? <FreelasDoEvento e={e} aoMudarEvento={aoMudar} />
+        : aba === 'equipe' ? <EquipeEvento e={e} aoMudarEvento={aoMudar} />
         : <AbaLogistica e={e} eventos={eventos} aba={aba} />}
     </div>
   )
@@ -448,7 +450,7 @@ const emBranco: NovoEvento = {
   nome: '', status: 'negociacao', statusMotivo: null, tipo: null, organizador: null, organizadorContato: null, local: null, endereco: null,
   publicoEstimado: null, montagemInicio: null, montagemFim: null, desmontagemInicio: null, desmontagemFim: null, taxaOrganizadorPct: null,
   valorFixo: null, condicoes: null, quemRecebe: null, repassePrazoDias: null, repasseObs: null, infraestrutura: null, observacao: null,
-  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null, foraDaMedia: false,
+  cidade: null, gastronomia: null, barracas: null, margemSegurancaPct: 10, diariaFreela: null, latitude: null, longitude: null, foraDaMedia: false, layoutBarracas: {},
   dias: [], operacoes: [], responsaveis: [],
 }
 

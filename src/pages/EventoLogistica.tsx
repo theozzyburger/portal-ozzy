@@ -9,7 +9,7 @@ import { ir } from '../lib/rota'
 import { criarReconhecedor, lerContagem } from '../lib/voz'
 import {
   chaveDe, daChave, type ChaveItem, type EnvioEvento, type Evento, type EventoEscalado, type Inventario, type ItemContagem, type ItemEnvio, type ItemModeloChecklist,
-  type NovoItemEnvio, type ProdutoEvento, type QtdDiaProduto, type Receita, type VendaEvento,
+  type NovoItemEnvio, type Operacao, type ProdutoEvento, type QtdDiaProduto, type Receita, type VendaEvento,
 } from '../lib/types'
 
 const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
@@ -24,6 +24,7 @@ export const ABAS_EVENTO = [
   { id: 'vendas', nome: 'Vendas' },
   { id: 'separacao', nome: 'Separação' },
   { id: 'sobras', nome: 'Sobras do dia' },
+  { id: 'equipe', nome: 'Equipe' },
   { id: 'freelas', nome: 'Freelas' },
 ]
 
@@ -57,6 +58,7 @@ export interface DadosLogistica {
     modelo: ItemModeloChecklist[]
     contagensBase: Inventario[]
     enviosTodos: EnvioEvento[]
+    operacoes: Operacao[]
   }
 }
 
@@ -69,11 +71,11 @@ export function useDadosLogistica(eventoId: string, gestao: boolean) {
       const [itens, envios, inventarios] = await Promise.all([store.itensContagem(), store.envios(eventoId), store.inventarios({ eventoId })])
       let g: DadosLogistica['gestao'] = null
       if (gestao) {
-        const [insumos, receitas, versoes, cardapio, previsao, vendas, modelo, contagensBase, enviosTodos] = await Promise.all([
+        const [insumos, receitas, versoes, cardapio, previsao, vendas, modelo, contagensBase, enviosTodos, operacoes] = await Promise.all([
           store.insumos(), store.receitas(), store.versoesReceitas(), store.cardapioEvento(eventoId), store.previsaoEvento(eventoId),
-          store.vendasEventos(), store.modeloChecklist(), store.inventarios({ local: 'base' }), store.envios(),
+          store.vendasEventos(), store.modeloChecklist(), store.inventarios({ local: 'base' }), store.envios(), store.operacoes(),
         ])
-        g = { cat: montarCatalogo(insumos, receitas, versoes), receitas, cardapio, previsao, vendas, modelo, contagensBase, enviosTodos }
+        g = { cat: montarCatalogo(insumos, receitas, versoes), receitas, cardapio, previsao, vendas, modelo, contagensBase, enviosTodos, operacoes }
       }
       setD({ itens, envios, inventarios, gestao: g })
     } catch (e) {
@@ -85,6 +87,11 @@ export function useDadosLogistica(eventoId: string, gestao: boolean) {
   }, [carregar])
   return { d, erro, carregar }
 }
+
+// Itens fixos do checklist que este evento leva: os sem operação e os das operações do evento.
+// Evento sem operação marcada leva todos (para não sumir nada).
+export const itensFixosDoEvento = (modelo: ItemModeloChecklist[], e: Pick<Evento, 'operacoes'>) =>
+  modelo.filter((m) => m.ativo && (!m.operacaoId || !e.operacoes.length || e.operacoes.includes(m.operacaoId)))
 
 const infoItem = (itens: ItemContagem[], chave: ChaveItem | null) => (chave ? itens.find((i) => i.chave === chave) : undefined)
 const nomeLinha = (itens: ItemContagem[], i: Pick<ItemEnvio, 'insumoId' | 'receitaId' | 'item'>) => infoItem(itens, chaveDe(i))?.nome ?? i.item ?? '—'
@@ -643,9 +650,10 @@ function MontarSeparacao({ e, d, diaInicial, aoFechar, aoCriar }: { e: Evento; d
           previsto: l.levar, quantidade: l.levar, quantidadeTexto: null, unidade: info?.unidade ?? null, nota: notaLevar(l),
         }
       })
+    // Itens fixos: só os das operações que vão para este evento (e os que valem para todas).
     if (primeira)
-      for (const m of g.modelo.filter((x) => x.ativo))
-        linhas.push({ k: 'm:' + m.id, usar: true, categoria: m.categoria, operacao: m.operacao, insumoId: null, receitaId: null, item: m.item, previsto: null, quantidade: null, quantidadeTexto: m.quantidade, unidade: null })
+      for (const m of itensFixosDoEvento(g.modelo, e))
+        linhas.push({ k: 'm:' + m.id, usar: true, categoria: m.categoria, operacao: g.operacoes.find((o) => o.id === m.operacaoId)?.nome ?? m.operacao, insumoId: null, receitaId: null, item: m.item, previsto: null, quantidade: null, quantidadeTexto: m.quantidade, unidade: null })
     return linhas
   }
   const [linhas, setLinhas] = useState<LinhaMontagem[]>(() => sugestao(diaInicial))

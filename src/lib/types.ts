@@ -816,6 +816,8 @@ export interface Evento {
   diariaFreela: number | null
   // Fica fora das médias do painel e da sugestão da previsão (a gestão escolhe).
   foraDaMedia: boolean
+  // Nome de cada quadrado da barraca 3x3, por barraca: { '1': { '0': 'Caixa' } }.
+  layoutBarracas: Record<string, Record<string, string>>
   // Local do evento, para a diária mandada de lá valer como presença.
   latitude: number | null
   longitude: number | null
@@ -939,6 +941,8 @@ export interface ItemModeloChecklist {
   item: string
   // Praça que usa o item (Foca, Pizza, Romana…); null = todas.
   operacao: string | null
+  // Operação dona do item (The Ozzy Pizza, Foca…): o evento só leva os itens das operações que vão. null = vai sempre.
+  operacaoId: string | null
   quantidade: string | null // livre: "2", "3 caixas", "Todas"
   ordem: number
   ativo: boolean
@@ -1046,4 +1050,18 @@ export interface EventoAberto {
   id: string
   nome: string
   dias: string[]
+}
+
+// Equipe do evento: quem trabalha e onde fica na barraca (grade 3x3, posição 0 a 8; linha de cima = frente).
+export interface MembroEquipeEvento {
+  id: string
+  eventoId: string
+  funcionarioId: string | null
+  freelaId: string | null
+  nome: string | null // só para quem não tem cadastro
+  funcao: string | null
+  barraca: number
+  posicao: number | null
+  observacao: string | null
+  ordem: number
 }
