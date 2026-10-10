@@ -5,7 +5,7 @@ import type { CompraFornecedor, ProdutoVenda, PedidoCompra, PrecoFornecedor, Ite
 import { chamadoEmAberto } from './types'
 import { addDias, addMeses, diasEntre, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
-import { fichasDemo, resultadosDemo } from './demoLucro'
+import { resultadosDemo } from './demoLucro'
 import { addMesesData } from './vencimentos'
 import { TURNOS_PADRAO } from './turnos'
 import { comFolgasDoTurno } from './pessoal'
@@ -240,10 +240,22 @@ const receitasDemo: Receita[] = [
   rec('re3', 'Refrigerante (exemplo)', 'produto', { linha: 'Bebidas', origem: 'revenda', precoVenda: 9 }),
   rec('re4', 'Pizza margherita (exemplo)', 'produto', { linha: 'Pizza', precoVenda: 50 }),
   rec('re5', 'Cannoli (exemplo)', 'produto', { linha: 'Sobremesa', precoVenda: 25, versaoAtual: 0 }),
-  rec('re6', 'Maionese verde (exemplo)', 'preparo', { linha: null, conservacao: 'Refrigerado até 5 °C', validadeDias: 4, modoPreparo: '1. Bata o cheiro verde e o alho com um pouco de óleo.\n2. Vá colocando o resto do óleo em fio até emulsionar.' }),
+  rec('re6', 'Maionese verde (exemplo)', 'preparo', { linha: null, conservacao: 'Refrigerado', validadeDias: 4, insumoId: 'in12', ecleticaCodigo: '100901', responsavel: 'Victoria',
+    porcaoNome: 'potinhos', porcaoQtd: 0.03, observacoes: 'Caso o molho separe, tire o líquido talhado, limpe o copo, comece de novo e use a mistura talhada no lugar do óleo.',
+    modoPreparo: 'Retire todos os talos da salsinha e da cebolinha\nAdicione o óleo, o alho e as folhas aos poucos no liquidificador\nBata até emulsionar, cerca de 30 segundos\nPorcione nos potinhos e guarde refrigerado' }),
+  // Fichas das lojas (vindas da Eclética).
+  rec('re7', 'Molho especial (exemplo)', 'preparo', { linha: null, area: 'lojas', insumoId: 'in13', ecleticaCodigo: '100902', conservacao: 'Refrigerado', validadeDias: 3,
+    modoPreparo: 'Coloque a maionese verde e o tomate no liquidificador\nBata por 1 minuto\nGuarde refrigerado em bisnagas' }),
+  rec('re8', 'BURGER BACON (EXEMPLO)', 'produto', { linha: 'BURGERS', area: 'lojas', ecleticaCodigo: '11', precoVenda: 44.9 }),
+  rec('re9', 'BURGER CLÁSSICO (EXEMPLO)', 'produto', { linha: 'BURGERS', area: 'lojas', ecleticaCodigo: '10', precoVenda: 39.9 }),
 ]
 const it = (insumoId: string | null, subReceitaId: string | null, quantidade: number, aproveitamento = 1) => ({ insumoId, subReceitaId, quantidade, aproveitamento })
 const versoesReceitaDemo: VersaoReceita[] = [
+  { id: 've7', receitaId: 're7', numero: 1, rendimento: 1, custoTotal: null, nota: 'Fórmula da Eclética', criadaEm: haHoras(10), criadaPor: null, itens: [it(null, 're6', 0.9), it('in6', null, 0.12, 0.9)] },
+  { id: 've8', receitaId: 're8', numero: 1, rendimento: 1, custoTotal: null, nota: 'Fórmula da Eclética', criadaEm: haHoras(10), criadaPor: null,
+    itens: [it('in18', null, 1), it('in16', null, 0.1), it('in17', null, 0.03), it(null, 're7', 0.02), it('in15', null, 0.05), { ...it('in21', null, 1), soDelivery: true }] },
+  { id: 've9', receitaId: 're9', numero: 1, rendimento: 1, custoTotal: null, nota: 'Fórmula da Eclética', criadaEm: haHoras(10), criadaPor: null,
+    itens: [it('in18', null, 1), it('in16', null, 0.1), it(null, 're6', 0.02), it('in15', null, 0.05), { ...it('in21', null, 1), soDelivery: true }] },
   { id: 've6', receitaId: 're6', numero: 1, rendimento: 1, custoTotal: 8.27, nota: 'Exemplo', criadaEm: haHoras(24 * 10), criadaPor: 'f1', itens: [it('in9', null, 0.8), it('in10', null, 0.12, 0.8), it('in11', null, 0.02)] },
   { id: 've1', receitaId: 're1', numero: 1, rendimento: 1, custoTotal: 34.08, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in4', null, 0.33), it('in3', null, 0.67)] },
   { id: 've2', receitaId: 're2', numero: 1, rendimento: 1, custoTotal: 7.78, nota: 'Exemplo', criadaEm: haHoras(24 * 20), criadaPor: 'f1', itens: [it('in1', null, 0.167), it('in2', null, 0.015), it(null, 're1', 0.025)] },
@@ -888,8 +900,8 @@ const pv = (id: string, codigo: string, nome: string, grupo: string, subgrupo: s
   id, ecleticaCodigo: codigo, nome, grupo, subgrupo, tipo, unidade: 'un', preco, precoPizza, receitaId: null, ativo: true,
 })
 const produtosVendaDemo: ProdutoVenda[] = [
-  pv('pv1', '10', 'BURGER CLÁSSICO (EXEMPLO)', 'Lanches', 'BURGERS', 39.9, null),
-  pv('pv2', '11', 'BURGER BACON (EXEMPLO)', 'Lanches', 'BURGERS', 44.9, null),
+  { ...pv('pv1', '10', 'BURGER CLÁSSICO (EXEMPLO)', 'Lanches', 'BURGERS', 39.9, null), receitaId: 're9' },
+  { ...pv('pv2', '11', 'BURGER BACON (EXEMPLO)', 'Lanches', 'BURGERS', 44.9, null), receitaId: 're8' },
   pv('pv3', '20', 'BATATA FRITA (EXEMPLO)', 'Acompanhamentos', 'ACOMPANHAMENTOS', 19.9, null),
   pv('pv4', '30', 'PIZZA MARGHERITA GRANDE (EXEMPLO)', 'Pizzas', 'PIZZAS GRANDES', null, 69.9),
   pv('pv5', '31', 'PIZZA CALABRESA BROTO (EXEMPLO)', 'Pizzas', 'PIZZAS BROTO', null, 39.9),
@@ -971,7 +983,13 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     const u = exigeEu()
     if (!podeGerenciar(u.nivel)) throw new Error('Seu nível de acesso não permite esta ação.')
     return u
+  }  // A produção (setor Produção) lança o que preparou: vê fichas, insumos e produções (0069).
+  const exigeGestaoOuProducao = () => {
+    const u = exigeEu()
+    if (!(podeGerenciar(u.nivel) || u.setor === 'producao')) throw new Error('Seu nível de acesso não permite esta ação.')
+    return u
   }
+
   const exigeFinanceiro = () => {
     const u = exigeEu()
     if (!vejoResultado(u.nivel)) throw new Error('Só o administrativo e o proprietário veem as contas a pagar.')
@@ -1562,11 +1580,6 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       if (leituras.some((l) => l.funcionarioId === u.id && l.versaoId === versaoId)) throw new Error('Você já assinou esta versão.')
       leituras.push({ funcionarioId: u.id, versaoId, assinatura, assinadoEm: agora(), hash: v.hash || (await sha256(v.texto)), dispositivo: navigator.userAgent, ip: null })
     },
-    async fichas() {
-      const u = exigeEu()
-      const fichas = fichasDemo().map((f) => (podeGerenciar(u.nivel) ? f : { ...f, custo: undefined }))
-      return espera({ fichas, atualizadoEm: agora() })
-    },
     async resultados() {
       const u = exigeEu()
       if (!vejoResultado(u.nivel)) throw new Error('Só Proprietário e Administrativo veem o resultado.')
@@ -1835,7 +1848,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       return structuredClone(novo)
     },
     async insumos() {
-      exigeGestao()
+      exigeGestaoOuProducao()
       return structuredClone(insumosDemo).map((i) => ({ ...i, prePreparo: prePreparoDemo.has(i.id) })).sort((a, b) => a.nome.localeCompare(b.nome))
     },
     async salvarInsumo(i) {
@@ -1859,11 +1872,11 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       return precosInsumoDemo.filter((p) => p.insumoId === id).sort((a, b) => b.em.localeCompare(a.em))
     },
     async receitas() {
-      exigeGestao()
+      exigeGestaoOuProducao()
       return structuredClone(receitasDemo).sort((a, b) => a.nome.localeCompare(b.nome))
     },
     async versoesReceitas() {
-      exigeGestao()
+      exigeGestaoOuProducao()
       return structuredClone(versoesReceitaDemo)
     },
     async salvarReceita(r) {
@@ -2123,7 +2136,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
 
     // Financeiro e estoque.
     async centrosCusto() {
-      exigeGestao()
+      exigeGestaoOuProducao()
       return espera(centrosDemo.map((c) => ({ ...c })))
     },
     async planoContas() {
@@ -2467,11 +2480,11 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       return espera([...m.values()])
     },
     async producoes(de, ate) {
-      exigeGestao()
+      exigeGestaoOuProducao()
       return espera(producoesDemo.filter((p) => p.data >= de && p.data <= ate).sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm)).map((p) => ({ ...p })))
     },
     async lancarProducao(n) {
-      const u = exigeGestao()
+      const u = exigeGestaoOuProducao()
       if (!n.centroCustoId) throw new Error('Escolha a loja.')
       if (!(n.quantidade > 0)) throw new Error('Diga quanto foi produzido.')
       const r = n.receitaId ? receitasDemo.find((x) => x.id === n.receitaId) : undefined

@@ -693,29 +693,6 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         notaHa30Dias: r.nota_ha_30_dias === null ? null : Number(r.nota_ha_30_dias), atualizadoEm: r.atualizado_em,
       }))
     },
-    async fichas() {
-      const [fichas, custos, sinc] = await Promise.all([
-        sb.from('lf_fichas').select('*'),
-        // Para quem não é da gestão o banco devolve vazio (regra de acesso).
-        sb.from('lf_fichas_custo').select('*'),
-        sb.from('lf_sincronizacao').select('em').eq('dado', 'fichas').maybeSingle(),
-      ])
-      const porId = new Map((ok(custos) ?? []).map((c: any) => [c.produto_id, c]))
-      return {
-        atualizadoEm: ok(sinc)?.em ?? null,
-        fichas: (ok(fichas) ?? []).map((r: any) => {
-          const c: any = porId.get(r.produto_id)
-          return {
-            produtoId: r.produto_id, nome: r.nome, categoria: r.categoria, preparo: r.preparo,
-            itens: (r.itens ?? []).map((i: any) => ({ ...i, qtd: Number(i.qtd) })),
-            custo: c && {
-              total: Number(c.custo), preco: Number(c.preco),
-              itens: (c.itens ?? []).map((i: any) => ({ custoUnit: Number(i.custoUnit), total: Number(i.total) })),
-            },
-          }
-        }),
-      }
-    },
     async resultados() {
       const [linhas, sinc] = await Promise.all([
         sb.from('lf_resultados').select('*'),
@@ -899,13 +876,13 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return (ok(await sb.from('receitas').select('*').order('nome')) ?? []).map(paraReceita)
     },
     async versoesReceitas() {
-      return (await todas((de, ate) => sb.from('receita_versoes').select('*, receita_itens(ordem, insumo_id, sub_receita_id, quantidade, aproveitamento)').order('numero').order('id').range(de, ate))).map(
+      return (await todas((de, ate) => sb.from('receita_versoes').select('*, receita_itens(ordem, insumo_id, sub_receita_id, quantidade, aproveitamento, so_delivery)').order('numero').order('id').range(de, ate))).map(
         (r: any): VersaoReceita => ({
           id: r.id, receitaId: r.receita_id, numero: r.numero, rendimento: Number(r.rendimento), custoTotal: numeroOuNulo(r.custo_total), nota: r.nota,
           criadaEm: r.criada_em, criadaPor: r.criada_por,
           itens: (r.receita_itens ?? [])
             .sort((a: any, b: any) => a.ordem - b.ordem)
-            .map((i: any) => ({ insumoId: i.insumo_id, subReceitaId: i.sub_receita_id, quantidade: Number(i.quantidade), aproveitamento: Number(i.aproveitamento) })),
+            .map((i: any) => ({ insumoId: i.insumo_id, subReceitaId: i.sub_receita_id, quantidade: Number(i.quantidade), aproveitamento: Number(i.aproveitamento), soDelivery: !!i.so_delivery })),
         }),
       )
     },
@@ -914,6 +891,11 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         nome: r.nome.trim(), tipo: r.tipo, linha: texto(r.linha), operacao_id: r.operacaoId, origem: r.origem, unidade: r.unidade, preco_venda: r.precoVenda,
         tempo_preparo_min: r.tempoPreparoMin, tempo_finalizacao_min: r.tempoFinalizacaoMin, capacidade_hora: r.capacidadeHora, equipamentos: texto(r.equipamentos),
         conservacao: texto(r.conservacao), validade_dias: r.validadeDias, modo_preparo: texto(r.modoPreparo), ativo: r.ativo, atualizado_em: new Date().toISOString(),
+        ...(r.area ? { area: r.area } : {}),
+        ...(r.observacoes !== undefined ? { observacoes: texto(r.observacoes) } : {}),
+        ...(r.responsavel !== undefined ? { responsavel: texto(r.responsavel) } : {}),
+        ...(r.porcaoNome !== undefined ? { porcao_nome: texto(r.porcaoNome), porcao_qtd: r.porcaoQtd ?? null } : {}),
+        ...(r.lotes !== undefined ? { lotes: r.lotes?.length ? r.lotes : null } : {}),
       }
       return paraReceita(r.id
         ? ok(await sb.from('receitas').update(linha).eq('id', r.id).select().single())
@@ -922,7 +904,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async salvarVersaoReceita(receitaId, rendimento, custoTotal, nota, itens) {
       return ok(await sb.rpc('salvar_versao_receita', {
         p_receita: receitaId, p_rendimento: rendimento, p_custo: custoTotal, p_nota: nota,
-        p_itens: itens.map((i) => ({ insumo_id: i.insumoId, sub_receita_id: i.subReceitaId, quantidade: i.quantidade, aproveitamento: i.aproveitamento })),
+        p_itens: itens.map((i) => ({ insumo_id: i.insumoId, sub_receita_id: i.subReceitaId, quantidade: i.quantidade, aproveitamento: i.aproveitamento, so_delivery: !!i.soDelivery })),
       })) as number
     },
 
@@ -1536,6 +1518,8 @@ const paraReceita = (r: any): Receita => ({
   id: r.id, nome: r.nome, tipo: r.tipo, linha: r.linha, operacaoId: r.operacao_id, origem: r.origem, unidade: r.unidade, precoVenda: numeroOuNulo(r.preco_venda),
   tempoPreparoMin: r.tempo_preparo_min, tempoFinalizacaoMin: r.tempo_finalizacao_min, capacidadeHora: r.capacidade_hora, equipamentos: r.equipamentos,
   conservacao: r.conservacao, validadeDias: r.validade_dias, modoPreparo: r.modo_preparo ?? null, ativo: r.ativo, versaoAtual: r.versao_atual, insumoId: r.insumo_id ?? null,
+  area: r.area ?? 'eventos', ecleticaCodigo: r.ecletica_codigo ?? null, observacoes: r.observacoes ?? null, responsavel: r.responsavel ?? null,
+  porcaoNome: r.porcao_nome ?? null, porcaoQtd: numeroOuNulo(r.porcao_qtd), lotes: r.lotes ? r.lotes.map(Number) : null,
 })
 
 const linhaItemEnvio = (i: NovoItemEnvio) => ({

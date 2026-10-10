@@ -4,7 +4,6 @@ import { useApp } from '../lib/contexto'
 import { addMeses, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { apelidoUnidade, type ResultadoMes } from '../lib/types'
 import { reais } from '../lib/financeiro'
-import { atualizadoEm } from './Fichas'
 
 type Linha = Omit<ResultadoMes, 'unidadeId' | 'mes'>
 
@@ -156,4 +155,9 @@ function Numero({
       )}
     </div>
   )
+}
+
+function atualizadoEm(iso: string | null) {
+  if (!iso) return 'ainda não copiado'
+  return 'atualizado em ' + new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }

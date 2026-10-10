@@ -24,7 +24,7 @@ import Turnos from './pages/Turnos'
 import Ponto from './pages/Ponto'
 import Regras from './pages/Regras'
 import Manutencao from './pages/Manutencao'
-import Fichas from './pages/Fichas'
+import FichasEvento from './pages/FichasEvento'
 import Freelancers from './pages/Freelancers'
 import Motoboys from './pages/Motoboys'
 import Producao from './pages/Producao'
@@ -141,7 +141,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (modulo.id === 'inicio') conteudo = <Inicio />
   else if (modulo.id === 'regras') conteudo = <Regras />
   else if (modulo.id === 'manutencao') conteudo = <Manutencao />
-  else if (modulo.id === 'fichas') conteudo = <Fichas />
+  else if (modulo.id === 'fichas') conteudo = <FichasEvento area="lojas" id={sub} key={sub ?? 'lista'} />
   else if (modulo.id === 'financeiro') conteudo = <ModuloFinanceiro sub={sub} />
   else if (modulo.id === 'cadastros') conteudo = <Cadastros />
   else if (modulo.id === 'compras') conteudo = <Compras />

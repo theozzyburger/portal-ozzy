@@ -39,7 +39,7 @@ function ProdutosVenda() {
     try {
       const [p, r] = await Promise.all([store.produtosVenda(), store.receitas().catch(() => [])])
       setProdutos(p)
-      setReceitas(r.filter((x) => x.tipo === 'produto'))
+      setReceitas(r.filter((x) => x.tipo === 'produto' && x.area === 'lojas'))
     } catch (e) {
       setErro((e as Error).message)
     }

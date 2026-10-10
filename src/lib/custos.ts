@@ -91,3 +91,17 @@ export function usadoEm(cat: Catalogo, alvo: { insumoId?: string; receitaId?: st
 export const nomeUnidade = (u: string) => ({ kg: 'kg', l: 'L', un: 'un' })[u] ?? u
 export { reais } from './financeiro'
 export const qtd = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+
+// Quantidade para quem pesa na produção: abaixo de 1 kg em gramas, abaixo de 1 L em ml.
+export function qtdLegivel(n: number, unidade: string) {
+  const f = (x: number, casas: number) => x.toLocaleString('pt-BR', { maximumFractionDigits: casas })
+  if (unidade === 'kg' || unidade === 'l') {
+    const [menor, maior] = unidade === 'kg' ? ['g', 'kg'] : ['ml', 'L']
+    if (n * 1000 < 999.5) {
+      const m = n * 1000
+      return `${f(m, m < 10 ? 1 : 0)} ${menor}`
+    }
+    return `${f(n, 3)} ${maior}`
+  }
+  return `${f(n, 2)} ${nomeUnidade(unidade)}`
+}

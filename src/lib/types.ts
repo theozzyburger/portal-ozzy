@@ -969,12 +969,23 @@ export interface Receita {
   versaoAtual: number
   // Item de estoque que a produção deste preparo alimenta (0058).
   insumoId?: string | null
+  // Fichas num lugar só (0069): de quem é a ficha de produto; os pré-preparos servem para todos.
+  area?: AreaFicha
+  ecleticaCodigo?: string | null
+  // Ficha impressa da produção.
+  observacoes?: string | null
+  responsavel?: string | null
+  porcaoNome?: string | null // potinhos, seringas…
+  porcaoQtd?: number | null // quanto vai em cada porção, na unidade da ficha
+  lotes?: number[] | null // quanto imprimir em cada coluna; vazio = 1 a 4 receitas
 }
+export type AreaFicha = 'eventos' | 'lojas'
 export interface ItemReceita {
   insumoId: string | null
   subReceitaId: string | null
   quantidade: number
   aproveitamento: number
+  soDelivery?: boolean // embalagem que só vai no delivery (* na Eclética)
 }
 export interface VersaoReceita {
   id: string

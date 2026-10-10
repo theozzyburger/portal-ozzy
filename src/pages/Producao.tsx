@@ -53,11 +53,17 @@ function Pedidos() {
   const [tem, setTem] = useState<Record<string, string>>({})
   const [erro, setErro] = useState('')
   const [salvando, setSalvando] = useState(false)
+  // Lançar direto da lista (Heitor, 10/10): o computador da produção mostra o que preparar e quem preparou lança ali.
+  const [feitos, setFeitos] = useState<ProducaoT[]>([])
+  const [dados, setDados] = useState<Dados | null>(null)
+  const [lancar, setLancar] = useState<PedidoProducao | null>(null)
   const carregar = useCallback(async () => {
     try {
-      const [l, f] = await Promise.all([store.pedidosProducao(para), store.fechamentos(addDias(para, -1), addDias(para, -1))])
+      const [l, f, p] = await Promise.all([store.pedidosProducao(para), store.fechamentos(addDias(para, -1), addDias(para, -1)),
+        store.producoes(addDias(para, -1), para).catch(() => [])])
       setLinhas(l)
       setFechs(f)
+      setFeitos(p)
       setTem(Object.fromEntries(l.filter((x) => x.prePreparo && x.central > 0).map((x) => [x.insumoId, String(Math.round(x.central * 1000) / 1000).replace('.', ',')])))
     } catch (e) {
       setErro((e as Error).message)
@@ -70,6 +76,13 @@ function Pedidos() {
   const separar = (linhas ?? []).filter((l) => !l.prePreparo)
   const temNa = (l: PedidoProducao) => lerValor(tem[l.insumoId] ?? '') ?? 0
   const fazer = (l: PedidoProducao) => Math.max(0, Math.round((l.total - temNa(l)) * 1000) / 1000)
+  const feito = (l: PedidoProducao) => feitos.filter((p) => p.insumoId === l.insumoId).reduce((t, p) => t + p.quantidade, 0)
+  const abrirLancar = async (l: PedidoProducao) => {
+    try {
+      setDados(dados ?? (await carregarDados(store)))
+      setLancar(l)
+    } catch (e) { avisar((e as Error).message) }
+  }
   const mudados = preparar.filter((l) => tem[l.insumoId] !== undefined && lerValor(tem[l.insumoId]) !== null && Math.abs((lerValor(tem[l.insumoId]) ?? 0) - l.central) > 0.0001)
 
   const copiar = async (texto: string) => {
@@ -132,6 +145,7 @@ function Pedidos() {
                   <thead><tr className="text-left text-xs text-stone-500">
                     <th className="px-2 py-2">Preparo</th><th className="px-1 py-2 text-right">PSD</th><th className="px-1 py-2 text-right">Vila</th>
                     <th className="px-1 py-2 text-right">Total</th><th className="px-1 py-2 text-center">Tem na Central</th><th className="px-2 py-2 text-right">Fazer</th>
+                    <th className="px-2 py-2 text-right">Feito</th>
                   </tr></thead>
                   <tbody className="divide-y divide-stone-100">
                     {preparar.map((l) => (
@@ -145,6 +159,12 @@ function Pedidos() {
                             onChange={(e) => setTem((v) => ({ ...v, [l.insumoId]: e.target.value }))} className={`${estiloEntrada} w-16! px-1! text-center`} />
                         </td>
                         <td className={`px-2 py-2 text-right font-bold ${fazer(l) > 0 ? '' : 'text-emerald-700'}`}>{fazer(l) > 0 ? mostrarQtd(fazer(l)) : 'tem'}</td>
+                        <td className="px-2 py-1 text-right whitespace-nowrap">
+                          {feito(l) > 0 && <span className="mr-1 text-xs font-semibold text-emerald-700">{mostrarQtd(feito(l))}</span>}
+                          <button onClick={() => abrirLancar(l)} className="rounded-lg bg-carvao px-2 py-1 text-xs font-semibold text-white hover:bg-stone-700" aria-label={`Lançar ${l.nome}`}>
+                            {feito(l) > 0 ? '+ Lançar' : 'Lançar'}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -191,6 +211,10 @@ function Pedidos() {
             })}
           </section>
         </>
+      )}
+      {lancar && dados && (
+        <LancarProducao d={dados} inicial={{ insumoId: lancar.insumoId, quantidade: unidadeIgual(lancar.unidadeContagem, dados.insumos.find((i) => i.id === lancar.insumoId)?.unidade) && fazer(lancar) - feito(lancar) > 0 ? Math.round((fazer(lancar) - feito(lancar)) * 1000) / 1000 : null }}
+          aoFechar={() => setLancar(null)} aoSalvar={async () => { setLancar(null); avisar('Produção lançada: estoque atualizado'); await carregar() }} />
       )}
     </div>
   )
@@ -338,16 +362,21 @@ function Listas() {
 
 // ——— Produzido: lançar a produção do dia ———
 
+const carregarDados = (store: ReturnType<typeof useApp>['store']): Promise<Dados> =>
+  Promise.all([store.insumos(), store.receitas(), store.versoesReceitas(), store.centrosCusto(), store.producoes(addDias(hoje(), -30), hoje())])
+    .then(([insumos, receitas, versoes, centros, producoes]) => ({ insumos, receitas, versoes, centros, producoes }))
+// A lista conta em "Kg", "Lts", "Uni"…; o estoque guarda em kg, l, un. Só sugere a quantidade quando é a mesma.
+const unidadeIgual = (contagem: string, estoque?: string) => {
+  const c = contagem.trim().toLowerCase()
+  return !!estoque && (c === estoque || (estoque === 'kg' && c.startsWith('kg')) || (estoque === 'l' && /^(l|lt|lts|litros?)$/.test(c)) || (estoque === 'un' && /^(un|uni|und|unid)/.test(c)))
+}
+
 function Produzido() {
   const { store, avisar, nomeDe } = useApp()
   const [d, setD] = useState<Dados | null>(null)
   const [erro, setErro] = useState('')
   const [lancando, setLancando] = useState(false)
-  const carregar = useCallback(
-    () => Promise.all([store.insumos(), store.receitas(), store.versoesReceitas(), store.centrosCusto(), store.producoes(addDias(hoje(), -30), hoje())])
-      .then(([insumos, receitas, versoes, centros, producoes]) => setD({ insumos, receitas, versoes, centros, producoes }), (e) => setErro(e.message)),
-    [store],
-  )
+  const carregar = useCallback(() => carregarDados(store).then(setD, (e) => setErro(e.message)), [store])
   useEffect(() => { carregar() }, [carregar])
 
   if (erro) return <p className="text-red-700">{erro}</p>
@@ -397,8 +426,9 @@ function Produzido() {
 
 interface Saida { insumoId: string; qtd: string; daFicha: string | null }
 
-function LancarProducao({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: () => void; aoSalvar: () => void }) {
-  const { store } = useApp()
+function LancarProducao({ d, inicial, aoFechar, aoSalvar }: { d: Dados; inicial?: { insumoId: string; quantidade: number | null }; aoFechar: () => void; aoSalvar: () => void }) {
+  const { store, eu } = useApp()
+  const gestao = podeGerenciar(eu.nivel)
   const ativos = useMemo(() => d.insumos.filter((i) => i.ativo).sort((a, b) => a.nome.localeCompare(b.nome)), [d.insumos])
   // Só o que é pré-preparo entra na lista (Heitor, 10/10): os itens marcados como pré-preparo e as fichas de preparo.
   // Quem tem ficha já vem com os ingredientes dela como sugestão.
@@ -415,9 +445,11 @@ function LancarProducao({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: () => v
   }, [d.receitas, d.insumos])
   const [centro, setCentro] = useState(d.centros.some((c) => c.id === 'central') ? 'central' : d.centros[0]?.id ?? '')
   const [data, setData] = useState(hoje())
-  const [receitaId, setReceitaId] = useState('')
-  const [insumoId, setInsumoId] = useState('')
-  const [qtd, setQtd] = useState('')
+  // Vindo da lista do que preparar: já com o preparo (pela ficha ligada ao item) e o que falta fazer.
+  const fichaInicial = inicial ? d.receitas.find((r) => r.tipo === 'preparo' && r.ativo && r.insumoId === inicial.insumoId) : undefined
+  const [receitaId, setReceitaId] = useState(fichaInicial?.id ?? '')
+  const [insumoId, setInsumoId] = useState(inicial && !fichaInicial ? inicial.insumoId : '')
+  const [qtd, setQtd] = useState(inicial?.quantidade ? String(inicial.quantidade).replace('.', ',') : '')
   const [saidas, setSaidas] = useState<Saida[]>([])
   const [obs, setObs] = useState('')
   const [erro, setErro] = useState('')
@@ -443,6 +475,10 @@ function LancarProducao({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: () => v
       return { insumoId: id, qtd: String(valor).replace('.', ','), daFicha: id ? null : sub }
     }))
   }
+
+  useEffect(() => {
+    if (fichaInicial && inicial?.quantidade) pelaFicha(fichaInicial.id, String(inicial.quantidade).replace('.', ','))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const custo = saidas.reduce((t, s) => t + (lerValor(s.qtd) ?? 0) * (d.insumos.find((i) => i.id === s.insumoId)?.preco ?? 0), 0)
   const semPreco = saidas.filter((s) => s.insumoId && d.insumos.find((i) => i.id === s.insumoId)?.preco == null).length
@@ -519,7 +555,7 @@ function LancarProducao({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: () => v
               )
             })}
             <button className="text-sm font-semibold underline" onClick={() => setSaidas([...saidas, { insumoId: '', qtd: '', daFicha: null }])}>+ Ingrediente</button>
-            {custo > 0 && n ? (
+            {gestao && custo > 0 && n ? (
               <p className="text-xs text-stone-600">
                 Custo: <b>{reais(custo)}</b> ({reais(custo / n)} por {unidade}){semPreco ? ` · ${semPreco} sem preço cadastrado` : ''}. Vira o preço do preparo no estoque.
               </p>

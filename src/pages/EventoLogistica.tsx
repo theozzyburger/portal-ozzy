@@ -114,7 +114,7 @@ export function CardapioPrevisao({ e, eventos, d, aoMudar }: { e: Evento; evento
   const [base, setBase] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState(false)
   const [novo, setNovo] = useState('')
-  const produtos = g.receitas.filter((r) => r.tipo === 'produto' && r.ativo)
+  const produtos = g.receitas.filter((r) => r.tipo === 'produto' && (r.area ?? 'eventos') === 'eventos' && r.ativo)
   const receita = (id: string) => g.receitas.find((r) => r.id === id)
   const q = (r: string, dia: string) => numero(grade[`${r}|${dia}`] ?? '') ?? 0
   const finalizados = eventos.filter((x) => x.id !== e.id && x.status === 'finalizado' && g.vendas.some((v) => v.eventoId === x.id))

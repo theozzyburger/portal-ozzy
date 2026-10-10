@@ -270,7 +270,7 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
               <p className="text-stone-500">Nenhuma ficha usa este insumo.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {usos.map((u) => <button key={u.id} onClick={() => ir('eventos/fichas/' + u.id)} className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold hover:bg-stone-200">{u.nome}</button>)}
+                {usos.map((u) => <button key={u.id} onClick={() => ir('fichas/' + u.id)} className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold hover:bg-stone-200">{u.nome}</button>)}
               </div>
             )}
           </div>
