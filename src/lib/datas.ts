@@ -16,6 +16,8 @@ export const addDias = (s: string, n: number) => {
 }
 
 // Semana começa na segunda-feira.
+// Dias de a até b (datas AAAA-MM-DD; negativo se b vem antes).
+export const diasEntre = (a: string, b: string) => Math.round((Date.parse(b + 'T12:00:00') - Date.parse(a + 'T12:00:00')) / 86400000)
 export const inicioDaSemana = (s: string) => {
   const d = deIso(s)
   return addDias(s, -((d.getDay() + 6) % 7))

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Cartao, Campo, Vazio, estiloEntrada } from '../components/ui'
+import { agruparPorCategoria } from '../lib/categorias'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje } from '../lib/datas'
 import { lerValor, mostrarQtd } from '../lib/financeiro'
@@ -242,26 +243,31 @@ function TelaFechamento({ loja, setor, data }: { loja: string; setor: SetorFecha
         <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-stone-500">
           <span className="flex-1">Item</span><span className="w-20 text-center">Tem</span><span className="w-20 text-center">Pedir</span>
         </div>
-        {visiveis.map((i) => {
-          const s = sugestao(i)
-          const p = lerValor(ped[i.itemId] ?? '')
-          return (
-            <div key={i.itemId} className={`flex items-center gap-2 px-3 py-2 ${destaque.has(i.itemId) ? 'bg-ozzy-50' : ''}`}>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{i.nome}</div>
-                <div className="truncate text-xs text-stone-500">
-                  {i.unidadeContagem}{i.ideal !== null ? ` · ideal ${mostrarQtd(i.ideal)}` : ' · sem ideal'}
-                  {s !== null && p !== s ? ` · sugestão ${mostrarQtd(s)}` : ''}
+        {agruparPorCategoria(visiveis).map(([cat, lista]) => (
+          <div key={cat} className="divide-y divide-stone-100">
+            <div className="bg-stone-50 px-3 py-1.5 text-xs font-bold tracking-wide text-stone-600 uppercase">{cat}</div>
+            {lista.map((i) => {
+              const s = sugestao(i)
+              const p = lerValor(ped[i.itemId] ?? '')
+              return (
+                <div key={i.itemId} className={`flex items-center gap-2 px-3 py-2 ${destaque.has(i.itemId) ? 'bg-ozzy-50' : ''}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{i.nome}</div>
+                    <div className="truncate text-xs text-stone-500">
+                      {i.unidadeContagem}{i.ideal !== null ? ` · ideal ${mostrarQtd(i.ideal)}` : ' · sem ideal'}
+                      {s !== null && p !== s ? ` · sugestão ${mostrarQtd(s)}` : ''}
+                    </div>
+                  </div>
+                  <input inputMode="decimal" aria-label={`Quanto tem de ${i.nome}`} value={cont[i.itemId] ?? ''} onChange={(e) => mudarContagem({ [i.itemId]: e.target.value })}
+                    className={`${estiloEntrada} w-20! text-center`} />
+                  <input inputMode="decimal" aria-label={`Quanto pedir de ${i.nome}`} value={ped[i.itemId] ?? ''}
+                    onChange={(e) => { setPed((v) => ({ ...v, [i.itemId]: e.target.value })); setEditado((x) => new Set(x).add(i.itemId)) }}
+                    className={`${estiloEntrada} w-20! text-center ${(p ?? 0) > 0 ? 'font-bold ring-2 ring-carvao/40' : ''}`} />
                 </div>
-              </div>
-              <input inputMode="decimal" aria-label={`Quanto tem de ${i.nome}`} value={cont[i.itemId] ?? ''} onChange={(e) => mudarContagem({ [i.itemId]: e.target.value })}
-                className={`${estiloEntrada} w-20! text-center`} />
-              <input inputMode="decimal" aria-label={`Quanto pedir de ${i.nome}`} value={ped[i.itemId] ?? ''}
-                onChange={(e) => { setPed((v) => ({ ...v, [i.itemId]: e.target.value })); setEditado((x) => new Set(x).add(i.itemId)) }}
-                className={`${estiloEntrada} w-20! text-center ${(p ?? 0) > 0 ? 'font-bold ring-2 ring-carvao/40' : ''}`} />
-            </div>
-          )
-        })}
+              )
+            })}
+          </div>
+        ))}
         {visiveis.length === 0 && <p className="px-3 py-4 text-sm text-stone-500">Nada aqui.</p>}
       </div>
 

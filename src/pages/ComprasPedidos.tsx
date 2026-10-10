@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Botao, Campo, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
-import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana } from '../lib/datas'
+import { naHoraDeComprar, quantidadeSugerida, ritmo } from '../lib/compras'
+import { addDias, dataCurta, diaSemana, diasEntre, hoje, inicioDaSemana } from '../lib/datas'
 import { lerValor, mostrarQtd, nomeCentro, reais } from '../lib/financeiro'
 import {
   CATEGORIAS_COMPRA, STATUS_COMPRA,
-  type CategoriaCompra, type CentroCusto, type Fornecedor, type Insumo, type ItemCompra, type NovoPedidoCompra, type PedidoCompra, type PrecoFornecedor, type StatusCompra,
+  type CategoriaCompra, type CompraFornecedor, type CentroCusto, type Fornecedor, type Insumo, type ItemCompra, type NovoPedidoCompra, type PedidoCompra, type PrecoFornecedor, type StatusCompra,
 } from '../lib/types'
 
 // Compras (Heitor, 09/10): pedido de compra ao fornecedor (itens, preço, previsão de entrega) e o relatório
@@ -16,7 +17,6 @@ const SELO_STATUS: Record<StatusCompra, 'cinza' | 'ambar' | 'verde' | 'azul'> = 
 const nomeStatus = (s: StatusCompra) => STATUS_COMPRA.find((x) => x.valor === s)!.nome
 const nomeCategoria = (c: CategoriaCompra) => CATEGORIAS_COMPRA.find((x) => x.valor === c)!.nome
 const prazoPadrao = (c: CategoriaCompra) => (c === 'embalagens' ? 15 : 2)
-const diasEntre = (a: string, b: string) => Math.round((Date.parse(b + 'T12:00:00') - Date.parse(a + 'T12:00:00')) / 86400000)
 const numTexto = (n: number | null) => (n === null ? '' : String(n).replace('.', ','))
 
 interface Dados { pedidos: PedidoCompra[]; fornecedores: Fornecedor[]; insumos: Insumo[]; centros: CentroCusto[] }
@@ -156,6 +156,7 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
   const [previsaoMexida, setPrevisaoMexida] = useState(!!pedido)
   const [linhas, setLinhas] = useState<LinhaForm[]>(() => (pedido?.itens ?? []).map((i) => ({ chave: 'l' + seq++, insumoId: i.insumoId, qtd: numTexto(i.quantidade), unidade: i.unidade, preco: numTexto(i.preco) })))
   const [precos, setPrecos] = useState<PrecoFornecedor[]>([])
+  const [historico, setHistorico] = useState<CompraFornecedor[]>([])
   const [busca, setBusca] = useState('')
   const [novoFornecedor, setNovoFornecedor] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
@@ -164,8 +165,9 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
   const editavel = !pedido || pedido.status === 'rascunho' || pedido.status === 'pedido'
 
   useEffect(() => {
-    if (!v.fornecedorId) return setPrecos([])
+    if (!v.fornecedorId) { setPrecos([]); setHistorico([]); return }
     store.precosFornecedor(v.fornecedorId).then(setPrecos, () => setPrecos([]))
+    store.comprasDoFornecedor(v.fornecedorId).then(setHistorico, () => setHistorico([]))
   }, [store, v.fornecedorId])
 
   // Previsão pelo prazo do fornecedor (ou o padrão da categoria), até a pessoa mexer nela.
@@ -194,16 +196,22 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [precos])
 
-  const adicionar = (ins: Insumo) => {
+  const adicionar = (ins: Insumo, qtd: number | null = null) => {
     if (linhas.some((l) => l.insumoId === ins.id)) return avisar('Este item já está no pedido.')
-    setLinhas((ls) => [...ls, { chave: 'l' + seq++, insumoId: ins.id, qtd: '', unidade: ins.unidade, preco: numTexto(ultimo(ins.id)?.preco ?? null) }])
+    setLinhas((ls) => [...ls, { chave: 'l' + seq++, insumoId: ins.id, qtd: numTexto(qtd), unidade: ins.unidade, preco: numTexto(ultimo(ins.id)?.preco ?? null) }])
     setBusca('')
   }
   const mudar = (chave: string, m: Partial<LinhaForm>) => setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, ...m } : l)))
 
   const termo = busca.trim().toLowerCase()
   const achados = termo.length >= 2 ? insumos.filter((i) => i.ativo && i.nome.toLowerCase().includes(termo)).slice(0, 8) : []
-  const jaComprados = precos.map((p) => insumos.find((i) => i.id === p.insumoId)).filter((i): i is Insumo => !!i && !linhas.some((l) => l.insumoId === i.id))
+  // Sugestões pelo histórico deste fornecedor (o que costuma comprar e quanto); depois os outros já comprados dele.
+  const sugeridos = historico
+    .map((c) => ({ c, ins: insumos.find((i) => i.id === c.insumoId) }))
+    .filter((x): x is { c: CompraFornecedor; ins: Insumo } => !!x.ins && x.ins.ativo && !linhas.some((l) => l.insumoId === x.c.insumoId))
+    .map((x) => ({ ...x, qtd: quantidadeSugerida(x.c, x.ins), hora: naHoraDeComprar(x.c, v.previsaoEntrega) }))
+  const daVez = sugeridos.filter((x) => x.hora && x.c.compras > 0)
+  const jaComprados = precos.map((p) => insumos.find((i) => i.id === p.insumoId)).filter((i): i is Insumo => !!i && !linhas.some((l) => l.insumoId === i.id) && !historico.some((c) => c.insumoId === i.id))
   const total = linhas.reduce((t, l) => t + (lerValor(l.qtd) ?? 0) * (lerValor(l.preco) ?? 0), 0)
 
   const textoFornecedor = () => [
@@ -310,7 +318,7 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
               </div>
               {u && (
                 <p className={`mt-1 text-xs ${p !== null && Math.abs(p - u.preco) > 0.0001 ? 'text-amber-800' : 'text-stone-500'}`}>
-                  Último preço com este fornecedor: {reais(u.preco)} em {dataCurta(u.em)} ({u.origem === 'nota' ? 'nota fiscal' : 'pedido'}){p !== null && Math.abs(p - u.preco) > 0.0001 ? ` · ${p > u.preco ? 'subiu' : 'baixou'} ${Math.abs(Math.round(((p - u.preco) / u.preco) * 1000) / 10).toLocaleString('pt-BR')}%` : ''}
+                  Último preço com este fornecedor: {reais(u.preco)} em {dataCurta(u.em)} ({u.origem === 'nota' ? 'nota fiscal' : u.origem === 'historico' ? 'Eclética' : 'pedido'}){p !== null && Math.abs(p - u.preco) > 0.0001 ? ` · ${p > u.preco ? 'subiu' : 'baixou'} ${Math.abs(Math.round(((p - u.preco) / u.preco) * 1000) / 10).toLocaleString('pt-BR')}%` : ''}
                 </p>
               )}
             </div>
@@ -336,6 +344,30 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
                   adicionar(novo)
                 } catch (e) { setErro((e as Error).message) }
               }}>Cadastrar “{busca.trim()}” como item novo</button>
+            )}
+            {sugeridos.length > 0 && !termo && (
+              <div className="rounded-xl bg-ozzy-50 p-3 ring-1 ring-ozzy-100">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-bold">Sugestão pelo que você costuma comprar daqui</p>
+                  {daVez.length > 0 && <Botao variante="secundario" onClick={() => daVez.forEach((x) => adicionar(x.ins, x.qtd))}>Adicionar os {daVez.length} da vez</Botao>}
+                </div>
+                <p className="mt-0.5 text-xs text-stone-600">Média das últimas 12 semanas (histórico da Eclética e pedidos daqui). Ainda não desconta o que tem em estoque: confira antes de mandar.</p>
+                <ul className="mt-2 divide-y divide-ozzy-100">
+                  {sugeridos.slice(0, 40).map(({ c, ins, qtd, hora }) => (
+                    <li key={c.insumoId} className="flex items-center gap-2 py-1.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{ins.nome} {hora && <Selo cor="ambar">da vez</Selo>}</div>
+                        <div className="truncate text-xs text-stone-600">
+                          {ritmo(c)} · última {dataCurta(c.ultima)}: {mostrarQtd(c.ultimaQtd)} {ins.unidade}{c.compras > 1 ? ` · média ${mostrarQtd(Math.round((c.intervaloDias !== null && c.intervaloDias >= 10 ? c.porCompra ?? 0 : c.porSemana) * 10) / 10)} ${ins.unidade}${c.intervaloDias !== null && c.intervaloDias >= 10 ? ' por compra' : '/semana'}` : ''}
+                        </div>
+                      </div>
+                      <button onClick={() => adicionar(ins, qtd)} className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-semibold ring-1 ring-stone-300 hover:ring-carvao" aria-label={`Adicionar ${ins.nome}`}>
+                        + {qtd !== null ? `${mostrarQtd(qtd)} ${ins.unidade}` : 'Adicionar'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
             {jaComprados.length > 0 && !termo && (
               <div>

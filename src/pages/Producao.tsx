@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Botao, Campo, Modal, Vazio, estiloEntrada } from '../components/ui'
+import { agruparPorCategoria } from '../lib/categorias'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje } from '../lib/datas'
 import { lerValor, mostrarQtd, nomeCentro, reais } from '../lib/financeiro'
@@ -237,10 +238,35 @@ function Listas() {
     }
   }
 
+  const adicionar = async (ins: Insumo) => {
+    // Item que já esteve na lista (tirado) volta com o ideal e a unidade de antes.
+    const antes = itens?.find((x) => x.insumoId === ins.id)
+    try {
+      await store.salvarItemListaFechamento(antes ? { ...antes, ativo: true } : {
+        unidadeId: loja, setor, insumoId: ins.id, unidadeContagem: ins.unidade === 'kg' ? 'Kg' : ins.unidade === 'l' ? 'Lts' : 'Uni',
+        ordem: Math.max(0, ...(itens ?? []).map((x) => x.ordem)) + 1, ideal: Array(7).fill(null), prePreparo: !!ins.prePreparo, ativo: true,
+      })
+      setNovo('')
+      avisar(`${ins.nome} entrou na lista`)
+      await carregar()
+    } catch (e) { avisar((e as Error).message) }
+  }
+  const tirar = async (i: ItemListaFechamento) => {
+    if (mudou.size > 0) return avisar('Salve ou descarte as alterações antes de tirar um item.')
+    try {
+      await store.salvarItemListaFechamento({ ...i, ativo: false })
+      avisar(`${i.nome} saiu da lista das duas lojas`)
+      await carregar()
+    } catch (e) { avisar((e as Error).message) }
+  }
+
   if (erro) return <p className="text-red-700">{erro}</p>
   const termo = busca.trim().toLowerCase()
-  const visiveis = (itens ?? []).filter((i) => !termo || i.nome.toLowerCase().includes(termo))
-  const fora = insumos.filter((i) => i.ativo && !(itens ?? []).some((x) => x.insumoId === i.id))
+  const visiveis = (itens ?? []).filter((i) => i.ativo && (!termo || i.nome.toLowerCase().includes(termo)))
+  const grupos = agruparPorCategoria(visiveis)
+  const naLista = new Set((itens ?? []).filter((x) => x.ativo).map((x) => x.insumoId))
+  const termoNovo = novo.trim().toLowerCase()
+  const achados = termoNovo.length >= 2 ? insumos.filter((i) => i.ativo && !naLista.has(i.id) && i.nome.toLowerCase().includes(termoNovo)).slice(0, 10) : []
 
   return (
     <div className="space-y-3">
@@ -254,55 +280,49 @@ function Listas() {
             {LOJAS_FECHAMENTO.map((u) => <option key={u} value={u}>{u === 'burger-psd' ? 'Parque São Domingos' : 'Vila Anastácio'}</option>)}
           </select>
         </label>
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Procurar item" className={`${estiloEntrada} max-w-xs`} />
       </div>
-      <p className="text-xs text-stone-500">A lista é a mesma nas duas lojas: adicionar, tirar (Ativo), unidade e “Preparo” valem para as duas. Só o estoque ideal é de cada loja: quanto ela precisa ter no começo de cada dia, na unidade em que conta (em branco = sem sugestão). “Preparo” marca o que a Central prepara.</p>
+      <div className="rounded-2xl bg-white p-3 ring-1 ring-stone-200">
+        <input value={novo} onChange={(e) => setNovo(e.target.value)} placeholder="Adicionar item: digite o nome do material" aria-label="Adicionar item" className={estiloEntrada} />
+        {achados.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {achados.map((i) => <button key={i.id} onClick={() => adicionar(i)} className="rounded-full bg-stone-100 px-3 py-1 text-sm hover:bg-stone-200">+ {i.nome}{i.categoria ? <span className="text-stone-500"> · {i.categoria}</span> : null}</button>)}
+          </div>
+        )}
+        {termoNovo.length >= 2 && achados.length === 0 && <p className="mt-2 text-sm text-stone-500">Nada no cadastro com esse nome (ou já está na lista).</p>}
+      </div>
+      <p className="text-xs text-stone-500">A lista é a mesma nas duas lojas: adicionar, tirar, unidade e “Preparo” valem para as duas. Só o estoque ideal é de cada loja: quanto ela precisa ter no começo de cada dia, na unidade em que conta (em branco = sem sugestão). “Preparo” marca o que a Central prepara.</p>
+      {(itens?.length ?? 0) > 8 && <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Procurar na lista" aria-label="Procurar na lista" className={`${estiloEntrada} max-w-xs`} />}
       {!itens ? <p className="text-stone-400">Carregando…</p> : (
         <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-stone-200">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs text-stone-500">
               <th className="px-3 py-2">Item</th><th className="px-1 py-2">Un.</th>
               {DIAS_CURTOS.map((d) => <th key={d} className="px-1 py-2 text-center">{d}</th>)}
-              <th className="px-1 py-2 text-center">Preparo</th><th className="px-2 py-2 text-center">Ativo</th>
+              <th className="px-1 py-2 text-center">Preparo</th><th className="px-2 py-2" />
             </tr></thead>
-            <tbody className="divide-y divide-stone-100">
-              {visiveis.map((i) => (
-                <tr key={i.id} className={i.ativo ? '' : 'opacity-50'}>
-                  <td className="min-w-48 px-3 py-1">{i.nome}</td>
-                  <td className="px-1 py-1"><input value={i.unidadeContagem} onChange={(e) => mudar(i.id, { unidadeContagem: e.target.value })} className={`${estiloEntrada} w-14! px-1! text-center`} aria-label={`Unidade de ${i.nome}`} /></td>
-                  {i.ideal.map((v, k) => (
-                    <td key={k} className="px-1 py-1">
-                      <input inputMode="decimal" defaultValue={v === null ? '' : String(v).replace('.', ',')} aria-label={`Ideal de ${i.nome} na ${DIAS_CURTOS[k]}`}
-                        onChange={(e) => mudar(i.id, { ideal: i.ideal.map((x, j) => (j === k ? lerValor(e.target.value) : x)) })}
-                        className={`${estiloEntrada} w-14! px-1! text-center`} />
-                    </td>
-                  ))}
-                  <td className="px-1 py-1 text-center"><input type="checkbox" checked={i.prePreparo} onChange={(e) => mudar(i.id, { prePreparo: e.target.checked })} aria-label={`${i.nome} é preparo da Central`} /></td>
-                  <td className="px-2 py-1 text-center"><input type="checkbox" checked={i.ativo} onChange={(e) => mudar(i.id, { ativo: e.target.checked })} aria-label={`${i.nome} está na lista`} /></td>
-                </tr>
-              ))}
-            </tbody>
+            {grupos.map(([cat, lista]) => (
+              <tbody key={cat} className="divide-y divide-stone-100">
+                <tr><td colSpan={11} className="bg-stone-50 px-3 py-1.5 text-xs font-bold tracking-wide text-stone-600 uppercase">{cat}</td></tr>
+                {lista.map((i) => (
+                  <tr key={i.id}>
+                    <td className="min-w-48 px-3 py-1">{i.nome}</td>
+                    <td className="px-1 py-1"><input value={i.unidadeContagem} onChange={(e) => mudar(i.id, { unidadeContagem: e.target.value })} className={`${estiloEntrada} w-14! px-1! text-center`} aria-label={`Unidade de ${i.nome}`} /></td>
+                    {i.ideal.map((v, k) => (
+                      <td key={k} className="px-1 py-1">
+                        <input inputMode="decimal" defaultValue={v === null ? '' : String(v).replace('.', ',')} aria-label={`Ideal de ${i.nome} na ${DIAS_CURTOS[k]}`}
+                          onChange={(e) => mudar(i.id, { ideal: i.ideal.map((x, j) => (j === k ? lerValor(e.target.value) : x)) })}
+                          className={`${estiloEntrada} w-14! px-1! text-center`} />
+                      </td>
+                    ))}
+                    <td className="px-1 py-1 text-center"><input type="checkbox" checked={i.prePreparo} onChange={(e) => mudar(i.id, { prePreparo: e.target.checked })} aria-label={`${i.nome} é preparo da Central`} /></td>
+                    <td className="px-2 py-1 text-center"><button onClick={() => tirar(i)} className="text-xs font-semibold text-stone-500 underline hover:text-red-700" aria-label={`Tirar ${i.nome} da lista`}>Tirar</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
           </table>
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <select value={novo} onChange={(e) => setNovo(e.target.value)} className={`${estiloEntrada} max-w-xs`}>
-          <option value="">Adicionar item do cadastro…</option>
-          {fora.map((i) => <option key={i.id} value={i.id}>{i.nome}</option>)}
-        </select>
-        <Botao variante="secundario" disabled={!novo} onClick={async () => {
-          const ins = insumos.find((x) => x.id === novo)!
-          try {
-            await store.salvarItemListaFechamento({
-              unidadeId: loja, setor, insumoId: ins.id, unidadeContagem: ins.unidade === 'kg' ? 'Kg' : ins.unidade === 'l' ? 'Lts' : 'Uni',
-              ordem: Math.max(0, ...(itens ?? []).map((x) => x.ordem)) + 1, ideal: Array(7).fill(null), prePreparo: false, ativo: true,
-            })
-            setNovo('')
-            avisar('Item adicionado')
-            await carregar()
-          } catch (e) { avisar((e as Error).message) }
-        }}>Adicionar</Botao>
-      </div>
       {mudou.size > 0 && (
         <div className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white p-3 shadow-lg ring-1 ring-stone-300">
           <span className="text-sm text-stone-600">{mudou.size} {mudou.size === 1 ? 'item alterado' : 'itens alterados'}</span>
@@ -379,8 +399,20 @@ interface Saida { insumoId: string; qtd: string; daFicha: string | null }
 
 function LancarProducao({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: () => void; aoSalvar: () => void }) {
   const { store } = useApp()
-  const preparos = useMemo(() => d.receitas.filter((r) => r.tipo === 'preparo' && r.ativo).sort((a, b) => a.nome.localeCompare(b.nome)), [d.receitas])
   const ativos = useMemo(() => d.insumos.filter((i) => i.ativo).sort((a, b) => a.nome.localeCompare(b.nome)), [d.insumos])
+  // Só o que é pré-preparo entra na lista (Heitor, 10/10): os itens marcados como pré-preparo e as fichas de preparo.
+  // Quem tem ficha já vem com os ingredientes dela como sugestão.
+  const opcoes = useMemo(() => {
+    const r: { valor: string; nome: string; semFicha: boolean }[] = []
+    const ligados = new Set<string>()
+    for (const x of d.receitas.filter((x) => x.tipo === 'preparo' && x.ativo)) {
+      const ins = x.insumoId ?? d.insumos.find((i) => i.nome.toLowerCase() === x.nome.toLowerCase())?.id
+      if (ins) ligados.add(ins)
+      r.push({ valor: x.id, nome: x.nome, semFicha: !x.versaoAtual })
+    }
+    for (const i of d.insumos.filter((i) => i.ativo && i.prePreparo && !ligados.has(i.id))) r.push({ valor: 'i:' + i.id, nome: i.nome, semFicha: true })
+    return r.sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [d.receitas, d.insumos])
   const [centro, setCentro] = useState(d.centros.some((c) => c.id === 'central') ? 'central' : d.centros[0]?.id ?? '')
   const [data, setData] = useState(hoje())
   const [receitaId, setReceitaId] = useState('')
@@ -453,13 +485,8 @@ function LancarProducao({ d, aoFechar, aoSalvar }: { d: Dados; aoFechar: () => v
               const v = e.target.value
               if (v.startsWith('i:')) { setReceitaId(''); setInsumoId(v.slice(2)); setSaidas([]) } else { setReceitaId(v); setInsumoId(''); pelaFicha(v, qtd) }
             }}>
-            <option value="">Escolher</option>
-            <optgroup label="Pela ficha de preparo">
-              {preparos.map((r) => <option key={r.id} value={r.id}>{r.nome}{r.versaoAtual ? '' : ' (ficha sem ingredientes)'}</option>)}
-            </optgroup>
-            <optgroup label="Sem ficha (você põe os ingredientes)">
-              {ativos.map((i) => <option key={i.id} value={'i:' + i.id}>{i.nome}</option>)}
-            </optgroup>
+            <option value="">Escolher o pré-preparo</option>
+            {opcoes.map((o) => <option key={o.valor} value={o.valor}>{o.nome}{o.semFicha ? ' (sem ficha: você põe os ingredientes)' : ''}</option>)}
           </select>
         </Campo>
         <Campo rotulo={`Quanto ficou pronto${unidade ? ` (${unidade})` : ''}`}>

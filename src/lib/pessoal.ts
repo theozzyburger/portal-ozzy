@@ -1,7 +1,6 @@
-import { addDias, indiceSemana, inicioDaSemana } from './datas'
+import { addDias, diasEntre, indiceSemana, inicioDaSemana } from './datas'
 import type { Admissao, Desligamento, Documento, EntregaUniforme, Folga, Funcionario, Turno } from './types'
 
-const diasEntre = (a: string, b: string) => Math.round((new Date(b + 'T12:00:00').getTime() - new Date(a + 'T12:00:00').getTime()) / 86400000)
 
 // ---------- Aniversário ----------
 

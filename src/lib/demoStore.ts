@@ -1,9 +1,9 @@
 import { degrau, possoAlterar, atendeChamados, vejoResultado, podeGerenciar, podeVerPainel, podeVerDocumentosDe, podeVerFuncionario } from './permissoes'
 import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, distanciaM, nomeProprio, soDigitos, type Store } from './store'
 import { cpfValido } from './cpf'
-import type { PedidoCompra, PrecoFornecedor, ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
+import type { CompraFornecedor, ProdutoVenda, PedidoCompra, PrecoFornecedor, ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, SemanaMotoboy, CentroCusto, ContaContabil, NotaFiscal, ContaPagar, ContaRecorrente, MovimentoEstoque, ItemNota, MovimentoExtrato, RegraExtrato, SaldoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, ItemEnvio, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, Inventario, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, LocalEnvio, LocalLoja, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, PagamentoFreela, Chamado, Comunicado, LeituraRegulamento, VersaoRegulamento, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, Unidade } from './types'
 import { chamadoEmAberto } from './types'
-import { addDias, addMeses, hoje, inicioDaSemana } from './datas'
+import { addDias, addMeses, diasEntre, hoje, inicioDaSemana } from './datas'
 import { avaliacoesDemo, vendasDemo } from './demoVendas'
 import { fichasDemo, resultadosDemo } from './demoLucro'
 import { addMesesData } from './vencimentos'
@@ -216,16 +216,17 @@ const insumosDemo: Insumo[] = [
   ins('in10', 'Cheiro verde', 'Hortifruti', 'kg', 12, 'fo2'),
   ins('in11', 'Alho', 'Hortifruti', 'kg', 30, 'fo2'),
   // Lista de fechamento das lojas (exemplo; a real vem da Eclética).
-  ins('in12', 'Maionese verde', 'Preparos', 'kg', 8.8, null),
-  ins('in13', 'Molho especial', 'Preparos', 'kg', 14, null),
-  ins('in14', 'Cebola caramelizada', 'Preparos', 'kg', 16, null),
-  ins('in15', 'Alface americana', 'Cozinha das lojas', 'un', 4, null),
-  ins('in16', 'Blend burger 1 unidade (100g)', 'Cozinha das lojas', 'kg', 42, null),
-  ins('in17', 'Bacon fatiado', 'Cozinha das lojas', 'kg', 38, null),
-  ins('in18', 'Pão brioche mini (PCT com 12)', 'Cozinha das lojas', 'un', 1.1, null),
-  ins('in19', 'Coca cola 350ml lata', 'Atendimento das lojas', 'un', 3.2, null),
-  ins('in20', 'Guardanapo sachê personalizado', 'Atendimento das lojas', 'un', 0.05, null),
-  ins('in21', 'Saco kraft P PCT C/ 100', 'Atendimento das lojas', 'un', 0.3, null),
+  ins('in12', 'Maionese verde', 'Pré Preparos', 'kg', 8.8, null, { ecleticaCodigo: '100901', setorEnvio: 'cozinha' }),
+  ins('in13', 'Molho especial', 'Pré Preparos', 'kg', 14, null, { ecleticaCodigo: '100902', setorEnvio: 'cozinha' }),
+  ins('in14', 'Cebola caramelizada', 'Pré Preparos', 'kg', 16, null, { ecleticaCodigo: '100903', setorEnvio: 'cozinha' }),
+  ins('in15', 'Alface americana', 'Hortifruti', 'un', 4, 'fo2', { ecleticaCodigo: '100904', setorEnvio: 'cozinha', embalagem: 'Caixa', embalagemQtd: 12 }),
+  ins('in16', 'Blend burger 1 unidade (100g)', 'Proteínas e Ovos', 'kg', 42, null, { ecleticaCodigo: '100905', setorEnvio: 'cozinha' }),
+  ins('in17', 'Bacon fatiado', 'Proteínas e Ovos', 'kg', 38, 'fo1', { ecleticaCodigo: '100906', setorEnvio: 'cozinha', estoqueMinimo: 5 }),
+  ins('in18', 'Pão brioche mini (PCT com 12)', 'Pão', 'un', 1.1, null, { ecleticaCodigo: '100907', setorEnvio: 'cozinha', embalagem: 'Caixa', embalagemQtd: 12 }),
+  ins('in19', 'Coca cola 350ml lata', 'Bebidas', 'un', 3.2, 'fo1', { ecleticaCodigo: '88', setorEnvio: 'atendimento', embalagem: 'Fardo', embalagemQtd: 12 }),
+  ins('in20', 'Guardanapo sachê personalizado', 'Utensílios e Descartáveis', 'un', 0.05, null, { ecleticaCodigo: '100908', setorEnvio: 'atendimento' }),
+  ins('in21', 'Saco kraft P PCT C/ 100', 'Embalagens', 'un', 0.3, 'fo3', { ecleticaCodigo: '100909', setorEnvio: 'atendimento' }),
+  ins('in22', 'Água sanitária 2L', 'Produtos de Limpeza', 'un', 6.5, null, { ecleticaCodigo: '100619', setorEnvio: 'cozinha' }),
 ]
 const prePreparoDemo = new Set(['in12', 'in13', 'in14'])
 const precosInsumoDemo: PrecoInsumo[] = insumosDemo.map((i) => ({ id: 'pi' + i.id, insumoId: i.id, preco: i.preco, em: haHoras(24 * 5), por: null, origem: 'exemplo' }))
@@ -871,6 +872,32 @@ const pedidosCompraDemo: PedidoCompra[] = [
   { id: 'pc3', numero: 3, fornecedorId: 'fo3', centroCustoId: 'central', categoria: 'embalagens', status: 'pedido', dataPedido: segDemo, previsaoEntrega: addDias(segDemo, 15),
     itens: [{ insumoId: 'in21', quantidade: 20, unidade: 'pct', preco: 30 }], total: 600, formaPagamento: null, observacao: null, recebidoEm: null, criadoEm: segDemo + 'T11:00:00Z', criadoPor: 'f1' },
 ]
+// Histórico de compras de EXEMPLO (no real vem da Eclética): compras semanais nas últimas 12 semanas.
+const historicoComprasDemo: { fornecedorId: string; insumoId: string; dia: string; quantidade: number; preco: number }[] = Array.from({ length: 12 }, (_, k) => addDias(segDemo, -7 * (k + 1))).flatMap((dia, k) => [
+  { fornecedorId: 'fo2', insumoId: 'in6', dia, quantidade: 8 + (k % 3) * 2, preco: 8.5 },
+  { fornecedorId: 'fo2', insumoId: 'in10', dia, quantidade: 2, preco: 11 },
+  { fornecedorId: 'fo2', insumoId: 'in15', dia, quantidade: 24 + (k % 2) * 12, preco: 3.8 },
+  ...(k % 2 ? [] : [{ fornecedorId: 'fo2', insumoId: 'in11', dia, quantidade: 3, preco: 28 }, { fornecedorId: 'fo2', insumoId: 'in5', dia, quantidade: 2, preco: 19 }]),
+  { fornecedorId: 'fo1', insumoId: 'in17', dia, quantidade: 10 + (k % 2) * 4, preco: 37 },
+  { fornecedorId: 'fo1', insumoId: 'in19', dia, quantidade: 120, preco: 3.1 },
+  ...(k % 3 ? [] : [{ fornecedorId: 'fo1', insumoId: 'in9', dia, quantidade: 36, preco: 7.9 }]),
+  ...(k % 4 ? [] : [{ fornecedorId: 'fo3', insumoId: 'in21', dia, quantidade: 20, preco: 29 }]),
+])
+// Cardápio de EXEMPLO (no real vem da Eclética).
+const pv = (id: string, codigo: string, nome: string, grupo: string, subgrupo: string, preco: number | null, precoPizza: number | null, tipo: ProdutoVenda['tipo'] = 'normal'): ProdutoVenda => ({
+  id, ecleticaCodigo: codigo, nome, grupo, subgrupo, tipo, unidade: 'un', preco, precoPizza, receitaId: null, ativo: true,
+})
+const produtosVendaDemo: ProdutoVenda[] = [
+  pv('pv1', '10', 'BURGER CLÁSSICO (EXEMPLO)', 'Lanches', 'BURGERS', 39.9, null),
+  pv('pv2', '11', 'BURGER BACON (EXEMPLO)', 'Lanches', 'BURGERS', 44.9, null),
+  pv('pv3', '20', 'BATATA FRITA (EXEMPLO)', 'Acompanhamentos', 'ACOMPANHAMENTOS', 19.9, null),
+  pv('pv4', '30', 'PIZZA MARGHERITA GRANDE (EXEMPLO)', 'Pizzas', 'PIZZAS GRANDES', null, 69.9),
+  pv('pv5', '31', 'PIZZA CALABRESA BROTO (EXEMPLO)', 'Pizzas', 'PIZZAS BROTO', null, 39.9),
+  pv('pv6', '88', 'COCA COLA 350ML LATA', 'Bebidas', 'REFRIGERANTES', 7, 7),
+  pv('pv7', '2', 'EXTRA MOLHO ESPECIAL', 'Acompanhamentos', 'ADICIONAIS', 4.5, null),
+  pv('pv8', '40', 'COMBO CLÁSSICO (EXEMPLO)', 'Outros', 'COMBOS', 54.9, null),
+  pv('pv9', '41', 'QUAL O PONTO DA CARNE?', 'Outros', 'PERGUNTAS', 0, null, 'vinculo'),
+]
 // Ideal de segunda a domingo (exemplo).
 const listaFechDemo: ItemListaFechamento[] = (['burger-psd', 'burger-va'] as const).flatMap((u, k) => ([
   ['cozinha', 'in15', 'Uni', [8, 8, 8, 10, 12, 12, 10]],
@@ -880,6 +907,7 @@ const listaFechDemo: ItemListaFechamento[] = (['burger-psd', 'burger-va'] as con
   ['cozinha', 'in12', 'Kg', [1.5, 1.5, 1.5, 2, 3, 3, 2]],
   ['cozinha', 'in13', 'Kg', [2, 2, 2, 3, 4, 4, 3]],
   ['cozinha', 'in18', 'Uni', [24, 24, 24, 36, 48, 48, 36]],
+  ['cozinha', 'in22', 'GL', [2, 2, 2, 2, 2, 2, 2]],
   ['atendimento', 'in19', 'Uni', [48, 48, 48, 72, 96, 96, 72]],
   ['atendimento', 'in20', 'Uni', [300, 300, 300, 300, 500, 500, 400]],
   ['atendimento', 'in21', 'Pct', [null, null, null, null, null, null, null]],
@@ -1808,7 +1836,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async insumos() {
       exigeGestao()
-      return structuredClone(insumosDemo).sort((a, b) => a.nome.localeCompare(b.nome))
+      return structuredClone(insumosDemo).map((i) => ({ ...i, prePreparo: prePreparoDemo.has(i.id) })).sort((a, b) => a.nome.localeCompare(b.nome))
     },
     async salvarInsumo(i) {
       const u = exigeGestao()
@@ -1819,6 +1847,10 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const salvo: Insumo = { ...(atual ?? { id: novoId('in') }), ...i, nome, id: atual?.id ?? novoId('in'), precoEm: mudouPreco ? agora() : atual!.precoEm }
       if (atual) Object.assign(atual, salvo)
       else insumosDemo.push(salvo)
+      if (i.prePreparo !== undefined) {
+        if (i.prePreparo) prePreparoDemo.add(salvo.id)
+        else prePreparoDemo.delete(salvo.id)
+      }
       if (mudouPreco) precosInsumoDemo.push({ id: novoId('pi'), insumoId: salvo.id, preco: salvo.preco, em: agora(), por: u.id, origem: 'manual' })
       return structuredClone(salvo)
     },
@@ -2480,7 +2512,47 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       const r = new Map<string, PrecoFornecedor>()
       for (const p of [...pedidosCompraDemo].filter((x) => x.fornecedorId === fornecedorId && x.status !== 'cancelado').sort((a, b) => a.dataPedido.localeCompare(b.dataPedido) || a.criadoEm.localeCompare(b.criadoEm)))
         for (const i of p.itens) if (i.preco) r.set(i.insumoId, { insumoId: i.insumoId, preco: i.preco, em: p.dataPedido, origem: 'pedido' })
+      for (const h of historicoComprasDemo.filter((x) => x.fornecedorId === fornecedorId).sort((a, b) => a.dia.localeCompare(b.dia)))
+        if (!r.has(h.insumoId) || r.get(h.insumoId)!.em < h.dia) r.set(h.insumoId, { insumoId: h.insumoId, preco: h.preco, em: h.dia, origem: 'historico' })
       return espera([...r.values()])
+    },
+    async comprasDoFornecedor(fornecedorId) {
+      exigeGestao()
+      // Compras por dia (histórico de exemplo + pedidos), últimas 12 semanas.
+      const dias = new Map<string, Map<string, number>>()
+      const somar = (insumoId: string, dia: string, q: number) => {
+        const m = dias.get(insumoId) ?? new Map<string, number>()
+        m.set(dia, (m.get(dia) ?? 0) + q)
+        dias.set(insumoId, m)
+      }
+      for (const h of historicoComprasDemo) if (h.fornecedorId === fornecedorId) somar(h.insumoId, h.dia, h.quantidade)
+      for (const p of pedidosCompraDemo) if (p.fornecedorId === fornecedorId && (p.status === 'pedido' || p.status === 'recebido'))
+        for (const i of p.itens) if (i.quantidade > 0) somar(i.insumoId, p.recebidoEm ?? p.previsaoEntrega, i.quantidade)
+      const desde = addDias(hoje(), -84)
+      const r: CompraFornecedor[] = [...dias].map(([insumoId, m]) => {
+        const ds = [...m.keys()].sort()
+        const rec = ds.filter((d) => d >= desde)
+        const q = rec.reduce((t, d) => t + m.get(d)!, 0)
+        return {
+          insumoId, compras: rec.length, quantidade: rec.length ? q : null, porSemana: Math.round((q / 12) * 1000) / 1000, porCompra: rec.length ? Math.round((q / rec.length) * 1000) / 1000 : null,
+          intervaloDias: ds.length > 1 ? Math.round((diasEntre(ds[0], ds[ds.length - 1]) / (ds.length - 1)) * 10) / 10 : null, ultima: ds[ds.length - 1], ultimaQtd: m.get(ds[ds.length - 1])!,
+        }
+      })
+      return espera(r.sort((a, b) => b.compras - a.compras || b.ultima.localeCompare(a.ultima)))
+    },
+    async produtosVenda() {
+      exigeGestao()
+      return espera(structuredClone(produtosVendaDemo).sort((a, b) => a.nome.localeCompare(b.nome)))
+    },
+    async salvarProdutoVenda(p) {
+      exigeGestao()
+      if (!p.nome.trim()) throw new Error('Dê um nome ao produto.')
+      if (p.ecleticaCodigo && produtosVendaDemo.some((x) => x.ecleticaCodigo === p.ecleticaCodigo && x.id !== p.id)) throw new Error('duplicate key: código já usado')
+      const atual = p.id ? produtosVendaDemo.find((x) => x.id === p.id) : undefined
+      const novo: ProdutoVenda = { ...p, id: atual?.id ?? novoId('pv'), nome: p.nome.trim() }
+      if (atual) Object.assign(atual, novo)
+      else produtosVendaDemo.push(novo)
+      return espera(structuredClone(novo))
     },
     async listaFechamento(unidadeId, setor, data) {
       const u = exigeEu()
@@ -2490,7 +2562,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       return espera(listaFechDemo.filter((i) => i.unidadeId === unidadeId && i.setor === setor && i.ativo).map((i): ItemFechamento => {
         const c = f && contagensFechDemo.find((x) => x.fechamentoId === f.id && x.itemId === i.id)
         return {
-          itemId: i.id, insumoId: i.insumoId, nome: insumosDemo.find((x) => x.id === i.insumoId)?.nome ?? '', unidadeContagem: i.unidadeContagem, ordem: i.ordem,
+          itemId: i.id, insumoId: i.insumoId, nome: insumosDemo.find((x) => x.id === i.insumoId)?.nome ?? '', categoria: insumosDemo.find((x) => x.id === i.insumoId)?.categoria ?? null, unidadeContagem: i.unidadeContagem, ordem: i.ordem,
           prePreparo: prePreparoDemo.has(i.insumoId), ideal: i.ideal[dia] ?? null, contagem: c?.contagem ?? null, sugestao: c?.sugestao ?? null, pedido: c?.pedido ?? null,
         }
       }))
@@ -2547,17 +2619,17 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     async itensListaFechamento(unidadeId, setor) {
       exigeGestao()
       return espera(listaFechDemo.filter((i) => i.unidadeId === unidadeId && i.setor === setor).sort((a, b) => a.ordem - b.ordem)
-        .map((i) => ({ ...i, ideal: [...i.ideal], nome: insumosDemo.find((x) => x.id === i.insumoId)?.nome ?? '', prePreparo: prePreparoDemo.has(i.insumoId) })))
+        .map((i) => ({ ...i, ideal: [...i.ideal], nome: insumosDemo.find((x) => x.id === i.insumoId)?.nome ?? '', categoria: insumosDemo.find((x) => x.id === i.insumoId)?.categoria ?? null, prePreparo: prePreparoDemo.has(i.insumoId) })))
     },
     async salvarItemListaFechamento(i) {
       exigeGestao()
       const comum = { unidadeContagem: i.unidadeContagem.trim() || 'Uni', ordem: i.ordem, ativo: i.ativo }
-      const atual = i.id ? listaFechDemo.find((x) => x.id === i.id) : undefined
+      const atual = listaFechDemo.find((x) => x.unidadeId === i.unidadeId && x.setor === i.setor && x.insumoId === i.insumoId)
       if (atual) {
+        // Item tirado antes e adicionado de novo volta a valer nas duas lojas.
         atual.ideal = [...i.ideal]
         for (const x of listaFechDemo.filter((x) => x.setor === i.setor && x.insumoId === i.insumoId)) Object.assign(x, comum)
       } else {
-        if (listaFechDemo.some((x) => x.setor === i.setor && x.insumoId === i.insumoId)) throw new Error('Este item já está na lista.')
         for (const u of ['burger-psd', 'burger-va'])
           listaFechDemo.push({ id: novoId('fi'), nome: '', unidadeId: u, setor: i.setor, insumoId: i.insumoId, ...comum, ideal: u === i.unidadeId ? [...i.ideal] : Array(7).fill(null), prePreparo: false })
       }

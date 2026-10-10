@@ -8,7 +8,7 @@ import { ir } from '../lib/rota'
 import { formatarCnpj } from '../lib/nfe'
 
 import ImportarFornecedores from './ImportarFornecedores'
-import type { ContaContabil, Fornecedor, Insumo, PrecoInsumo, UnidadeMedida } from '../lib/types'
+import { SETORES_ENVIO, type ContaContabil, type Fornecedor, type Insumo, type PrecoInsumo, type SetorEnvio, type UnidadeMedida } from '../lib/types'
 
 const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
 const doNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n).replace('.', ','))
@@ -47,26 +47,36 @@ function ListaInsumos({ insumos, fornecedores, cat, aoMudar }: { insumos: Insumo
   const [categoria, setCategoria] = useState('')
   const [semPreco, setSemPreco] = useState(false)
   const [inativos, setInativos] = useState(false)
+  const [setor, setSetor] = useState<SetorEnvio | 'preparo' | ''>('')
+  const [limite, setLimite] = useState(150)
   const [editando, setEditando] = useState<Insumo | 'novo' | null>(null)
   const categorias = [...new Set(insumos.map((i) => i.categoria).filter(Boolean) as string[])].sort()
   const nomeForn = (id: string | null) => fornecedores.find((f) => f.id === id)?.nome
+  const termo = busca.trim().toLowerCase()
   const lista = insumos.filter(
-    (i) => (inativos || i.ativo) && (!categoria || i.categoria === categoria) && (!semPreco || i.preco === null) && (!busca || i.nome.toLowerCase().includes(busca.toLowerCase())),
+    (i) => (inativos || i.ativo) && (!categoria || i.categoria === categoria) && (!semPreco || i.preco === null)
+      && (!setor || (setor === 'preparo' ? i.prePreparo : i.setorEnvio === setor))
+      && (!termo || i.nome.toLowerCase().includes(termo) || i.ecleticaCodigo === termo),
   )
   const faltando = insumos.filter((i) => i.ativo && i.preco === null).length
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <input className={`${estiloEntrada} basis-full py-2! sm:basis-0 sm:flex-1`} placeholder="Buscar insumo" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar insumo" />
+        <input className={`${estiloEntrada} basis-full py-2! sm:basis-0 sm:flex-1`} placeholder="Buscar por nome ou código" value={busca} onChange={(e) => { setBusca(e.target.value); setLimite(150) }} aria-label="Buscar insumo" />
+        <select className={`${estiloEntrada} w-auto! py-2!`} value={setor} onChange={(e) => setSetor(e.target.value as SetorEnvio | 'preparo' | '')} aria-label="Para onde vai">
+          <option value="">Todos os destinos</option>
+          {Object.entries(SETORES_ENVIO).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+          <option value="preparo">Pré-preparos da Central</option>
+        </select>
         <select className={`${estiloEntrada} w-auto! py-2!`} value={categoria} onChange={(e) => setCategoria(e.target.value)} aria-label="Categoria">
           <option value="">Todas as categorias</option>
           {categorias.map((c) => <option key={c}>{c}</option>)}
         </select>
-        <Botao onClick={() => setEditando('novo')}>+ Insumo</Botao>
+        <Botao onClick={() => setEditando('novo')}>+ Material</Botao>
       </div>
       <div className="flex flex-wrap items-center gap-4 text-sm text-stone-600">
-        <span>{lista.length} insumo{lista.length === 1 ? '' : 's'}</span>
+        <span>{lista.length} {lista.length === 1 ? 'material' : 'materiais'}</span>
         <label className="flex items-center gap-2">
           <input type="checkbox" className="accent-carvao" checked={semPreco} onChange={(e) => setSemPreco(e.target.checked)} /> Só sem preço {faltando > 0 && <Selo cor="ambar">{faltando} ativos</Selo>}
         </label>
@@ -87,14 +97,15 @@ function ListaInsumos({ insumos, fornecedores, cat, aoMudar }: { insumos: Insumo
               </tr>
             </thead>
             <tbody>
-              {lista.map((i) => {
+              {lista.slice(0, limite).map((i) => {
                 const usos = usadoEm(cat, { insumoId: i.id }).length
                 return (
                   <tr key={i.id} onClick={() => setEditando(i)} className="cursor-pointer border-t border-stone-100 hover:bg-stone-50">
                     <td className="px-3 py-2">
                       <div className="font-semibold">{i.nome} {!i.ativo && <Selo>Inativo</Selo>}</div>
                       <div className="text-xs text-stone-500">
-                        {[i.categoria, usos ? `em ${usos} ficha${usos === 1 ? '' : 's'}` : 'sem uso nas fichas', i.embalagem && `compra em ${i.embalagem}`].filter(Boolean).join(' · ')}
+                        {[i.ecleticaCodigo && `cód. ${i.ecleticaCodigo}`, i.categoria, i.prePreparo && 'pré-preparo', usos ? `em ${usos} ficha${usos === 1 ? '' : 's'}` : null,
+                          i.embalagem && `compra em ${i.embalagem}${i.embalagemQtd ? ` com ${String(i.embalagemQtd).replace('.', ',')}` : ''}`].filter(Boolean).join(' · ')}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
@@ -107,6 +118,11 @@ function ListaInsumos({ insumos, fornecedores, cat, aoMudar }: { insumos: Insumo
               })}
             </tbody>
           </table>
+          {lista.length > limite && (
+            <button onClick={() => setLimite(lista.length)} className="w-full border-t border-stone-100 py-2.5 text-sm font-semibold text-stone-600 hover:bg-stone-50">
+              Mostrar todos os {lista.length} (ou busque pelo nome)
+            </button>
+          )}
         </div>
       )}
       {editando && (
@@ -140,7 +156,10 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
   const [f, setF] = useState({
     nome: i?.nome ?? '', categoria: i?.categoria ?? '', unidade: i?.unidade ?? 'kg', preco: doNumero(i?.preco), embalagem: i?.embalagem ?? '',
     embalagemQtd: doNumero(i?.embalagemQtd), fornecedorId: i?.fornecedorId ?? '', observacao: i?.observacao ?? '',
+    setorEnvio: i?.setorEnvio ?? '', contaId: i?.contaId ?? '', estoqueMinimo: doNumero(i?.estoqueMinimo),
   })
+  const [prePreparo, setPrePreparo] = useState(!!i?.prePreparo)
+  const [plano, setPlano] = useState<ContaContabil[]>([])
   const [ativo, setAtivo] = useState(i?.ativo ?? true)
   const [precos, setPrecos] = useState<PrecoInsumo[]>([])
   const [erro, setErro] = useState('')
@@ -148,6 +167,7 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
   const mudar = (c: keyof typeof f) => (ev: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [c]: ev.target.value })
   useEffect(() => {
     if (i) store.precosInsumo(i.id).then(setPrecos)
+    store.planoContas().then(setPlano, () => setPlano([]))
   }, [store, i])
   const usos = i ? usadoEm(cat, { insumoId: i.id }) : []
 
@@ -158,11 +178,14 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
     if (preco !== null && (Number.isNaN(preco) || preco < 0)) return setErro('Confira o preço.')
     const embQtd = numero(f.embalagemQtd)
     if (embQtd !== null && (Number.isNaN(embQtd) || embQtd <= 0)) return setErro('Confira quantas unidades vêm na embalagem.')
+    const minimo = numero(f.estoqueMinimo)
+    if (minimo !== null && (Number.isNaN(minimo) || minimo < 0)) return setErro('Confira o estoque mínimo.')
     setSalvando(true)
     try {
       await store.salvarInsumo({
         id: i?.id, nome: f.nome, categoria: f.categoria || null, unidade: f.unidade as UnidadeMedida, preco, embalagem: f.embalagem || null, embalagemQtd: embQtd,
         fornecedorId: f.fornecedorId || null, observacao: f.observacao || null, ativo,
+        setorEnvio: (f.setorEnvio || null) as SetorEnvio | null, contaId: f.contaId || null, estoqueMinimo: minimo, prePreparo,
       })
       aoSalvar()
     } catch (e) {
@@ -173,7 +196,7 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
   }
 
   return (
-    <Modal titulo={i ? i.nome : 'Novo insumo'} aberto aoFechar={aoFechar}>
+    <Modal titulo={i ? `${i.nome}${i.ecleticaCodigo ? ` · cód. ${i.ecleticaCodigo}` : ''}` : 'Novo material'} aberto aoFechar={aoFechar}>
       <form onSubmit={salvar} className="space-y-4">
         <Campo rotulo="Nome">
           <input className={estiloEntrada} value={f.nome} onChange={mudar('nome')} required />
@@ -202,6 +225,24 @@ function EditarInsumo({ i, fornecedores, categorias, cat, aoFechar, aoSalvar }: 
             <input className={estiloEntrada} inputMode="decimal" value={f.embalagemQtd} onChange={mudar('embalagemQtd')} placeholder="Ex.: 12" />
           </Campo>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Campo rotulo="Vai para">
+            <select className={estiloEntrada} value={f.setorEnvio} onChange={mudar('setorEnvio')}>
+              <option value="">Não vai para as lojas</option>
+              {Object.entries(SETORES_ENVIO).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo={`Estoque mínimo (${nomeUnidade(f.unidade)})`}>
+            <input className={estiloEntrada} inputMode="decimal" value={f.estoqueMinimo} onChange={mudar('estoqueMinimo')} placeholder="Opcional" />
+          </Campo>
+        </div>
+        <Campo rotulo="Conta contábil" dica="A conta da despesa quando este material é comprado.">
+          <EscolherConta plano={plano} valor={f.contaId} aoMudar={(id) => setF({ ...f, contaId: id })} vazio="Nenhuma" />
+        </Campo>
+        <label className="flex items-center gap-3 text-sm">
+          <input type="checkbox" className="size-5 accent-carvao" checked={prePreparo} onChange={(ev) => setPrePreparo(ev.target.checked)} />
+          Pré-preparo feito na Central (aparece em Produção › Lançar)
+        </label>
         <Campo rotulo="Fornecedor">
           <select className={estiloEntrada} value={f.fornecedorId} onChange={mudar('fornecedorId')}>
             <option value="">—</option>

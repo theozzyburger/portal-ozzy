@@ -927,7 +927,16 @@ export interface Insumo {
   fornecedorId: string | null
   observacao: string | null
   ativo: boolean
+  // Cadastro da Eclética (09/10): código, para onde vai, conta contábil e estoque mínimo.
+  ecleticaCodigo?: string | null
+  setorEnvio?: SetorEnvio | null
+  contaId?: string | null
+  estoqueMinimo?: number | null
+  // Feito na Central (pré-preparo): é o que pode ser lançado em Produção.
+  prePreparo?: boolean
 }
+export type SetorEnvio = 'cozinha' | 'atendimento' | 'eventos'
+export const SETORES_ENVIO: Record<SetorEnvio, string> = { cozinha: 'Cozinha das lojas', atendimento: 'Atendimento das lojas', eventos: 'Eventos' }
 export interface PrecoInsumo {
   id: string
   insumoId: string
@@ -1381,6 +1390,7 @@ export interface ItemFechamento {
   itemId: string
   insumoId: string
   nome: string
+  categoria?: string | null
   unidadeContagem: string
   ordem: number
   prePreparo: boolean
@@ -1429,6 +1439,7 @@ export interface ItemListaFechamento {
   setor: SetorFechamento
   insumoId: string
   nome: string
+  categoria?: string | null
   unidadeContagem: string
   ordem: number
   ideal: (number | null)[]
@@ -1473,5 +1484,32 @@ export interface PrecoFornecedor {
   insumoId: string
   preco: number
   em: string
-  origem: 'pedido' | 'nota'
+  origem: 'pedido' | 'nota' | 'historico'
+}
+// O que costuma ser comprado de um fornecedor (histórico da Eclética + pedidos do portal, últimas 12 semanas).
+export interface CompraFornecedor {
+  insumoId: string
+  compras: number
+  quantidade: number | null
+  porSemana: number
+  porCompra: number | null
+  intervaloDias: number | null
+  ultima: string
+  ultimaQtd: number
+}
+// Cardápio da Eclética. preco = tabela padrão (Burger), precoPizza = tabela The Ozzy Pizza.
+export type TipoProdutoVenda = 'normal' | 'escondido' | 'vinculo'
+export const TIPOS_PRODUTO_VENDA: Record<TipoProdutoVenda, string> = { normal: 'No PDV', escondido: 'Escondido', vinculo: 'Vínculo (combo ou pergunta)' }
+export interface ProdutoVenda {
+  id: string
+  ecleticaCodigo: string | null
+  nome: string
+  grupo: string | null
+  subgrupo: string | null
+  tipo: TipoProdutoVenda
+  unidade: UnidadeMedida
+  preco: number | null
+  precoPizza: number | null
+  receitaId: string | null
+  ativo: boolean
 }

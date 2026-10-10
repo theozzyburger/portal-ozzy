@@ -16,6 +16,7 @@ import Escala from './pages/Escala'
 import Equipe from './pages/Equipe'
 import Perfil from './pages/Perfil'
 import EmBreve from './pages/EmBreve'
+import Cadastros from './pages/Cadastros'
 import Compras from './pages/Compras'
 import Vencimentos from './pages/Vencimentos'
 import Caixinha from './pages/Caixinha'
@@ -142,6 +143,7 @@ function Casca({ aoSair }: { aoSair: () => void }) {
   else if (modulo.id === 'manutencao') conteudo = <Manutencao />
   else if (modulo.id === 'fichas') conteudo = <Fichas />
   else if (modulo.id === 'financeiro') conteudo = <ModuloFinanceiro sub={sub} />
+  else if (modulo.id === 'cadastros') conteudo = <Cadastros />
   else if (modulo.id === 'compras') conteudo = <Compras />
   else if (modulo.id === 'estoque') conteudo = <Estoque sub={sub} param={param} />
   else if (modulo.id === 'freelancers') conteudo = <Freelancers />

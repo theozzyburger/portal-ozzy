@@ -2,7 +2,7 @@ import { podeGerenciar, vejoResultado } from './permissoes'
 import { LOJAS_FECHAMENTO, type Funcionario } from './types'
 
 export type IdIcone =
-  | 'inicio' | 'rh' | 'freelancers' | 'motoboys' | 'fechamento' | 'producao' | 'fichas' | 'financeiro' | 'administrativo' | 'compras' | 'estoque'
+  | 'inicio' | 'rh' | 'freelancers' | 'motoboys' | 'fechamento' | 'producao' | 'fichas' | 'financeiro' | 'cadastros' | 'compras' | 'estoque'
   | 'checklists' | 'regras' | 'treinamentos' | 'manutencao' | 'eventos'
 
 export interface Modulo {
@@ -37,6 +37,8 @@ export const MODULOS: Modulo[] = [
     id: 'financeiro', nome: 'Financeiro', pronto: true, ve: (eu) => vejoResultado(eu.nivel),
     resumo: 'Contas a pagar, despesas por conta contábil e loja, e o resultado do Lucro Fácil.',
   },
+  // Cadastros da Eclética (09/10): materiais (insumos), produtos de venda com preço e fornecedores, num lugar só.
+  { id: 'cadastros', nome: 'Cadastros', pronto: true, soGestao: true },
   {
     id: 'compras', soGestao: true, nome: 'Compras', pronto: true,
     resumo: 'Do pedido de compra até a conferência da nota.',

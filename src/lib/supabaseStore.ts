@@ -3,7 +3,7 @@ import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, t
 import { LOJAS_FECHAMENTO, chaveDe, daChave } from './types'
 import { addDias as addDiasIso, hoje } from './datas'
 import { comFolgasDoTurno } from './pessoal'
-import type { PedidoCompra, PrecoFornecedor, ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { CompraFornecedor, ProdutoVenda, PedidoCompra, PrecoFornecedor, ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -100,6 +100,17 @@ const ok = <T,>({ data, error }: { data: T; error: { message: string } | null })
     throw new Error(error.message)
   }
   return data
+}
+
+// O Supabase entrega no máximo 1.000 linhas por consulta: busca de mil em mil até acabar.
+// A consulta precisa de uma ordem estável (terminar em id) para não pular nem repetir linhas.
+async function todas<T = any>(pagina: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const r: T[] = []
+  for (let de = 0; ; de += 1000) {
+    const pg = ok(await pagina(de, de + 999)) ?? []
+    r.push(...pg)
+    if (pg.length < 1000) return r
+  }
 }
 
 // "Lembrar meu acesso": com a opção marcada, a sessão fica guardada no aparelho (localStorage);
@@ -869,12 +880,16 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         : ok(await sb.from('fornecedores').insert(linha).select().single()))
     },
     async insumos() {
-      return (ok(await sb.from('insumos').select('*').order('nome')) ?? []).map(paraInsumo)
+      return (await todas((de, ate) => sb.from('insumos').select('*').order('nome').order('id').range(de, ate))).map(paraInsumo)
     },
     async salvarInsumo(i) {
       const linha = {
         nome: i.nome.trim(), categoria: texto(i.categoria), unidade: i.unidade, embalagem: texto(i.embalagem), embalagem_qtd: i.embalagemQtd,
         preco: i.preco, fornecedor_id: i.fornecedorId, observacao: texto(i.observacao), ativo: i.ativo,
+        ...(i.setorEnvio !== undefined && { setor_envio: i.setorEnvio }),
+        ...(i.contaId !== undefined && { conta_id: i.contaId }),
+        ...(i.estoqueMinimo !== undefined && { estoque_minimo: i.estoqueMinimo }),
+        ...(i.prePreparo !== undefined && { pre_preparo: i.prePreparo }),
       }
       return paraInsumo(i.id
         ? ok(await sb.from('insumos').update(linha).eq('id', i.id).select().single())
@@ -1392,9 +1407,27 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         insumoId: r.insumo_id, preco: Number(r.preco), em: r.em, origem: r.origem,
       }))
     },
+    async comprasDoFornecedor(fornecedorId) {
+      return (ok(await sb.rpc('compras_do_fornecedor', { p_fornecedor: fornecedorId })) ?? []).map((r: any): CompraFornecedor => ({
+        insumoId: r.insumo_id, compras: r.compras, quantidade: numeroOuNulo(r.quantidade), porSemana: Number(r.por_semana), porCompra: numeroOuNulo(r.por_compra),
+        intervaloDias: numeroOuNulo(r.intervalo_dias), ultima: r.ultima, ultimaQtd: Number(r.ultima_qtd),
+      }))
+    },
+    async produtosVenda() {
+      return (await todas((de, ate) => sb.from('produtos_venda').select('*').order('nome').order('id').range(de, ate))).map(paraProdutoVenda)
+    },
+    async salvarProdutoVenda(p) {
+      const linha = {
+        ecletica_codigo: texto(p.ecleticaCodigo), nome: p.nome.trim(), grupo: texto(p.grupo), subgrupo: texto(p.subgrupo), tipo: p.tipo, unidade: p.unidade,
+        preco: p.preco, preco_pizza: p.precoPizza, receita_id: p.receitaId, ativo: p.ativo, atualizado_em: new Date().toISOString(),
+      }
+      return paraProdutoVenda(p.id
+        ? ok(await sb.from('produtos_venda').update(linha).eq('id', p.id).select().single())
+        : ok(await sb.from('produtos_venda').insert(linha).select().single()))
+    },
     async listaFechamento(unidadeId, setor, data) {
-      return (ok(await sb.rpc('lista_fechamento', { p_unidade: unidadeId, p_setor: setor, p_data: data })) ?? []).map((r: any): ItemFechamento => ({
-        itemId: r.item_id, insumoId: r.insumo_id, nome: r.nome, unidadeContagem: r.unidade_contagem, ordem: r.ordem, prePreparo: r.pre_preparo,
+      return (ok(await sb.rpc('itens_fechamento', { p_unidade: unidadeId, p_setor: setor, p_data: data })) ?? []).map((r: any): ItemFechamento => ({
+        itemId: r.item_id, insumoId: r.insumo_id, nome: r.nome, categoria: r.categoria ?? null, unidadeContagem: r.unidade_contagem, ordem: r.ordem, prePreparo: r.pre_preparo,
         ideal: numeroOuNulo(r.ideal), contagem: numeroOuNulo(r.contagem), sugestao: numeroOuNulo(r.sugestao), pedido: numeroOuNulo(r.pedido),
       }))
     },
@@ -1420,9 +1453,9 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return ok(await sb.rpc('contar_central', { p_data: data, p_itens: itens.map((i) => ({ insumo_id: i.insumoId, quantidade: i.quantidade })) })) as number
     },
     async itensListaFechamento(unidadeId, setor) {
-      const linhas = ok(await sb.from('fechamento_itens').select('*, insumos(nome, pre_preparo)').eq('unidade_id', unidadeId).eq('setor', setor).order('ordem')) ?? []
+      const linhas = ok(await sb.from('fechamento_itens').select('*, insumos(nome, categoria, pre_preparo)').eq('unidade_id', unidadeId).eq('setor', setor).order('ordem')) ?? []
       return linhas.map((r: any): ItemListaFechamento => ({
-        id: r.id, unidadeId: r.unidade_id, setor: r.setor, insumoId: r.insumo_id, nome: r.insumos?.nome ?? '', unidadeContagem: r.unidade_contagem,
+        id: r.id, unidadeId: r.unidade_id, setor: r.setor, insumoId: r.insumo_id, nome: r.insumos?.nome ?? '', categoria: r.insumos?.categoria ?? null, unidadeContagem: r.unidade_contagem,
         ordem: r.ordem, ideal: Array.from({ length: 7 }, (_, k) => numeroOuNulo(r.ideal?.[k])), prePreparo: !!r.insumos?.pre_preparo, ativo: r.ativo,
       }))
     },
@@ -1430,13 +1463,11 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       // A lista é a mesma nas duas lojas (Heitor, 09/10): item, unidade, ordem e ativo valem para as duas; o ideal é de cada loja.
       const comum = { unidade_contagem: i.unidadeContagem.trim() || 'Uni', ordem: i.ordem, ativo: i.ativo }
       const ideal = i.ideal.some((x) => x !== null) ? i.ideal : null
-      if (i.id) {
-        ok(await sb.from('fechamento_itens').update({ ideal }).eq('id', i.id))
-        ok(await sb.from('fechamento_itens').update(comum).eq('setor', i.setor).eq('insumo_id', i.insumoId))
-      } else {
-        ok(await sb.from('fechamento_itens').upsert(LOJAS_FECHAMENTO.map((u) => ({ ...comum, unidade_id: u, setor: i.setor, insumo_id: i.insumoId, ideal: u === i.unidadeId ? ideal : null })),
-          { onConflict: 'unidade_id,setor,insumo_id', ignoreDuplicates: true }))
-      }
+      // Item tirado antes (inativo) e adicionado de novo volta a valer nas duas lojas.
+      ok(await sb.from('fechamento_itens').upsert(LOJAS_FECHAMENTO.map((u) => ({ ...comum, unidade_id: u, setor: i.setor, insumo_id: i.insumoId })),
+        { onConflict: 'unidade_id,setor,insumo_id', ignoreDuplicates: true }))
+      ok(await sb.from('fechamento_itens').update(comum).eq('setor', i.setor).eq('insumo_id', i.insumoId))
+      ok(await sb.from('fechamento_itens').update({ ideal }).eq('unidade_id', i.unidadeId).eq('setor', i.setor).eq('insumo_id', i.insumoId))
       ok(await sb.from('insumos').update({ pre_preparo: i.prePreparo }).eq('id', i.insumoId))
     },
     async lancarMovimentoEstoque(m) {
@@ -1507,6 +1538,12 @@ const diaDoMes = (mes: string, dia: number) => {
 const paraInsumo = (r: any): Insumo => ({
   id: r.id, nome: r.nome, categoria: r.categoria, unidade: r.unidade, embalagem: r.embalagem, embalagemQtd: numeroOuNulo(r.embalagem_qtd),
   preco: numeroOuNulo(r.preco), precoEm: r.preco_em, fornecedorId: r.fornecedor_id, observacao: r.observacao, ativo: r.ativo,
+  ecleticaCodigo: r.ecletica_codigo ?? null, setorEnvio: r.setor_envio ?? null, contaId: r.conta_id ?? null, estoqueMinimo: numeroOuNulo(r.estoque_minimo),
+  prePreparo: !!r.pre_preparo,
+})
+const paraProdutoVenda = (r: any): ProdutoVenda => ({
+  id: r.id, ecleticaCodigo: r.ecletica_codigo, nome: r.nome, grupo: r.grupo, subgrupo: r.subgrupo, tipo: r.tipo, unidade: r.unidade,
+  preco: numeroOuNulo(r.preco), precoPizza: numeroOuNulo(r.preco_pizza), receitaId: r.receita_id, ativo: r.ativo,
 })
 const paraReceita = (r: any): Receita => ({
   id: r.id, nome: r.nome, tipo: r.tipo, linha: r.linha, operacaoId: r.operacao_id, origem: r.origem, unidade: r.unidade, precoVenda: numeroOuNulo(r.preco_venda),
