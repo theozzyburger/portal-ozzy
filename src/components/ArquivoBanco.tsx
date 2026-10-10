@@ -3,7 +3,7 @@ import { Botao, Campo, Modal, Selo, estiloEntrada } from './ui'
 import { useApp } from '../lib/contexto'
 import { baixarRemessa, chaveFormatada, conferir, montarRemessa, tipoDaChave, type PagamentoBanco, type TipoRemessa } from '../lib/sispag'
 import { dataLonga } from '../lib/datas'
-import { reais } from '../pages/Fichas'
+import { reais } from '../lib/financeiro'
 import type { ContaPagamento, RemessaPagamento } from '../lib/types'
 
 const NOME_CHAVE = { telefone: 'celular', email: 'e-mail', cpfCnpj: 'CPF/CNPJ', aleatoria: 'chave aleatória' } as const

@@ -171,7 +171,7 @@ export function montarPainel(eventos: Evento[], vendas: VendaEvento[], cat: Cata
     for (let i = ord.length - 1; i > 0; i--) {
       const depois = ord[i]
       const antes = [...ord.slice(0, i)].reverse().find((x) => x.ano < depois.ano)
-      if (antes) {
+      if (antes && antes.porDia > 0) {
         anoAno.push({ nome: depois.e.nome.replace(/\s*\b(19|20)\d{2}\b/, ''), antes, depois, variacao: (depois.porDia / antes.porDia - 1) * 100 })
         break
       }
@@ -195,7 +195,7 @@ export function montarPainel(eventos: Evento[], vendas: VendaEvento[], cat: Cata
   const sab = diasSemana.find((d) => d.nome === 'Sábado')
   const dom = diasSemana.find((d) => d.nome === 'Domingo')
   const sex = diasSemana.find((d) => d.nome === 'Sexta')
-  if (sab && dom) {
+  if (sab && dom && dom.porDia > 0) {
     const dif = (sab.porDia / dom.porDia - 1) * 100
     const t = Math.abs(dif) < 5
       ? `Sábado e domingo faturam quase igual: ${mil(sab.porDia)} e ${mil(dom.porDia)} por dia`

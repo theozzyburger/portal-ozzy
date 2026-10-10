@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, diaSemana, hoje, inicioDaSemana } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { soDigitos } from '../lib/store'
 import { apelidoUnidade, nomeCurto, type DiariaFreela, type Funcionario, type Freelancer, type PagamentoFreela, type TurnoFreela } from '../lib/types'
-import { reais } from './Fichas'
+import { reais } from '../lib/financeiro'
 
 const FUNCOES = ['Chapeiro', 'Auxiliar de cozinha', 'Pizzaiolo', 'Atendente', 'Caixa', 'Entregador', 'Limpeza']
 const NOME_TURNO: Record<TurnoFreela, string> = { manha: 'Manhã', noite: 'Noite' }
@@ -37,10 +38,17 @@ export default function Freelancers() {
   const fim = addDias(semana, 6)
   const pagamento = addDias(semana, 7)
 
+  // A semana pode mudar enquanto carrega: resposta de uma semana antiga é descartada (senão "Marcar pago"
+  // gravaria a semana nova com o total da antiga).
+  const semanaAtual = useRef(semana)
+  semanaAtual.current = semana
+  const [carregadaPara, setCarregadaPara] = useState<string | null>(null)
   const carregar = useCallback(async () => {
     const [f, d, p, e] = await Promise.all([
       store.freelancers(), store.diariasFreela(semana, addDias(semana, 6)), store.pagamentosFreela(semana), store.enviosFreela('pendente'),
     ])
+    if (semanaAtual.current !== semana) return
+    setCarregadaPara(semana)
     setPendentes(e.length)
     setFreelas(f)
     setDiarias(d)
@@ -51,7 +59,7 @@ export default function Freelancers() {
     carregar()
   }, [carregar])
 
-  if (!freelas) return <p className="text-stone-400">Carregando…</p>
+  if (!freelas || carregadaPara !== semana) return <p className="text-stone-400">Carregando…</p>
 
   const porId = new Map(freelas.map((f) => [f.id, f]))
 
@@ -473,7 +481,7 @@ function FormDiaria({
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
-    const valor = Number(d.valor.replace(',', '.'))
+    const valor = lerNumero(d.valor) ?? NaN
     if (!(valor >= 0)) return setErro('Valor inválido.')
     setErro('')
     setSalvando(true)

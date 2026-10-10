@@ -44,7 +44,7 @@ export default function ComparativoEventos() {
   const ordenadas = [...filtradas].sort((a, b) =>
     ordem === 'fat' ? b.fat - a.fat : ordem === 'diaBarraca' ? (porDiaBarraca(b) ?? 0) - (porDiaBarraca(a) ?? 0) : (b.e.dias[0]?.data ?? '').localeCompare(a.e.dias[0]?.data ?? ''),
   )
-  const maxFat = Math.max(...filtradas.map((l) => l.fat))
+  const maxFat = Math.max(1, ...filtradas.map((l) => l.fat))
   const fatTotal = filtradas.reduce((s, l) => s + l.fat, 0)
   const diasTotal = filtradas.reduce((s, l) => s + l.dias, 0)
 

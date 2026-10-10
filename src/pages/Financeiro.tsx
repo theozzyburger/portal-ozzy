@@ -3,7 +3,8 @@ import { Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addMeses, hoje, mesDe, nomeMesAno } from '../lib/datas'
 import { apelidoUnidade, type ResultadoMes } from '../lib/types'
-import { atualizadoEm, reais } from './Fichas'
+import { reais } from '../lib/financeiro'
+import { atualizadoEm } from './Fichas'
 
 type Linha = Omit<ResultadoMes, 'unidadeId' | 'mes'>
 

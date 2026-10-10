@@ -25,6 +25,7 @@ import { emAdmissao } from '../lib/pessoal'
 import { tamanhosDe } from './Compras'
 import { textoExperiencia } from '../components/FormFuncionario'
 import { experienciaDe, idadeEm } from '../lib/pessoal'
+import { reais } from '../lib/financeiro'
 
 type AbaPerfil = 'documentos' | 'saude' | 'uniformes' | 'ocorrencias' | 'ferias' | 'salario'
 
@@ -785,7 +786,6 @@ function PagamentosPessoa({ funcionarioId }: { funcionarioId: string }) {
     store.pagamentosFuncionario(funcionarioId).then(setLista).catch(() => setLista([]))
   }, [store, funcionarioId])
   if (!lista) return null
-  const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   const pagos = lista.filter((p) => p.pagoEm)
   const ano = pagos.filter((p) => p.pagoEm!.slice(0, 4) === hoje().slice(0, 4)).reduce((s, p) => s + p.valor, 0)
   return (

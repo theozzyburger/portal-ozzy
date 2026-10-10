@@ -68,8 +68,10 @@ export default function Painel() {
   useEffect(() => {
     const ini = primeiroDia(anterior)
     const fim = ultimoDia(mes)
-    store.ocorrenciasEntre(ini, fim).then(setOcorrencias)
-    store.atestadosEntre(ini, fim).then(setAtestados)
+    let vale = true
+    store.ocorrenciasEntre(ini, fim).then((o) => vale && setOcorrencias(o))
+    store.atestadosEntre(ini, fim).then((a) => vale && setAtestados(a))
+    return () => { vale = false }
   }, [store, mes, anterior])
 
   const daUnidade = (u: string) => {

@@ -4,7 +4,7 @@ import { useApp } from '../lib/contexto'
 import { NOMES_VALORES, aplicarValores, juntarValores, lerHolerites, liquidoLido, separarPaginas, type ValoresHolerite } from '../lib/holerite'
 import { nomeMesAno } from '../lib/datas'
 import { dataPagamento, diaMes, salarioVazio } from '../lib/salarios'
-import { reais } from '../pages/Fichas'
+import { reais } from '../lib/financeiro'
 import type { Funcionario, RubricaHolerite, Salario } from '../lib/types'
 
 interface Grupo {

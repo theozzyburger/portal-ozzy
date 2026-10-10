@@ -2,13 +2,21 @@ import type { CentroCusto, ContaContabil, ContaPagar, FormaPagamento } from './t
 import { FORMAS_PAGAMENTO } from './types'
 import { addDias, hoje } from './datas'
 
-export const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-// "1.234,56" ou "1234.56" viram 1234.56. Vazio vira null.
-export const lerValor = (s: string) => {
-  const t = s.trim()
+// Formato de dinheiro único do portal (casas = 0 para valores redondos em painéis).
+export const reais = (n: number, casas = 2) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: casas, maximumFractionDigits: casas })
+// Número digitado, a regra única do portal (revisão de 10/10; antes cada tela lia de um jeito):
+// com vírgula é o jeito brasileiro ("1.234,56"); sem vírgula, "1.500" (pontos de milhar) é mil e quinhentos e
+// "0.5" é meio. Vazio vira null; texto que não é número vira NaN (lerValor devolve null nesse caso).
+export const lerNumero = (s: string | null | undefined): number | null => {
+  const t = (s ?? '').trim().replace(/\s/g, '').replace(/^R\$/i, '')
   if (!t) return null
-  const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t)
-  return Number.isFinite(n) ? n : null
+  if (t.includes(',')) return Number(t.replace(/\./g, '').replace(',', '.'))
+  if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) return Number(t.replace(/\./g, ''))
+  return Number(t)
+}
+export const lerValor = (s: string) => {
+  const n = lerNumero(s)
+  return n !== null && Number.isFinite(n) ? n : null
 }
 export const mostrarValor = (n: number | null | undefined) => (n === null || n === undefined ? '' : n.toFixed(2).replace('.', ','))
 export const mostrarQtd = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })

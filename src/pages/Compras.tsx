@@ -6,6 +6,7 @@ import { Botao, Campo, Modal, Selo, Titulo, Vazio, estiloEntrada } from '../comp
 import logo from '../assets/logo.png'
 import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { ir } from '../lib/rota'
 import { CORES_CAMISETA, PECAS, consolidado, corCamiseta, descricaoPeca, modelagemDe } from '../lib/uniformes'
 import {
@@ -185,7 +186,6 @@ function Responder({ s, aoFechar, aoSalvar }: { s: SolicitacaoUniforme; aoFechar
 
 // ---------- Pedidos de compra por leva ----------
 
-const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 // Uma linha com valor, fechamento e entrega (avisa quando a previsão já passou e não chegou).
 function resumoPedido(p: PedidoUniforme) {
@@ -650,7 +650,7 @@ function ValoresUniforme() {
   useEffect(() => {
     carregar()
   }, [carregar])
-  const numero = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'))
+  const numero = (s: string) => lerNumero(s) ?? 0
   const salvar = async () => {
     setSalvando(true)
     try {

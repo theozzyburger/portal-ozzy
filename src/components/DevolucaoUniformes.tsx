@@ -5,10 +5,10 @@ import logo from '../assets/logo.png'
 import { useApp } from '../lib/contexto'
 import { formatarCpf } from '../lib/cpf'
 import { dataLonga, hoje } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { EMPRESAS } from '../lib/empresas'
 import type { DevolucaoUniforme, EntregaUniforme, Funcionario, ItemDevolucao } from '../lib/types'
 
-const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const falta = (i: ItemDevolucao) => Math.max(0, i.entregue - i.devolvido)
 
 // Soma tudo o que a pessoa recebeu, por peça e tamanho.
@@ -125,7 +125,7 @@ function Conferir({ pessoa, entregas, aoFechar, aoSalvar }: { pessoa: Funcionari
   }, [store, entregas])
 
   const mudar = (k: number, p: Partial<ItemDevolucao & { valorTexto: string }>) => setItens(itens.map((x, i) => (i === k ? { ...x, ...p } : x)))
-  const numero = (s: string) => Number(s.replace(/\./g, '').replace(',', '.')) || 0
+  const numero = (s: string) => lerNumero(s) || 0
   const total = itens.reduce((t, i) => t + falta(i) * numero(i.valorTexto), 0)
   const semValor = itens.filter((i) => falta(i) > 0 && !numero(i.valorTexto))
 

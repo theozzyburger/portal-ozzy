@@ -3,19 +3,20 @@ import { Avatar, Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../comp
 import { useApp } from '../lib/contexto'
 import { calcularCaixinha } from '../lib/caixinha'
 import { hoje, nomeMesAno, primeiroDia, ultimoDia } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import {
   anterior, baixar, creditosDe, csv, dataPagamento, descontosDe, diaMes, liquido, nomeTipo, proximo, proximoPagamento, salarioVazio,
   totalCreditos, totalDescontos, vtDe, type CampoValor, type Pagamento,
 } from '../lib/salarios'
 import { apelidoUnidade, type Funcionario, type Salario } from '../lib/types'
-import { reais } from './Fichas'
+import { reais } from '../lib/financeiro'
 import ImportarHolerites from '../components/ImportarHolerites'
 import ArquivoBanco from '../components/ArquivoBanco'
 import type { PagamentoBanco } from '../lib/sispag'
 import { lerHolerites, aplicarValores } from '../lib/holerite'
 
 const num = (n: number) => (n ? n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '')
-const lerValor = (t: string) => Math.max(0, Number(t.replace(/[^\d,]/g, '').replace(',', '.')) || 0)
+const lerValor = (t: string) => Math.max(0, lerNumero(t) || 0)
 
 export default function Salarios() {
   const { store, equipe, unidades, nomeUnidade, avisar } = useApp()
@@ -31,8 +32,10 @@ export default function Salarios() {
 
   const carregar = () => store.salarios(mes).then(setTodas)
   useEffect(() => {
+    let vale = true
     setTodas(null)
-    store.salarios(mes).then(setTodas)
+    store.salarios(mes).then((t) => vale && setTodas(t))
+    return () => { vale = false }
   }, [store, mes])
   const linhas = useMemo(() => todas?.filter((l) => l.tipo === tipo) ?? null, [todas, tipo])
 

@@ -89,5 +89,5 @@ export function usadoEm(cat: Catalogo, alvo: { insumoId?: string; receitaId?: st
 }
 
 export const nomeUnidade = (u: string) => ({ kg: 'kg', l: 'L', un: 'un' })[u] ?? u
-export const reais = (n: number, casas = 2) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: casas, maximumFractionDigits: casas })
+export { reais } from './financeiro'
 export const qtd = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 3 })

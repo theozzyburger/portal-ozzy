@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, hoje } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { COR_SITUACAO, TEXTO_SITUACAO, periodosFerias, type PeriodoFerias } from '../lib/ferias'
 import type { DecimoTerceiro, Ferias, Funcionario } from '../lib/types'
-import { reais } from './Fichas'
+import { reais } from '../lib/financeiro'
 
 const br = (d: string) => d.split('-').reverse().join('/')
 
@@ -219,7 +220,7 @@ function Form13({ pessoa, jaPagas, aoFechar, aoSalvar }: { pessoa: Funcionario; 
     try {
       await store.registrarDecimoTerceiro({
         funcionarioId: pessoa.id, ano: Number(f.ano), parcela: Number(f.parcela) as 1 | 2,
-        valor: Number(f.valor.replace(/[^\d,]/g, '').replace(',', '.')) || 0, pagoEm: f.pagoEm, observacao: f.obs || null,
+        valor: lerNumero(f.valor) || 0, pagoEm: f.pagoEm, observacao: f.obs || null,
       })
       aoSalvar()
     } catch (err) {

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Botao, Cartao, Selo, Vazio, estiloEntrada } from '../components/ui'
+import { Botao, CampoNumero, Cartao, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { cmv, custoFicha, montarCatalogo, nomeUnidade, qtd, reais, type Catalogo } from '../lib/custos'
 import { dataCurta, diaSemana, hoje, tempoDesde } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { arredondarPara, consumoEvento, estoqueBase, quantoLevar, referenciasPadrao, semFicha, sugerirVendas, type LinhaLevar } from '../lib/logistica'
 import { posicaoEventos } from '../lib/painelEventos'
 import { ir } from '../lib/rota'
@@ -12,7 +13,7 @@ import {
   type NovoItemEnvio, type Operacao, type ProdutoEvento, type QtdDiaProduto, type Receita, type VendaEvento,
 } from '../lib/types'
 
-const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
+const numero = lerNumero
 const doNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(Math.round(n * 1000) / 1000).replace('.', ','))
 const diaCurto = (d: string) => `${diaSemana(d).slice(0, 3)} ${dataCurta(d)}`
 const inteiro = (n: number) => Math.round(n).toLocaleString('pt-BR')
@@ -235,13 +236,12 @@ export function CardapioPrevisao({ e, eventos, d, aoMudar }: { e: Evento; evento
                     {!custo && <span className="block text-xs text-amber-700">sem ficha técnica</span>}
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input
+                    <CampoNumero
                       className="w-20 rounded-lg border border-stone-200 px-2 py-1 text-right"
-                      inputMode="decimal"
                       aria-label={`Preço de ${r?.nome}`}
-                      value={doNumero(c.preco)}
-                      onChange={(ev) => {
-                        setCardapio((cs) => cs.map((x, j) => (j === i ? { ...x, preco: numero(ev.target.value) } : x)))
+                      valor={c.preco}
+                      aoMudar={(n) => {
+                        setCardapio((cs) => cs.map((x, j) => (j === i ? { ...x, preco: n } : x)))
                         setMudou(true)
                       }}
                     />
@@ -717,12 +717,11 @@ function MontarSeparacao({ e, d, diaInicial, aoFechar, aoCriar }: { e: Evento; d
                     </label>
                     {chaveDe(l) ? (
                       <span className="ml-7 flex items-center gap-1.5 sm:ml-0">
-                        <input
+                        <CampoNumero
                           className="w-20 rounded-lg border border-stone-200 px-2 py-1 text-right"
-                          inputMode="decimal"
                           aria-label={`Quantidade de ${info?.nome}`}
-                          value={doNumero(l.quantidade)}
-                          onChange={(ev) => mudar(l.k, { quantidade: numero(ev.target.value) })}
+                          valor={l.quantidade}
+                          aoMudar={(n) => mudar(l.k, { quantidade: n })}
                         />
                         <span className="w-8 text-stone-500">{nomeUnidade(info?.unidade ?? '')}</span>
                         <span className="hidden w-28 text-xs text-stone-400 sm:inline">{embalagens(info, l.quantidade ?? 0)}</span>

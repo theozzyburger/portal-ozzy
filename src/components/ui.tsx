@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { lerValor } from '../lib/financeiro'
 
 export function Botao({
   children, variante = 'primario', className = '', ...props
@@ -108,5 +109,25 @@ export function Avatar({ nome, tamanho = 40, foto }: { nome: string; tamanho?: n
     >
       {iniciais}
     </span>
+  )
+}
+
+// Campo de número que guarda o texto enquanto a pessoa digita ("12," não vira "12" no meio da digitação).
+// Só troca o texto quando o valor muda por fora (ex.: recalculado pela tela).
+const textoDoNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(Math.round(n * 1000) / 1000).replace('.', ','))
+export function CampoNumero({ valor, aoMudar, ...props }: { valor: number | null | undefined; aoMudar: (n: number | null) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [texto, setTexto] = useState(textoDoNumero(valor))
+  const [anterior, setAnterior] = useState(valor ?? null)
+  if ((valor ?? null) !== anterior) {
+    setAnterior(valor ?? null)
+    if ((valor ?? null) !== lerValor(texto)) setTexto(textoDoNumero(valor))
+  }
+  return (
+    <input inputMode="decimal" {...props} value={texto} onChange={(e) => {
+      setTexto(e.target.value)
+      const n = lerValor(e.target.value)
+      setAnterior(n)
+      aoMudar(n)
+    }} />
   )
 }

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, hoje, inicioDaSemana } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { soDigitos } from '../lib/store'
 import { apelidoUnidade, nomeCurto, type ExtraMotoboy, type Motoboy, type SemanaMotoboy } from '../lib/types'
-import { reais } from './Fichas'
+import { reais } from '../lib/financeiro'
 import ArquivoBanco from '../components/ArquivoBanco'
 
 // Motoboys (Heitor, 09/10): não são da equipe, mas têm cadastro (nome, Pix). Todo domingo a gestão lança a semana
@@ -13,12 +14,7 @@ import ArquivoBanco from '../components/ArquivoBanco'
 type Aba = 'semana' | 'cadastro'
 interface Linha { motoboyId: string; diarias: string; entregas: string; extras: { descricao: string; valor: string }[]; jaPago: boolean }
 
-const num = (s: string) => {
-  const t = s.trim().replace(/\s/g, '')
-  if (!t) return 0
-  const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t)
-  return Number.isFinite(n) ? n : NaN
-}
+const num = (s: string) => lerNumero(s) ?? 0
 const texto = (n: number) => (n ? String(n).replace('.', ',') : '')
 const totalLinha = (l: Linha) => num(l.diarias) + num(l.entregas) + l.extras.reduce((t, e) => t + num(e.valor), 0)
 // Segunda do pagamento: amanhã se hoje é domingo, hoje se é segunda, senão a próxima.

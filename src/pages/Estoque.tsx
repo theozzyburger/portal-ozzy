@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import EscolherConta from '../components/EscolherConta'
 import { useApp } from '../lib/contexto'
-import { addDias, dataCurta, hoje, mesDe, nomeMesAno } from '../lib/datas'
+import { addDias, addMeses, dataCurta, hoje, mesDe, nomeMesAno, primeiroDia, ultimoDia } from '../lib/datas'
 import { ir } from '../lib/rota'
 import { vejoResultado } from '../lib/permissoes'
 import { formaDoTPag, formatarCnpj, lerXmlNfe } from '../lib/nfe'
 import { dividir, lerValor, mostrarQtd, mostrarValor, nomeCentro, nomeForma, r2, reais, somarMeses } from '../lib/financeiro'
 import {
   FORMAS_PAGAMENTO,
-  type CentroCusto, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor, type Insumo, type MovimentoEstoque, type NotaFiscal,
+  type CentroCusto, type ContaContabil, type ContaPagar, type FormaPagamento, type Fornecedor, type Insumo, type MovimentoEstoque, type NotaFiscal, type SaldoEstoque,
 } from '../lib/types'
 
 const ABAS = [
@@ -283,7 +283,7 @@ function DetalheNota({ id }: { id: string }) {
           insumoId: i.insumoId ?? '', descricao: i.insumoId ? '' : i.descricao, quantidade: String(i.quantidade).replace('.', ','), valor: mostrarValor(i.valorTotal),
         })))
       }
-      if (financeiro) setContas((await store.contasPagar()).filter((x) => x.notaId === id))
+      if (financeiro) setContas(await store.contasDaNota(id))
       if (nota.arquivo) setLink(await store.linkArquivoNota(nota.arquivo))
     } catch (e) {
       setErro((e as Error).message)
@@ -627,41 +627,29 @@ function DetalheNota({ id }: { id: string }) {
   )
 }
 
-// Saldo = soma dos movimentos da loja. Custo = o da última entrada (ou o preço do cadastro).
-function saldos(movs: MovimentoEstoque[], centro: string) {
-  const m = new Map<string, { qtd: number; custo: number | null; ultima: string }>()
-  for (const x of [...movs].sort((a, b) => a.data.localeCompare(b.data) || a.criadoEm.localeCompare(b.criadoEm))) {
-    if (x.centroCustoId !== centro) continue
-    const s = m.get(x.insumoId) ?? { qtd: 0, custo: null, ultima: x.data }
-    s.qtd += x.quantidade
-    if (x.quantidade > 0 && x.custoUnit !== null) s.custo = x.custoUnit
-    s.ultima = x.data
-    m.set(x.insumoId, s)
-  }
-  return m
-}
-
 function Saldo() {
   const { store } = useApp()
   const { c, erro: erroCad } = useCadastros()
-  const [movs, setMovs] = useState<MovimentoEstoque[] | null>(null)
+  const [saldos, setSaldos] = useState<SaldoEstoque[] | null>(null)
   const [erro, setErro] = useState('')
   const [centro, setCentro] = useState('burger-psd')
   const [busca, setBusca] = useState('')
   const [mov, setMov] = useState<{ insumoId: string } | null>(null)
-  const carregar = useCallback(() => store.movimentosEstoque().then(setMovs, (e) => setErro(e.message)), [store])
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+  const carregar = useCallback(() => {
+    let vale = true
+    setSaldos(null)
+    store.saldosEstoque(centro).then((s) => vale && setSaldos(s), (e) => vale && setErro(e.message))
+    return () => { vale = false }
+  }, [store, centro])
+  useEffect(carregar, [carregar])
   if (erro || erroCad) return <Vazio>{erro || erroCad}</Vazio>
-  if (!movs || !c) return <p className="text-stone-400">Carregando…</p>
+  if (!saldos || !c) return <p className="text-stone-400">Carregando…</p>
 
-  const s = saldos(movs, centro)
-  const linhas = [...s.entries()]
-    .map(([id, v]) => {
-      const ins = c.insumos.find((i) => i.id === id)
+  const linhas = saldos
+    .map((v) => {
+      const ins = c.insumos.find((i) => i.id === v.insumoId)
       const custo = v.custo ?? ins?.preco ?? null
-      return { id, ins, ...v, custo, valor: custo !== null ? Math.max(v.qtd, 0) * custo : 0 }
+      return { id: v.insumoId, ins, qtd: v.quantidade, ultima: v.ultima, custo, valor: custo !== null ? Math.max(v.quantidade, 0) * custo : 0 }
     })
     .filter((l) => Math.abs(l.qtd) > 0.0001 && (!busca || (l.ins?.nome ?? '').toLowerCase().includes(busca.toLowerCase())))
     .sort((a, b) => (a.ins?.nome ?? '').localeCompare(b.ins?.nome ?? ''))
@@ -709,7 +697,7 @@ function Saldo() {
         </Cartao>
       )}
       {mov && (
-        <NovoMovimento c={c} centro={centro} insumoId={mov.insumoId} saldoDe={(id) => s.get(id)?.qtd ?? 0}
+        <NovoMovimento c={c} centro={centro} insumoId={mov.insumoId} saldoDe={(id) => saldos.find((x) => x.insumoId === id)?.quantidade ?? 0}
           aoFechar={() => setMov(null)} aoSalvar={() => { setMov(null); carregar() }} />
       )}
     </div>
@@ -747,8 +735,10 @@ function NovoMovimento({ c, centro, insumoId, saldoDe, aoFechar, aoSalvar }: {
         const dif = r2(q - atual)
         if (Math.abs(dif) > 0.0001) await store.lancarMovimentoEstoque({ ...base, centroCustoId: centro, tipo: 'ajuste', quantidade: dif, observacao: v.obs || `Contagem: ${mostrarQtd(q)} ${ins?.unidade ?? ''}` })
       } else if (v.tipo === 'transferencia') {
-        await store.lancarMovimentoEstoque({ ...base, centroCustoId: centro, tipo: 'transferencia', quantidade: -q, observacao: v.obs || `Para ${nomeCentro(c.centros.find((x) => x.id === v.destino))}` })
-        await store.lancarMovimentoEstoque({ ...base, centroCustoId: v.destino, tipo: 'transferencia', quantidade: q, custoUnit: ins?.preco ?? null, observacao: v.obs || `De ${nomeCentro(c.centros.find((x) => x.id === centro))}` })
+        await store.lancarMovimentoEstoque([
+          { ...base, centroCustoId: centro, tipo: 'transferencia', quantidade: -q, observacao: v.obs || `Para ${nomeCentro(c.centros.find((x) => x.id === v.destino))}` },
+          { ...base, centroCustoId: v.destino, tipo: 'transferencia', quantidade: q, custoUnit: ins?.preco ?? null, observacao: v.obs || `De ${nomeCentro(c.centros.find((x) => x.id === centro))}` },
+        ])
       } else {
         await store.lancarMovimentoEstoque({ ...base, centroCustoId: centro, tipo: v.tipo, quantidade: v.tipo === 'entrada' ? q : -q, custoUnit: v.tipo === 'entrada' ? ins?.preco ?? null : null })
       }
@@ -814,13 +804,17 @@ function Movimentos() {
   const [erro, setErro] = useState('')
   const [centro, setCentro] = useState('')
   const [mes, setMes] = useState(mesDe(hoje()))
+  // Só o mês escolhido vem do banco.
   useEffect(() => {
-    store.movimentosEstoque().then(setMovs, (e) => setErro(e.message))
-  }, [store])
+    let vale = true
+    setMovs(null)
+    store.movimentosEstoque(primeiroDia(mes), ultimoDia(mes)).then((m) => vale && setMovs(m), (e) => vale && setErro(e.message))
+    return () => { vale = false }
+  }, [store, mes])
   if (erro || erroCad) return <Vazio>{erro || erroCad}</Vazio>
-  if (!movs || !c) return <p className="text-stone-400">Carregando…</p>
-  const meses = [...new Set([mesDe(hoje()), ...movs.map((m) => mesDe(m.data))])].sort().reverse()
-  const lista = movs.filter((m) => mesDe(m.data) === mes && (!centro || m.centroCustoId === centro))
+  if (!c) return <p className="text-stone-400">Carregando…</p>
+  const meses = Array.from({ length: 18 }, (_, k) => addMeses(mesDe(hoje()), -k))
+  const lista = (movs ?? []).filter((m) => !centro || m.centroCustoId === centro)
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">Movimentos do estoque</h1>

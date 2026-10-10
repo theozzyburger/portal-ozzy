@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addDias, dataCurta, dataLonga, diaSemana, hoje, tempoDesde } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { ir } from '../lib/rota'
 import FichasEvento from './FichasEvento'
 import Insumos from './Insumos'
@@ -13,8 +14,7 @@ import FreelasEventos, { FreelasDoEvento } from './FreelasEventos'
 import { AbasEvento, CardapioPrevisao, Separacao, Sobras, VendasEvento, useDadosLogistica } from './EventoLogistica'
 import { STATUS_EVENTO, nomeStatusEvento, type DiaEvento, type Evento, type HistoricoEvento, type NovoEvento, type Operacao, type StatusEvento } from '../lib/types'
 
-const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
+const numero = lerNumero
 const doNumero = (n: number | null) => (n === null ? '' : String(n).replace('.', ','))
 const corStatus = (s: StatusEvento) => STATUS_EVENTO.find((x) => x.valor === s)?.cor ?? 'cinza'
 const encerrado = (s: StatusEvento) => s === 'finalizado' || s === 'cancelado'

@@ -3,7 +3,7 @@ import { EVENTO_ALTERADO, codigoAleatorio, linkDaGuia, nomeProprio, soDigitos, t
 import { LOJAS_FECHAMENTO, chaveDe, daChave } from './types'
 import { addDias as addDiasIso, hoje } from './datas'
 import { comFolgasDoTurno } from './pessoal'
-import type { CompraFornecedor, ProdutoVenda, PedidoCompra, PrecoFornecedor, ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
+import type { SaldoEstoque, CompraFornecedor, ProdutoVenda, PedidoCompra, PrecoFornecedor, ItemFechamento, Fechamento, PedidoProducao, ItemListaFechamento, Producao, Motoboy, NotaFiscal, ContaPagar, ContaRecorrente, ItemNota, MovimentoExtrato, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, NovoItemEnvio, EnvioEvento, Inventario, ItemModeloChecklist, VendaEvento, Fornecedor, Insumo, Receita, VersaoReceita, DiaEvento, Evento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, EnvioFreela, ContaPagamento, RemessaPagamento, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, Salario, DiariaFreela, Freelancer, Avaliacao, Chamado, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, Folga, Funcionario, Ocorrencia, VendaDia } from './types'
 
 // O login é celular + senha. Internamente o Supabase usa um e-mail derivado do celular,
 // assim não dependemos de SMS (que é pago).
@@ -229,7 +229,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return data?.signedUrl ?? null
     },
     async documentosTodos() {
-      return (ok(await sb.from('documentos').select('*')) ?? []).map(paraDocumento)
+      return (await todas((de, ate) => sb.from('documentos').select('*').order('id').range(de, ate))).map(paraDocumento)
     },
     async uniformes(fid) {
       return (ok(await sb.from('uniforme_entregas').select('*').eq('funcionario_id', fid).order('data', { ascending: false })) ?? []).map(paraUniforme)
@@ -449,12 +449,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
         }))))
     },
     async movimentosUniforme() {
-      const rs: any[] = []
-      for (let de = 0; ; de += 1000) {
-        const bloco = ok(await sb.from('uniforme_estoque').select('*').order('criado_em').range(de, de + 999)) ?? []
-        rs.push(...bloco)
-        if (bloco.length < 1000) break
-      }
+      const rs = await todas((de, ate) => sb.from('uniforme_estoque').select('*').order('criado_em').order('id').range(de, ate))
       return rs.map((r): MovimentoUniforme => ({
         id: r.id, data: r.data, item: r.item, cor: r.cor, modelagem: r.modelagem, tamanho: r.tamanho, tipo: r.tipo, quantidade: r.quantidade,
         referencia: r.referencia, observacao: r.observacao, criadoPor: r.criado_por, criadoEm: r.criado_em,
@@ -525,7 +520,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('preventivas').delete().eq('id', id))
     },
     async execucoesPreventiva() {
-      return (ok(await sb.from('preventiva_execucoes').select('*').order('feito_em', { ascending: false })) ?? []).map((r: any): ExecucaoPreventiva => ({
+      return (await todas((de, ate) => sb.from('preventiva_execucoes').select('*').order('feito_em', { ascending: false }).order('id').range(de, ate))).map((r: any): ExecucaoPreventiva => ({
         id: r.id, preventivaId: r.preventiva_id, unidadeId: r.unidade_id, feitoEm: r.feito_em, observacao: r.observacao, feitoPor: r.feito_por,
       }))
     },
@@ -646,7 +641,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('turnos').delete().eq('id', id))
     },
     async chamados() {
-      const linhas = ok(await sb.from('chamados').select('*, chamado_eventos(*)').order('aberto_em', { ascending: false })) ?? []
+      const linhas = await todas((de, ate) => sb.from('chamados').select('*, chamado_eventos(*)').order('aberto_em', { ascending: false }).order('id').range(de, ate))
       return linhas.map(paraChamado)
     },
     async abrirChamado(n) {
@@ -904,7 +899,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       return (ok(await sb.from('receitas').select('*').order('nome')) ?? []).map(paraReceita)
     },
     async versoesReceitas() {
-      return (ok(await sb.from('receita_versoes').select('*, receita_itens(ordem, insumo_id, sub_receita_id, quantidade, aproveitamento)').order('numero')) ?? []).map(
+      return (await todas((de, ate) => sb.from('receita_versoes').select('*, receita_itens(ordem, insumo_id, sub_receita_id, quantidade, aproveitamento)').order('numero').order('id').range(de, ate))).map(
         (r: any): VersaoReceita => ({
           id: r.id, receitaId: r.receita_id, numero: r.numero, rendimento: Number(r.rendimento), custoTotal: numeroOuNulo(r.custo_total), nota: r.nota,
           criadaEm: r.criada_em, criadaPor: r.criada_por,
@@ -951,14 +946,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       if (l.length) ok(await sb.from('evento_previsao').insert(l.map((x) => ({ evento_id: eventoId, data: x.data, receita_id: x.receitaId, quantidade: x.quantidade }))))
     },
     async vendasEventos() {
-      // Sem limite de 1.000 linhas do Supabase: busca em páginas.
-      const todas: any[] = []
-      for (let de = 0; ; de += 1000) {
-        const pg = ok(await sb.from('evento_vendas').select('*').order('id').range(de, de + 999)) ?? []
-        todas.push(...pg)
-        if (pg.length < 1000) break
-      }
-      return todas.map((r): VendaEvento => ({
+      return (await todas((de, ate) => sb.from('evento_vendas').select('*').order('id').range(de, ate))).map((r): VendaEvento => ({
         eventoId: r.evento_id, data: r.data, receitaId: r.receita_id, produto: r.produto, quantidade: Number(r.quantidade), total: numeroOuNulo(r.total), origem: r.origem,
       }))
     },
@@ -982,9 +970,11 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(i.id ? await sb.from('checklist_evento_modelo').update(linha).eq('id', i.id) : await sb.from('checklist_evento_modelo').insert(linha))
     },
     async envios(eventoId) {
-      let c = sb.from('evento_envios').select('*, evento_envio_itens(*)').order('data').order('criado_em')
-      if (eventoId) c = c.eq('evento_id', eventoId)
-      return (ok(await c) ?? []).map((r: any): EnvioEvento => ({
+      const c = (de: number, ate: number) => {
+        const q = sb.from('evento_envios').select('*, evento_envio_itens(*)').order('data').order('criado_em').order('id')
+        return (eventoId ? q.eq('evento_id', eventoId) : q).range(de, ate)
+      }
+      return (await todas(c)).map((r: any): EnvioEvento => ({
         id: r.id, eventoId: r.evento_id, data: r.data, tipo: r.tipo, observacao: r.observacao, criadoPor: r.criado_por, criadoEm: r.criado_em,
         itens: (r.evento_envio_itens ?? []).sort((a: any, b: any) => a.ordem - b.ordem).map((i: any) => ({
           id: i.id, ordem: i.ordem, categoria: i.categoria, operacao: i.operacao, insumoId: i.insumo_id, receitaId: i.receita_id, item: i.item, previsto: numeroOuNulo(i.previsto),
@@ -1137,7 +1127,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       else ok(await sb.from('plano_contas').insert(linha))
     },
     async notasFiscais() {
-      return (ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, extrato_movimento_id').order('emissao', { ascending: false })) ?? []).map(paraNota)
+      return (await todas((de, ate) => sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, extrato_movimento_id').order('emissao', { ascending: false }).order('id').range(de, ate))).map(paraNota)
     },
     async notaFiscal(id) {
       return paraNota(ok(await sb.from('notas_fiscais').select('id, chave, numero, serie, emissao, fornecedor_id, emitente_cnpj, emitente_nome, destinatario_cnpj, centro_custo_id, valor_produtos, frete, desconto, valor_total, pagamento_xml, duplicatas, arquivo, observacao, status, lancada_em, criado_em, extrato_movimento_id, nota_itens(*)').eq('id', id).single()))
@@ -1198,13 +1188,10 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('notas_fiscais').delete().eq('id', id).eq('status', 'conferir'))
     },
     async contasPagar() {
-      const linhas: any[] = []
-      for (let de = 0; ; de += 1000) {
-        const pg = ok(await sb.from('contas_pagar').select('*').order('vencimento').order('id').range(de, de + 999)) ?? []
-        linhas.push(...pg)
-        if (pg.length < 1000) break
-      }
-      return linhas.map(paraContaPagar)
+      return (await todas((de, ate) => sb.from('contas_pagar').select('*').order('vencimento').order('id').range(de, ate))).map(paraContaPagar)
+    },
+    async contasDaNota(notaId) {
+      return (ok(await sb.from('contas_pagar').select('*').eq('nota_id', notaId).order('vencimento')) ?? []).map(paraContaPagar)
     },
     async contasRecorrentes() {
       return (ok(await sb.from('contas_recorrentes').select('*').order('dia').order('descricao')) ?? []).map(paraRecorrente)
@@ -1276,19 +1263,19 @@ export function criarSupabaseStore(url: string, chave: string): Store {
     async excluirContaPagar(id) {
       ok(await sb.from('contas_pagar').delete().eq('id', id))
     },
-    async movimentosEstoque() {
-      return (ok(await sb.from('estoque_movimentos').select('*').order('data', { ascending: false })) ?? []).map((r: any) => ({
+    async movimentosEstoque(de, ate) {
+      return (await todas((x, y) => sb.from('estoque_movimentos').select('*').gte('data', de).lte('data', ate).order('data', { ascending: false }).order('id').range(x, y))).map((r: any) => ({
         id: r.id, centroCustoId: r.centro_custo_id, insumoId: r.insumo_id, data: r.data, tipo: r.tipo, quantidade: Number(r.quantidade),
         custoUnit: numeroOuNulo(r.custo_unit), notaItemId: r.nota_item_id, observacao: r.observacao, criadoEm: r.criado_em, producaoId: r.producao_id ?? null,
       }))
     },
+    async saldosEstoque(centroCustoId) {
+      return (ok(await sb.rpc('saldos_estoque', { p_centro: centroCustoId })) ?? []).map((r: any): SaldoEstoque => ({
+        insumoId: r.insumo_id, quantidade: Number(r.quantidade), custo: numeroOuNulo(r.custo), ultima: r.ultima,
+      }))
+    },
     async extrato() {
-      const linhas: any[] = []
-      for (let de = 0; ; de += 1000) {
-        const pg = ok(await sb.from('extrato_movimentos').select('*').order('data', { ascending: false }).range(de, de + 999)) ?? []
-        linhas.push(...pg)
-        if (pg.length < 1000) break
-      }
+      const linhas = await todas((de, ate) => sb.from('extrato_movimentos').select('*').order('data', { ascending: false }).order('id').range(de, ate))
       return linhas.map((r): MovimentoExtrato => ({
         id: r.id, banco: r.banco, agencia: r.agencia, conta: r.conta, fitid: r.fitid, data: r.data, valor: Number(r.valor), descricao: r.descricao,
         documento: r.documento, tipo: r.tipo, status: r.status, contaPagarId: r.conta_pagar_id, observacao: r.observacao, importadoEm: r.importado_em,
@@ -1369,7 +1356,7 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       if (chaveSempre) ok(await sb.from('extrato_regras').upsert({ chave: chaveSempre, ignorar: true, favorecido: motivo, atualizado_em: new Date().toISOString() }))
     },
     async producoes(de, ate) {
-      return (ok(await sb.from('producoes').select('*').gte('data', de).lte('data', ate).order('data', { ascending: false }).order('criado_em', { ascending: false })) ?? []).map((r: any): Producao => ({
+      return (await todas((x, y) => sb.from('producoes').select('*').gte('data', de).lte('data', ate).order('data', { ascending: false }).order('criado_em', { ascending: false }).order('id').range(x, y))).map((r: any): Producao => ({
         id: r.id, centroCustoId: r.centro_custo_id, data: r.data, receitaId: r.receita_id, versao: r.versao, insumoId: r.insumo_id, quantidade: Number(r.quantidade),
         custoTotal: numeroOuNulo(r.custo_total), observacao: r.observacao, criadoEm: r.criado_em, criadoPor: r.criado_por,
       }))
@@ -1471,10 +1458,10 @@ export function criarSupabaseStore(url: string, chave: string): Store {
       ok(await sb.from('insumos').update({ pre_preparo: i.prePreparo }).eq('id', i.insumoId))
     },
     async lancarMovimentoEstoque(m) {
-      ok(await sb.from('estoque_movimentos').insert({
-        centro_custo_id: m.centroCustoId, insumo_id: m.insumoId, data: m.data, tipo: m.tipo, quantidade: m.quantidade,
-        custo_unit: m.custoUnit ?? null, observacao: texto(m.observacao),
-      }))
+      ok(await sb.from('estoque_movimentos').insert((Array.isArray(m) ? m : [m]).map((x) => ({
+        centro_custo_id: x.centroCustoId, insumo_id: x.insumoId, data: x.data, tipo: x.tipo, quantidade: x.quantidade,
+        custo_unit: x.custoUnit ?? null, observacao: texto(x.observacao),
+      }))))
     },
   }
 }

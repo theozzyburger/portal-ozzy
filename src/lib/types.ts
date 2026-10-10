@@ -1288,6 +1288,13 @@ export interface ContaRecorrente {
   situacao: SituacaoRecorrente
   observacao: string | null
 }
+// Saldo de um item numa loja (soma dos movimentos, no banco). custo = o da última entrada.
+export interface SaldoEstoque {
+  insumoId: string
+  quantidade: number
+  custo: number | null
+  ultima: string
+}
 export interface MovimentoEstoque {
   id: string
   centroCustoId: string

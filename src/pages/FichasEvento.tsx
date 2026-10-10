@@ -3,10 +3,11 @@ import { Botao, Campo, Cartao, Modal, Selo, Vazio, estiloEntrada } from '../comp
 import { useApp } from '../lib/contexto'
 import { cmv, custoFicha, custoItens, montarCatalogo, nomeUnidade, qtd, reais, usadoEm, type Catalogo } from '../lib/custos'
 import { dataLonga } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { ir } from '../lib/rota'
 import { ORIGEM_PRODUTO, type Insumo, type ItemReceita, type Operacao, type OrigemProduto, type Receita, type TipoReceita, type UnidadeMedida, type VersaoReceita } from '../lib/types'
 
-const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
+const numero = lerNumero
 const doNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n).replace('.', ','))
 const inteiro = (s: string) => (s.trim() === '' ? null : Math.max(0, Math.round(Number(s.replace(',', '.')))))
 

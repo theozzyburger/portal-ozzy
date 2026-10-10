@@ -9,8 +9,8 @@ import { pegarLocalizacao, soDigitos } from '../lib/store'
 import { apelidoUnidade, type EnvioFreela, type Freelancer, type LocalLoja } from '../lib/types'
 import { formatarCpf } from '../lib/cpf'
 import logo from '../assets/logo.png'
+import { reais } from '../lib/financeiro'
 
-const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 // O link antigo com a loja no fim (#/diaria/<loja>) continua abrindo, já com a loja escolhida.
 export const linkDiaria = () => `${location.origin}${location.pathname}#/diaria`
 

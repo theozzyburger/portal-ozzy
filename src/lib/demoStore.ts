@@ -2270,6 +2270,10 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       exigeFinanceiro()
       return espera(contasPagarDemo.map((c) => ({ ...c })).sort((a, b) => a.vencimento.localeCompare(b.vencimento)))
     },
+    async contasDaNota(notaId) {
+      exigeFinanceiro()
+      return espera(contasPagarDemo.filter((c) => c.notaId === notaId).map((c) => ({ ...c })))
+    },
     async salvarContasPagar(contas) {
       exigeFinanceiro()
       for (const c of contas) {
@@ -2446,9 +2450,21 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
       }
       return espera(undefined)
     },
-    async movimentosEstoque() {
+    async movimentosEstoque(de, ate) {
       exigeGestao()
-      return espera([...movimentosDemo].sort((a, b) => b.data.localeCompare(a.data)))
+      return espera(movimentosDemo.filter((m) => m.data >= de && m.data <= ate).sort((a, b) => b.data.localeCompare(a.data)))
+    },
+    async saldosEstoque(centroCustoId) {
+      exigeGestao()
+      const m = new Map<string, { insumoId: string; quantidade: number; custo: number | null; ultima: string }>()
+      for (const x of [...movimentosDemo].filter((x) => x.centroCustoId === centroCustoId).sort((a, b) => a.data.localeCompare(b.data) || a.criadoEm.localeCompare(b.criadoEm))) {
+        const s = m.get(x.insumoId) ?? { insumoId: x.insumoId, quantidade: 0, custo: null, ultima: x.data }
+        s.quantidade += x.quantidade
+        if (x.quantidade > 0 && x.custoUnit !== null) s.custo = x.custoUnit
+        s.ultima = x.data
+        m.set(x.insumoId, s)
+      }
+      return espera([...m.values()])
     },
     async producoes(de, ate) {
       exigeGestao()
@@ -2639,7 +2655,7 @@ export function criarDemoStore(): Store & { entrarComo(id: string): Promise<Func
     },
     async lancarMovimentoEstoque(m) {
       exigeGestao()
-      movimentosDemo.push({ ...m, id: novoId('mv'), custoUnit: m.custoUnit ?? null, notaItemId: null, observacao: m.observacao?.trim() || null, criadoEm: agora() })
+      for (const x of Array.isArray(m) ? m : [m]) movimentosDemo.push({ ...x, id: novoId('mv'), custoUnit: x.custoUnit ?? null, notaItemId: null, observacao: x.observacao?.trim() || null, criadoEm: agora() })
       return espera(undefined)
     },
   }

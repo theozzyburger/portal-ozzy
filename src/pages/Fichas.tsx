@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
+import { reais } from '../lib/financeiro'
 import { podeGerenciar } from '../lib/permissoes'
 import type { Ficha, ItemFicha } from '../lib/types'
 
@@ -33,7 +34,6 @@ export function quantidade(qtd: number, unidade: string) {
   return `${num(qtd, 3)} un`
 }
 
-export const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const porcento = (n: number) => `${n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
 
 export function atualizadoEm(iso: string | null) {

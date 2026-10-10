@@ -165,9 +165,14 @@ function FormPedido({ d, pedido, aoFechar }: { d: Dados; pedido: PedidoCompra | 
   const editavel = !pedido || pedido.status === 'rascunho' || pedido.status === 'pedido'
 
   useEffect(() => {
-    if (!v.fornecedorId) { setPrecos([]); setHistorico([]); return }
-    store.precosFornecedor(v.fornecedorId).then(setPrecos, () => setPrecos([]))
-    store.comprasDoFornecedor(v.fornecedorId).then(setHistorico, () => setHistorico([]))
+    setPrecos([])
+    setHistorico([])
+    if (!v.fornecedorId) return
+    // Trocou de fornecedor antes de chegar a resposta: a do anterior é descartada.
+    let vale = true
+    store.precosFornecedor(v.fornecedorId).then((p) => vale && setPrecos(p), () => undefined)
+    store.comprasDoFornecedor(v.fornecedorId).then((h) => vale && setHistorico(h), () => undefined)
+    return () => { vale = false }
   }, [store, v.fornecedorId])
 
   // Previsão pelo prazo do fornecedor (ou o padrão da categoria), até a pessoa mexer nela.

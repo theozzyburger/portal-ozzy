@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataCurta, hoje } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { GRADE, chaveVariante, descricaoVariante, nomeLinha, saldosUniforme } from '../lib/uniformes'
 import type { Modelagem, MovimentoUniforme, NovoMovimentoUniforme, TipoMovUniforme, VarianteUniforme } from '../lib/types'
 
@@ -71,14 +72,14 @@ export default function EstoqueUniformes() {
     for (const [k, v] of tudo) {
       const txt = valores[k]?.trim()
       if (!txt) continue
-      const q = Math.round(Number(txt.replace(',', '.')))
+      const q = Math.round(lerNumero(txt) ?? NaN)
       if (!Number.isFinite(q) || q < 0) return avisar(`Quantidade inválida em ${descricaoVariante(v)}`)
       if (modo === 'contagem') {
         if (q !== (saldos.get(k) ?? 0) || !saldos.has(k)) linhas.push({ ...v, tipo: 'contagem', quantidade: q, referencia: ref, observacao: obs })
       } else if (q > 0) linhas.push({ ...v, tipo: modo, quantidade: modo === 'baixa' ? -q : q, referencia: ref, observacao: obs })
     }
     for (const o of outras) {
-      const q = Math.round(Number(o.qtd.replace(',', '.')))
+      const q = Math.round(lerNumero(o.qtd) ?? 0)
       if (!o.item.trim() || !q) continue
       const v = { item: o.item.trim(), cor: null, modelagem: null, tamanho: o.tamanho.trim() || 'Único' }
       linhas.push({ ...v, tipo: modo, quantidade: modo === 'baixa' ? -Math.abs(q) : Math.abs(q), referencia: ref, observacao: obs })

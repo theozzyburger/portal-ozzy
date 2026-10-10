@@ -195,13 +195,13 @@ function PainelGestao({ totalAtivos }: { totalAtivos: number }) {
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([])
 
   useEffect(() => {
+    // Duas consultas para a equipe toda (antes eram duas por pessoa).
     const desde = addDias(hoje(), -14)
-    Promise.all(equipe.map((f) => store.documentos(f.id))).then((ls) =>
-      setAtestados(ls.flat().filter((d) => d.tipo === 'atestado' && d.criadoEm.slice(0, 10) >= desde)),
-    )
-    Promise.all(equipe.map((f) => store.ocorrencias(f.id))).then((ls) =>
-      setOcorrencias(ls.flat().filter((o) => o.data >= desde).sort((a, b) => b.data.localeCompare(a.data))),
-    )
+    const ids = new Set(equipe.map((f) => f.id))
+    let vale = true
+    store.documentosTodos().then((ds) => vale && setAtestados(ds.filter((d) => ids.has(d.funcionarioId) && d.tipo === 'atestado' && d.criadoEm.slice(0, 10) >= desde)), () => undefined)
+    store.ocorrenciasEntre(desde, hoje()).then((os) => vale && setOcorrencias(os.filter((o) => ids.has(o.funcionarioId)).sort((a, b) => b.data.localeCompare(a.data))), () => undefined)
+    return () => { vale = false }
   }, [store, equipe])
 
   return (

@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { Botao, Campo, Modal, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { dataLonga, hoje } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { podeGerenciar } from '../lib/permissoes'
 import { apelidoUnidade, type Equipamento, type ManutencaoEquipamento, type TipoManutencao } from '../lib/types'
 
-const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
+const numero = lerNumero
 const doNumero = (n: number | null) => (n === null ? '' : String(n).replace('.', ','))
 
 // Inventário dos equipamentos de cada loja, com foto, compra, valor e histórico de manutenções.

@@ -4,13 +4,14 @@ import EscolherConta from '../components/EscolherConta'
 import { useApp } from '../lib/contexto'
 import { montarCatalogo, nomeUnidade, reais, usadoEm, type Catalogo } from '../lib/custos'
 import { dataLonga } from '../lib/datas'
+import { lerNumero } from '../lib/financeiro'
 import { ir } from '../lib/rota'
 import { formatarCnpj } from '../lib/nfe'
 
 import ImportarFornecedores from './ImportarFornecedores'
 import { SETORES_ENVIO, type ContaContabil, type Fornecedor, type Insumo, type PrecoInsumo, type SetorEnvio, type UnidadeMedida } from '../lib/types'
 
-const numero = (s: string) => (s.trim() === '' ? null : Number(s.replace(/\./g, '').replace(',', '.')))
+const numero = lerNumero
 const doNumero = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n).replace('.', ','))
 
 // Cadastro único de insumos (com histórico de preço) e fornecedores, usado pelas fichas de eventos.

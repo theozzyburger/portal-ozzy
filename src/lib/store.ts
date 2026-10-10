@@ -1,6 +1,7 @@
 import type { ItemNota, ItemRecibo } from './types'
-import type { CompraFornecedor, ProdutoVenda, PedidoCompra, NovoPedidoCompra, PrecoFornecedor, SetorFechamento, ItemFechamento, Fechamento, EnvioFechamento, PedidoProducao, ItemListaFechamento, Producao, NovaProducao, Motoboy, SemanaMotoboy, LinhaSemanaMotoboy, PagamentoPessoa, CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, NovoMovimentoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
+import type { SaldoEstoque, CompraFornecedor, ProdutoVenda, PedidoCompra, NovoPedidoCompra, PrecoFornecedor, SetorFechamento, ItemFechamento, Fechamento, EnvioFechamento, PedidoProducao, ItemListaFechamento, Producao, NovaProducao, Motoboy, SemanaMotoboy, LinhaSemanaMotoboy, PagamentoPessoa, CentroCusto, ContaContabil, NotaFiscal, NotaImportada, LancamentoNota, ContaPagar, NovaContaPagar, ContaRecorrente, FormaPagamento, MovimentoEstoque, MovimentoExtrato, RegraExtrato, SaldoExtrato, ExtratoOfx, MembroEquipeEvento, FreelaEvento, DiariaFreelaEvento, EventoAberto, ProdutoEvento, QtdDiaProduto, VendaEvento, ItemModeloChecklist, EnvioEvento, NovoItemEnvio, Inventario, ItemContagem, EventoEscalado, Fornecedor, Insumo, PrecoInsumo, Receita, VersaoReceita, ItemReceita, Evento, NovoEvento, HistoricoEvento, Operacao, Admissao, AjustePonto, DevolucaoUniforme, ItemDevolucao, TipoAjustePonto, LocalEnvio, LocalLoja, EnvioFreela, DiaEnviado, QuemSouFreela, StatusEnvioFreela, ContaPagamento, RemessaPagamento, Setor, VinculoAnterior, SolicitacaoUniforme, PedidoUniforme, ItemPedidoUniforme, MovimentoUniforme, NovoMovimentoUniforme, StatusTroca, Equipamento, ManutencaoEquipamento, Preventiva, ExecucaoPreventiva, Desligamento, DecimoTerceiro, Ferias, TipoFolga, Salario, TipoPagamento, Freelancer, DiariaFreela, PagamentoFreela, Ficha, ResultadoMes, Avaliacao, Chamado, CategoriaChamado, Gravidade, StatusChamado, LeituraRegulamento, Turno, VersaoRegulamento, Comunicado, Documento, EntregaUniforme, ItemUniforme, Folga, Funcionario, Ocorrencia, TipoDocumento, TipoOcorrencia, Unidade, VendaDia } from './types'
 
+export type NovoMovimentoEstoque = Omit<MovimentoEstoque, 'id' | 'criadoEm' | 'notaItemId' | 'custoUnit'> & { custoUnit?: number | null }
 export type NovoFuncionario = Omit<Funcionario, 'id'> & { id?: string }
 
 export interface NovoDocumento {
@@ -324,10 +325,13 @@ export interface Store {
   estornarNota(id: string): Promise<void>
   excluirNota(id: string): Promise<void>
   contasPagar(): Promise<ContaPagar[]>
+  contasDaNota(notaId: string): Promise<ContaPagar[]>
   salvarContasPagar(contas: NovaContaPagar[]): Promise<void>
   pagarConta(id: string, p: { pagoEm: string; valorPago: number; forma: FormaPagamento } | null): Promise<void>
   excluirContaPagar(id: string): Promise<void>
-  movimentosEstoque(): Promise<MovimentoEstoque[]>
+  // Movimentos de um período (de e até inclusive) e o saldo de cada item numa loja.
+  movimentosEstoque(de: string, ate: string): Promise<MovimentoEstoque[]>
+  saldosEstoque(centroCustoId: string): Promise<SaldoEstoque[]>
   // Produção de pré-preparos (0058, gestão): entrada do preparo e baixa dos ingredientes de uma vez.
   producoes(de: string, ate: string): Promise<Producao[]>
   lancarProducao(p: NovaProducao): Promise<string>
@@ -368,7 +372,8 @@ export interface Store {
   registrarMovimento(movimentoId: string, r: { centroCustoId: string; contaId: string | null; favorecido: string | null; fornecedorId?: string | null; funcionarioId?: string | null; motoboyId?: string | null; descricao: string; chave: string }): Promise<void>
   pagamentosFuncionario(funcionarioId: string): Promise<PagamentoPessoa[]>
   ignorarMovimento(movimentoId: string, motivo: string, chaveSempre: string | null): Promise<void>
-  lancarMovimentoEstoque(m: Omit<MovimentoEstoque, 'id' | 'criadoEm' | 'notaItemId' | 'custoUnit'> & { custoUnit?: number | null }): Promise<void>
+  // Vários de uma vez entram juntos (a transferência sai de uma loja e entra na outra no mesmo comando).
+  lancarMovimentoEstoque(m: NovoMovimentoEstoque | NovoMovimentoEstoque[]): Promise<void>
   salvarMembroEquipe(m: Omit<MembroEquipeEvento, 'id'> & { id?: string }): Promise<MembroEquipeEvento>
   excluirMembroEquipe(id: string): Promise<void>
   salvarLayoutBarracas(eventoId: string, layout: Record<string, Record<string, string>>): Promise<void>

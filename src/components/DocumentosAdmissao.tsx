@@ -7,6 +7,7 @@ import { folhaParaPdf } from '../lib/pdf'
 import { marcarEtapaAdmissao } from './ChecklistAdmissao'
 import { formatarCpf } from '../lib/cpf'
 import { addDias, dataCurta, hoje } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { EMPRESAS } from '../lib/empresas'
 import { EXPERIENCIA_PADRAO } from '../lib/pessoal'
 import type { Funcionario } from '../lib/types'
@@ -17,7 +18,6 @@ import type { Funcionario } from '../lib/types'
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
 const br = (d: string) => d.split('-').reverse().join('/')
 const dataExtenso = (d: string) => `${Number(d.slice(8, 10))} de ${MESES[Number(d.slice(5, 7)) - 1]} de ${d.slice(0, 4)}`
-const reais = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const linha = (n = 30) => '_'.repeat(n)
 
 const UNIDADES = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove']
@@ -26,7 +26,7 @@ const DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta',
 export const extenso = (n: number) => (n < 20 ? UNIDADES[n] : DEZENAS[Math.floor(n / 10)] + (n % 10 ? ` e ${UNIDADES[n % 10]}` : ''))
 const dias = (n: number) => `${String(n).padStart(2, '0')} (${extenso(n)})`
 
-const numero = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'))
+const numero = (s: string) => lerNumero(s) ?? 0
 
 // ---------- Contrato de experiência ----------
 

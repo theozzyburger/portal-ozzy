@@ -6,6 +6,7 @@ import ArquivoBanco from '../components/ArquivoBanco'
 import { useApp } from '../lib/contexto'
 import { cpfValido, formatarCpf } from '../lib/cpf'
 import { dataCurta, diaSemana, hoje } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { ir } from '../lib/rota'
 import { pegarLocalizacao, soDigitos } from '../lib/store'
 import type { PagamentoBanco } from '../lib/sispag'
@@ -17,8 +18,7 @@ import logo from '../assets/logo.png'
 
 export const FUNCOES_EVENTO = ['Pizzaiolo', 'Forneiro', 'Auxiliar de cozinha', 'Atendente', 'Caixa', 'Chapeiro', 'Montagem', 'Limpeza']
 export const linkDiariaEvento = () => `${location.origin}${location.pathname}#/diaria-evento`
-const reais = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const numero = (t: string) => Number(t.trim().replace(/\./g, '').replace(',', '.'))
+const numero = (t: string) => lerNumero(t) ?? 0
 const horaDe = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 const diaDe = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
 const km = (m: number) => (m < 1000 ? `${m} m` : `${(m / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`)

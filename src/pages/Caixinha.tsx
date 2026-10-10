@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react'
 import { Avatar, Selo, Vazio, estiloEntrada } from '../components/ui'
 import { useApp } from '../lib/contexto'
 import { addMeses, hoje, mesDe, nomeMesAno, primeiroDia, ultimoDia } from '../lib/datas'
+import { lerNumero, reais } from '../lib/financeiro'
 import { ir } from '../lib/rota'
 import { MINIMO_BONUS_POR_SETOR, PESO_ADVERTENCIA, PONTOS_BONUS, PONTOS_CARGO, RETENCAO, UNIDADES_CAIXINHA, calcularCaixinha, type LinhaCaixinha } from '../lib/caixinha'
 import { apelidoUnidade, type Ocorrencia } from '../lib/types'
 
-const real = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const num = (n: number, casas = 1) => n.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas })
 
 export default function Caixinha() {
-  const { store, equipe, nomeUnidade } = useApp()
+  const { store, equipe, nomeUnidade, avisar } = useApp()
   // A caixinha é fechada no mês seguinte: abre no mês anterior.
   const [mes, setMes] = useState(addMeses(mesDe(hoje()), -1))
   const [totais, setTotais] = useState<Record<string, number>>({})
@@ -18,16 +18,19 @@ export default function Caixinha() {
   const [carregado, setCarregado] = useState(false)
 
   useEffect(() => {
+    let vale = true
     setCarregado(false)
     Promise.all([store.caixinhaTotais(mes), store.ocorrenciasEntre(primeiroDia(mes), ultimoDia(mes))]).then(([t, o]) => {
+      if (!vale) return
       setTotais(t)
       setOcorrencias(o)
       setCarregado(true)
-    })
-  }, [store, mes])
+    }, (e) => vale && avisar((e as Error).message))
+    return () => { vale = false }
+  }, [store, mes, avisar])
 
   const salvar = async (u: string, texto: string) => {
-    const valor = Number(texto.replace(/[^\d,]/g, '').replace(',', '.')) || 0
+    const valor = lerNumero(texto) || 0
     setTotais({ ...totais, [u]: valor })
     await store.salvarCaixinhaTotal(mes, u, valor)
   }
@@ -73,18 +76,18 @@ export default function Caixinha() {
             />
             <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
               <dt className="text-stone-500">Impostos ({RETENCAO * 100}%)</dt>
-              <dd className="text-right tabular-nums">{real(u.retido)}</dd>
+              <dd className="text-right tabular-nums">{reais(u.retido)}</dd>
               <dt className="text-stone-500">A dividir</dt>
-              <dd className="text-right font-semibold tabular-nums">{real(u.aDividir)}</dd>
+              <dd className="text-right font-semibold tabular-nums">{reais(u.aDividir)}</dd>
               <dt className="text-stone-500">Total de pontos</dt>
               <dd className="text-right tabular-nums">{num(u.pontos)}</dd>
               <dt className="text-stone-500">Valor do ponto</dt>
-              <dd className="text-right font-semibold tabular-nums">{real(u.valorPonto)}</dd>
+              <dd className="text-right font-semibold tabular-nums">{reais(u.valorPonto)}</dd>
             </dl>
             <div className="mt-3 space-y-1.5 border-t border-stone-100 pt-3">
               {u.grupos.map((g) => (
                 <div key={g.nome} className="text-sm">
-                  <span className="font-semibold">{g.nome}</span> <span className="tabular-nums text-stone-500">({real(g.valor)})</span>
+                  <span className="font-semibold">{g.nome}</span> <span className="tabular-nums text-stone-500">({reais(g.valor)})</span>
                   <div className="text-stone-600">
                     {g.vencedores.length ? `${g.vencedores.map(nome).join(', ')}${g.vencedores.length > 1 ? ' dividem' : ''}` : 'Ninguém no grupo'}
                     {g.menorNota > 0 && <span className="text-stone-500"> · menor nota do grupo: {g.menorNota}</span>}
@@ -109,7 +112,7 @@ export default function Caixinha() {
           <Tabela titulo="Gerência (metade em cada loja)" linhas={linhas.filter((l) => l.pessoa.setor === 'geral')} />
           <div className="flex items-center justify-between rounded-2xl bg-carvao p-4 text-white">
             <span className="text-stone-300">Total pago à equipe</span>
-            <span className="text-2xl font-bold text-ozzy-400 tabular-nums">{real(totalPago)}</span>
+            <span className="text-2xl font-bold text-ozzy-400 tabular-nums">{reais(totalPago)}</span>
           </div>
         </>
       )}
@@ -154,13 +157,13 @@ function Tabela({ titulo, linhas }: { titulo: string; linhas: LinhaCaixinha[] })
             <span className="min-w-0 flex-1">
               <span className="block truncate font-semibold">{l.pessoa.nome}</span>
               <span className="block text-xs text-stone-500 tabular-nums">
-                {num(l.pontos)} pts · parte {real(l.parte)}
+                {num(l.pontos)} pts · parte {reais(l.parte)}
                 {l.faltas ? ` · ${l.faltas} falta${l.faltas > 1 ? 's' : ''}` : ''}
                 {l.advertencias ? ` · ${l.advertencias} advert.` : ''}
               </span>
-              {l.bonus > 0 && <span className="mt-0.5 block text-xs font-semibold text-emerald-700 tabular-nums">+ {real(l.bonus)} de bônus</span>}
+              {l.bonus > 0 && <span className="mt-0.5 block text-xs font-semibold text-emerald-700 tabular-nums">+ {reais(l.bonus)} de bônus</span>}
             </span>
-            <span className="shrink-0 font-bold tabular-nums">{real(l.total)}</span>
+            <span className="shrink-0 font-bold tabular-nums">{reais(l.total)}</span>
           </button>
         ))}
       </div>
@@ -190,11 +193,11 @@ function Tabela({ titulo, linhas }: { titulo: string; linhas: LinhaCaixinha[] })
                   </button>
                 </td>
                 <td className="px-2 py-2 text-right">{num(l.pontos)}</td>
-                <td className="px-2 py-2 text-right">{real(l.parte)}</td>
+                <td className="px-2 py-2 text-right">{reais(l.parte)}</td>
                 <td className="px-2 py-2 text-right">{l.faltas || '—'}</td>
                 <td className="px-2 py-2 text-right">{l.advertencias || '—'}</td>
-                <td className="px-2 py-2 text-right">{l.bonus ? <Selo cor="verde">+ {real(l.bonus)}</Selo> : '—'}</td>
-                <td className="px-3 py-2 text-right font-bold">{real(l.total)}</td>
+                <td className="px-2 py-2 text-right">{l.bonus ? <Selo cor="verde">+ {reais(l.bonus)}</Selo> : '—'}</td>
+                <td className="px-3 py-2 text-right font-bold">{reais(l.total)}</td>
               </tr>
             ))}
           </tbody>
